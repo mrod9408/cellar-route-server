@@ -661,11 +661,11 @@ function renderClusters() {
             <div class="stop-num" style="${isDone?'background:var(--green)':''}">${isDone?'✓':si+1}</div>
             <div class="stop-details">
               <div class="stop-customer">${inv.customerName}</div>
-              <div class="stop-address">${addr?(addr.full||addr.line1||'No address'):'No address'}</div>
+              <div class="stop-address">${addr?([addr.line1,addr.line2].filter(Boolean).join(', ')||'No address'):'No address'}</div>
               <div class="stop-cases">📦 ${inv.cases} case${inv.cases!==1?'s':''}</div>
               <div class="stop-inv">INV #${inv.invoiceNumber} · $${Number(inv.totalAmount||0).toFixed(2)}</div>
             </div>
-            ${addr?`<button class="btn-map-sm" onclick="openMap('${encodeURIComponent(addr.full||addr.line1||'')}')">🗺</button>`:''}
+            ${addr?`<button class="btn-map-sm" onclick="openMap('${encodeURIComponent([addr.line1,addr.line2].filter(Boolean).join(' '))}')">🗺</button>`:''}
           </div>`;
         }).join('')}
       </div>
@@ -754,7 +754,11 @@ function removeDriver(n){drivers=drivers.filter(d=>d!==n);saveState();renderDriv
 function saveSettings(){serverUrl=document.getElementById('serverUrl').value.trim()||serverUrl;saveState();showToast('Settings saved');}
 function clearAll(){if(!confirm('Clear all delivery data?'))return;invoices=[];assignments={};completed={};clusters=[];saveState();document.getElementById('connectCard').style.display='block';document.getElementById('plannerSection').style.display='none';document.getElementById('clusterList').innerHTML='';document.getElementById('warningBanners').innerHTML='';document.getElementById('fetchBtn').disabled=false;document.getElementById('fetchBtn').textContent="Pull Today's Deliveries";showToast('Data cleared');showTab('route');}
 
-function openMap(a){window.open(`https://maps.google.com/?q=${a}`,'_blank');}
+function openMap(a){
+  if(!a||a.trim()===''){showToast('No address available');return;}
+  const url='https://maps.google.com/?q='+a;
+  window.open(url,'_blank');
+}
 // ═══════════════════ TOKEN STATUS CHECK ══════════════════════════════════════
 async function checkTokenStatus() {
   try {
