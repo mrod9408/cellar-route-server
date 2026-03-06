@@ -273,6 +273,9 @@
 
     <!-- ROUTE PLANNER -->
     <div class="view active" id="view-route">
+      <!-- TOKEN STATUS BANNER -->
+      <div id="tokenBanner" style="display:none;border-radius:var(--radius);padding:14px 16px;margin-bottom:16px;font-size:13px;font-weight:500;display:none;align-items:flex-start;gap:10px;"></div>
+
       <div class="connect-card" id="connectCard">
         <h3>🔌 QuickBooks</h3>
         <p style="font-size:13px;color:var(--gray);margin-bottom:16px">Credentials are stored securely on the server. Just hit the button below to pull today's deliveries.</p>
@@ -515,6 +518,7 @@ function initApp() {
   }
   document.getElementById('serverUrl').value=serverUrl;
   renderDriverSettings();
+  checkTokenStatus();
   if (invoices.length>0) {
     document.getElementById('connectCard').style.display='none';
     document.getElementById('plannerSection').style.display='block';
@@ -751,6 +755,54 @@ function saveSettings(){serverUrl=document.getElementById('serverUrl').value.tri
 function clearAll(){if(!confirm('Clear all delivery data?'))return;invoices=[];assignments={};completed={};clusters=[];saveState();document.getElementById('connectCard').style.display='block';document.getElementById('plannerSection').style.display='none';document.getElementById('clusterList').innerHTML='';document.getElementById('warningBanners').innerHTML='';document.getElementById('fetchBtn').disabled=false;document.getElementById('fetchBtn').textContent="Pull Today's Deliveries";showToast('Data cleared');showTab('route');}
 
 function openMap(a){window.open(`https://maps.google.com/?q=${a}`,'_blank');}
+// ═══════════════════ TOKEN STATUS CHECK ══════════════════════════════════════
+async function checkTokenStatus() {
+  try {
+    const base = document.getElementById('serverUrl')?.value.trim() || serverUrl;
+    const res = await fetch(base + '/api/token-status');
+    if (!res.ok) return;
+    const data = await res.json();
+    const banner = document.getElementById('tokenBanner');
+    if (!banner) return;
+
+    if (!data.connected) {
+      // Token completely missing or expired
+      banner.style.display = 'flex';
+      banner.style.background = '#FDF0E8';
+      banner.style.border = '1.5px solid var(--orange)';
+      banner.style.color = 'var(--orange)';
+      banner.innerHTML = `<span style="font-size:20px">⚠️</span>
+        <div>
+          <strong>QuickBooks token expired</strong><br>
+          <span style="font-weight:400">Your refresh token has expired. Go to the Intuit OAuth Playground, get a new refresh token, and update <strong>QB_REFRESH_TOKEN</strong> in Railway.</span>
+        </div>`;
+    } else if (data.expiresInSeconds !== null && data.expiresInSeconds < 86400) {
+      // Access token expiring within 24 hours (unusual but worth flagging)
+      banner.style.display = 'flex';
+      banner.style.background = '#FDF3D8';
+      banner.style.border = '1.5px solid var(--gold)';
+      banner.style.color = '#8B6914';
+      banner.innerHTML = `<span style="font-size:20px">🔔</span>
+        <div>
+          <strong>Token refreshing soon</strong><br>
+          <span style="font-weight:400">Access token expires in ${Math.round(data.expiresInSeconds/60)} minutes. Auto-refresh is active.</span>
+        </div>`;
+    } else if (data.connected) {
+      // All good — show brief green confirmation then hide
+      banner.style.display = 'flex';
+      banner.style.background = 'var(--green-light)';
+      banner.style.border = '1.5px solid var(--green)';
+      banner.style.color = 'var(--green)';
+      banner.innerHTML = `<span style="font-size:20px">✓</span>
+        <div><strong>QuickBooks connected</strong><br>
+        <span style="font-weight:400">Auto-refresh active · ${data.environment}</span></div>`;
+      setTimeout(() => { banner.style.display = 'none'; }, 4000);
+    }
+  } catch(e) {
+    // Server unreachable — silent fail
+  }
+}
+
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500);}
 
 document.getElementById('newDriverName')?.addEventListener('keydown',e=>{if(e.key==='Enter')addDriver();});
