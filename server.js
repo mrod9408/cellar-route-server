@@ -165,6 +165,7 @@ app.get('/api/invoices', async (req, res) => {
     ? 'https://quickbooks.api.intuit.com'
     : 'https://sandbox-quickbooks.api.intuit.com';
 
+  // QuickBooks automatically redirects to the correct cluster
   const today = new Date();
   const todayStr = today.toISOString().split('T')[0];
 
@@ -175,7 +176,7 @@ app.get('/api/invoices', async (req, res) => {
   try {
     const response = await fetch(
       `${baseUrl}/v3/company/${companyId}/query?query=${encodeURIComponent(query)}&minorversion=65`,
-      { method: 'GET', headers: { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' } }
+      { method: 'GET', headers: { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' }, redirect: 'follow' }
     );
     const data = await response.json();
     if (!response.ok) {
@@ -238,7 +239,7 @@ app.get('/api/customers', async (req, res) => {
   try {
     const response = await fetch(
       `${baseUrl}/v3/company/${companyId}/query?query=${encodeURIComponent('SELECT * FROM Customer WHERE Active = true ORDERBY DisplayName ASC MAXRESULTS 200')}&minorversion=65`,
-      { method: 'GET', headers: { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' } }
+      { method: 'GET', headers: { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' }, redirect: 'follow' }
     );
     const data = await response.json();
     if (!response.ok) {
