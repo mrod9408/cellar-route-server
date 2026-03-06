@@ -199,12 +199,16 @@ app.get('/api/invoices', async (req, res) => {
     const invoices = data.QueryResponse?.Invoice || [];
     const formatAddress = (addr) => {
       if (!addr) return null;
-      return {
-        line1: addr.Line1 || '', line2: addr.Line2 || '',
-        city: addr.City || '', state: addr.CountrySubDivisionCode || '',
-        zip: addr.PostalCode || '',
-        full: [addr.Line1, addr.City, addr.CountrySubDivisionCode, addr.PostalCode].filter(Boolean).join(', ')
-      };
+      const line1 = addr.Line1 || '';
+      const line2 = addr.Line2 || '';
+      const city = addr.City || '';
+      const state = addr.CountrySubDivisionCode || '';
+      const zip = addr.PostalCode || '';
+      // Build the best possible full address for Google Maps
+      const full = [line2, city, state, zip].filter(Boolean).join(', ') 
+        || [line1, line2].filter(Boolean).join(' ')
+        || line1;
+      return { line1, line2, city, state, zip, full };
     };
 
     const formatted = invoices.map(inv => ({
@@ -268,12 +272,15 @@ app.get('/api/customers', async (req, res) => {
 
     const formatAddress = (addr) => {
       if (!addr) return null;
-      return {
-        line1: addr.Line1 || '', line2: addr.Line2 || '',
-        city: addr.City || '', state: addr.CountrySubDivisionCode || '',
-        zip: addr.PostalCode || '',
-        full: [addr.Line1, addr.City, addr.CountrySubDivisionCode, addr.PostalCode].filter(Boolean).join(', ')
-      };
+      const line1 = addr.Line1 || '';
+      const line2 = addr.Line2 || '';
+      const city = addr.City || '';
+      const state = addr.CountrySubDivisionCode || '';
+      const zip = addr.PostalCode || '';
+      const full = [line2, city, state, zip].filter(Boolean).join(', ')
+        || [line1, line2].filter(Boolean).join(' ')
+        || line1;
+      return { line1, line2, city, state, zip, full };
     };
 
     const formatted = (data.QueryResponse?.Customer || []).map(c => ({
