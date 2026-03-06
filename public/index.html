@@ -554,7 +554,7 @@ async function fetchInvoices() {
   try {
     const base=document.getElementById('serverUrl').value.trim()||serverUrl;
     const url=base+'/api/invoices';
-    const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({})});
+    const res=await fetch(url,{method:'GET',headers:{'Content-Type':'application/json'}});
     const data=await res.json();
     if(!res.ok) throw new Error(data.error||'Failed to fetch invoices');
     invoices=(data.invoices||[]).map(inv=>({...inv,cases:extractCases(inv)}));
