@@ -174,10 +174,19 @@ app.get('/api/invoices', async (req, res) => {
     : `SELECT * FROM Invoice ORDERBY TxnDate DESC MAXRESULTS 100`;
 
   try {
-    const response = await fetch(
-      `${baseUrl}/v3/company/${companyId}/query?query=${encodeURIComponent(query)}&minorversion=65`,
-      { method: 'GET', headers: { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' }, redirect: 'follow' }
-    );
+    const qbHeaders = { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' };
+    const qbUrl = `${baseUrl}/v3/company/${companyId}/query?query=${encodeURIComponent(query)}&minorversion=65`;
+    
+    // First attempt
+    let response = await fetch(qbUrl, { method: 'GET', headers: qbHeaders, redirect: 'manual' });
+    
+    // If QuickBooks redirects us to the correct cluster, follow it manually with auth header
+    if (response.status === 301 || response.status === 302 || response.status === 307 || response.status === 308) {
+      const redirectUrl = response.headers.get('location');
+      console.log(`Following QB redirect to: ${redirectUrl}`);
+      response = await fetch(redirectUrl, { method: 'GET', headers: qbHeaders });
+    }
+
     const data = await response.json();
     if (!response.ok) {
       return res.status(response.status).json({ error: 'QuickBooks API error', details: data });
@@ -237,10 +246,17 @@ app.get('/api/customers', async (req, res) => {
     : 'https://sandbox-quickbooks.api.intuit.com';
 
   try {
-    const response = await fetch(
-      `${baseUrl}/v3/company/${companyId}/query?query=${encodeURIComponent('SELECT * FROM Customer WHERE Active = true ORDERBY DisplayName ASC MAXRESULTS 200')}&minorversion=65`,
-      { method: 'GET', headers: { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' }, redirect: 'follow' }
-    );
+    const custHeaders = { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' };
+    const custUrl = `${baseUrl}/v3/company/${companyId}/query?query=${encodeURIComponent('SELECT * FROM Customer WHERE Active = true ORDERBY DisplayName ASC MAXRESULTS 200')}&minorversion=65`;
+    
+    let response = await fetch(custUrl, { method: 'GET', headers: custHeaders, redirect: 'manual' });
+    
+    if (response.status === 301 || response.status === 302 || response.status === 307 || response.status === 308) {
+      const redirectUrl = response.headers.get('location');
+      console.log(`Following QB redirect to: ${redirectUrl}`);
+      response = await fetch(redirectUrl, { method: 'GET', headers: custHeaders });
+    }
+
     const data = await response.json();
     if (!response.ok) {
       return res.status(response.status).json({ error: 'QuickBooks API error', details: data });
