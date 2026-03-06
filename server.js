@@ -152,11 +152,10 @@ app.post('/api/refresh-token', async (req, res) => {
 });
 
 // ─── FETCH INVOICES ───────────────────────────────────────────────────────────
-app.post('/api/invoices', async (req, res) => {
-  // Use server-stored token first, fall back to request token
-  let accessToken = await getValidAccessToken() || req.body.accessToken;
-  const companyId = tokenStore.companyId || req.body.companyId;
-  const environment = tokenStore.environment || req.body.environment;
+app.get('/api/invoices', async (req, res) => {
+  let accessToken = await getValidAccessToken();
+  const companyId = tokenStore.companyId;
+  const environment = tokenStore.environment;
 
   if (!accessToken || !companyId) {
     return res.status(400).json({ error: 'Not connected to QuickBooks. Check Railway environment variables.' });
@@ -223,10 +222,10 @@ app.post('/api/invoices', async (req, res) => {
 });
 
 // ─── FETCH CUSTOMERS ──────────────────────────────────────────────────────────
-app.post('/api/customers', async (req, res) => {
-  let accessToken = await getValidAccessToken() || req.body.accessToken;
-  const companyId = tokenStore.companyId || req.body.companyId;
-  const environment = tokenStore.environment || req.body.environment;
+app.get('/api/customers', async (req, res) => {
+  let accessToken = await getValidAccessToken();
+  const companyId = tokenStore.companyId;
+  const environment = tokenStore.environment;
 
   if (!accessToken || !companyId) {
     return res.status(400).json({ error: 'Not connected to QuickBooks.' });
