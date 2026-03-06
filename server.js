@@ -161,11 +161,12 @@ app.get('/api/invoices', async (req, res) => {
     return res.status(400).json({ error: 'Not connected to QuickBooks. Check Railway environment variables.' });
   }
 
-  const baseUrl = environment === 'production'
-    ? 'https://quickbooks.api.intuit.com'
-    : 'https://sandbox-quickbooks.api.intuit.com';
+  // Try both possible production endpoints
+  const baseUrls = environment === 'production'
+    ? ['https://quickbooks.api.intuit.com', 'https://qbo.api.intuit.com', 'https://c1.qbo.intuit.com', 'https://c3.qbo.intuit.com', 'https://c5.qbo.intuit.com']
+    : ['https://sandbox-quickbooks.api.intuit.com'];
+  let baseUrl = baseUrls[0];
 
-  // QuickBooks automatically redirects to the correct cluster
   const today = new Date();
   const todayStr = today.toISOString().split('T')[0];
 
@@ -175,19 +176,18 @@ app.get('/api/invoices', async (req, res) => {
 
   try {
     const qbHeaders = { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' };
-    const qbUrl = `${baseUrl}/v3/company/${companyId}/query?query=${encodeURIComponent(query)}&minorversion=65`;
-    
-    // First attempt
-    let response = await fetch(qbUrl, { method: 'GET', headers: qbHeaders, redirect: 'manual' });
-    
-    // If QuickBooks redirects us to the correct cluster, follow it manually with auth header
-    if (response.status === 301 || response.status === 302 || response.status === 307 || response.status === 308) {
-      const redirectUrl = response.headers.get('location');
-      console.log(`Following QB redirect to: ${redirectUrl}`);
-      response = await fetch(redirectUrl, { method: 'GET', headers: qbHeaders });
+    let response, data;
+
+    for (const tryUrl of baseUrls) {
+      const qbUrl = `${tryUrl}/v3/company/${companyId}/query?query=${encodeURIComponent(query)}&minorversion=65`;
+      console.log(`Trying QB endpoint: ${tryUrl}`);
+      response = await fetch(qbUrl, { method: 'GET', headers: qbHeaders });
+      data = await response.json();
+      if (response.ok) { console.log(`✓ Success with: ${tryUrl}`); break; }
+      if (data?.Fault?.Error?.[0]?.code !== '130') break; // Only retry on wrong cluster error
+      console.log(`Wrong cluster, trying next...`);
     }
 
-    const data = await response.json();
     if (!response.ok) {
       return res.status(response.status).json({ error: 'QuickBooks API error', details: data });
     }
