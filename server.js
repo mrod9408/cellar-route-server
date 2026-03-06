@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const fetch = require('node-fetch');
+const path = require('path');
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -8,15 +9,8 @@ const PORT = process.env.PORT || 8080;
 app.use(cors());
 app.use(express.json());
 
-// Health check
-app.get('/', (req, res) => {
-  res.json({
-    status: 'online',
-    service: 'Cellar Route Server',
-    version: '1.0.0',
-    timestamp: new Date().toISOString()
-  });
-});
+// Serve the Cellar Route frontend app from /public folder
+app.use(express.static(path.join(__dirname, 'public')));
 
 // Refresh OAuth token
 app.post('/api/refresh-token', async (req, res) => {
