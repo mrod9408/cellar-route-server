@@ -176,20 +176,24 @@ app.get('/api/invoices', async (req, res) => {
 
   try {
     const qbHeaders = { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' };
-    let response, data;
+    let response = null, data = null;
 
     for (const tryUrl of baseUrls) {
-      const qbUrl = `${tryUrl}/v3/company/${companyId}/query?query=${encodeURIComponent(query)}&minorversion=65`;
-      console.log(`Trying QB endpoint: ${tryUrl}`);
-      response = await fetch(qbUrl, { method: 'GET', headers: qbHeaders });
-      data = await response.json();
-      if (response.ok) { console.log(`✓ Success with: ${tryUrl}`); break; }
-      if (data?.Fault?.Error?.[0]?.code !== '130') break; // Only retry on wrong cluster error
-      console.log(`Wrong cluster, trying next...`);
+      try {
+        const qbUrl = `${tryUrl}/v3/company/${companyId}/query?query=${encodeURIComponent(query)}&minorversion=65`;
+        console.log(`Trying QB endpoint: ${tryUrl}`);
+        response = await fetch(qbUrl, { method: 'GET', headers: qbHeaders });
+        data = await response.json();
+        if (response.ok) { console.log(`✓ Success with: ${tryUrl}`); break; }
+        if (data?.Fault?.Error?.[0]?.code !== '130') break;
+        console.log(`Wrong cluster, trying next...`);
+      } catch (urlErr) {
+        console.log(`Failed to connect to ${tryUrl}: ${urlErr.message}`);
+      }
     }
 
-    if (!response.ok) {
-      return res.status(response.status).json({ error: 'QuickBooks API error', details: data });
+    if (!response || !response.ok) {
+      return res.status(500).json({ error: 'QuickBooks API error', details: data });
     }
 
     const invoices = data.QueryResponse?.Invoice || [];
