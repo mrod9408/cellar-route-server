@@ -274,35 +274,9 @@
     <!-- ROUTE PLANNER -->
     <div class="view active" id="view-route">
       <div class="connect-card" id="connectCard">
-        <h3>🔌 Connect to QuickBooks</h3>
-        <div class="form-row">
-          <label class="form-label">Access Token</label>
-          <input class="form-input" type="password" id="accessToken" placeholder="Paste your access token" />
-        </div>
-        <div class="form-row">
-          <label class="form-label">Refresh Token</label>
-          <input class="form-input" type="password" id="refreshToken" placeholder="Paste your refresh token" />
-        </div>
-        <div class="form-row">
-          <label class="form-label">Client ID</label>
-          <input class="form-input" type="password" id="clientId" placeholder="From Intuit Developer portal" />
-        </div>
-        <div class="form-row">
-          <label class="form-label">Client Secret</label>
-          <input class="form-input" type="password" id="clientSecret" placeholder="From Intuit Developer portal" />
-        </div>
-        <div class="form-row">
-          <label class="form-label">Company (Realm) ID</label>
-          <input class="form-input" type="text" id="companyId" placeholder="e.g. 9341456538417956" />
-        </div>
-        <div class="form-row">
-          <label class="form-label">Environment</label>
-          <select class="form-select" id="environment">
-            <option value="sandbox">Sandbox (Testing)</option>
-            <option value="production">Production</option>
-          </select>
-        </div>
-        <p style="font-size:12px;color:var(--gray);margin-bottom:12px">🔄 Your token will auto-refresh every hour so the app stays connected all day.</p>
+        <h3>🔌 QuickBooks</h3>
+        <p style="font-size:13px;color:var(--gray);margin-bottom:16px">Credentials are stored securely on the server. Just hit the button below to pull today's deliveries.</p>
+        <p style="font-size:12px;color:var(--green);background:var(--green-light);padding:10px 14px;border-radius:10px;margin-bottom:14px">🔄 Auto-refresh is active — tokens renew automatically all day.</p>
         <button class="btn-primary" id="fetchBtn" onclick="fetchInvoices()">Pull Today's Deliveries</button>
       </div>
 
@@ -569,26 +543,14 @@ function showTab(tab) {
 
 // ═══════════════════ FETCH INVOICES ══════════════════════════════════════════
 async function fetchInvoices() {
-  const accessToken=document.getElementById('accessToken').value.trim();
-  const refreshToken=document.getElementById('refreshToken').value.trim();
-  const clientId=document.getElementById('clientId').value.trim();
-  const clientSecret=document.getElementById('clientSecret').value.trim();
-  const companyId=document.getElementById('companyId').value.trim();
-  const environment=document.getElementById('environment').value;
-  if(!accessToken||!companyId){showToast('Please enter Access Token and Company ID');return;}
   document.getElementById('fetchBtn').disabled=true;
   document.getElementById('fetchBtn').textContent='Connecting...';
   document.getElementById('connectCard').style.display='none';
   document.getElementById('routeLoading').style.display='block';
   try {
     const base=document.getElementById('serverUrl').value.trim()||serverUrl;
-    // Save credentials to server for auto-refresh
-    if(refreshToken&&clientId&&clientSecret){
-      await fetch(base+'/api/connect',{method:'POST',headers:{'Content-Type':'application/json'},
-        body:JSON.stringify({accessToken,refreshToken,clientId,clientSecret,companyId,environment,expiresIn:3600})});
-    }
     const url=base+'/api/invoices';
-    const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({accessToken,companyId,environment})});
+    const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({})});
     const data=await res.json();
     if(!res.ok) throw new Error(data.error||'Failed to fetch invoices');
     invoices=(data.invoices||[]).map(inv=>({...inv,cases:extractCases(inv)}));
