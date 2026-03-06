@@ -67,13 +67,12 @@ app.post('/api/invoices', async (req, res) => {
     ? 'https://quickbooks.api.intuit.com'
     : 'https://sandbox-quickbooks.api.intuit.com';
 
-  // Calculate tomorrow's date in YYYY-MM-DD format
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const tomorrowStr = tomorrow.toISOString().split('T')[0];
+  // Get today's date in YYYY-MM-DD format
+  const today = new Date();
+  const todayStr = today.toISOString().split('T')[0];
 
-  // Query for unpaid invoices due on or before tomorrow
-  const query = `SELECT * FROM Invoice WHERE Balance > '0' AND DueDate <= '${tomorrowStr}' ORDERBY DueDate ASC MAXRESULTS 100`;
+  // Query for invoices created today (by invoice date)
+  const query = `SELECT * FROM Invoice WHERE TxnDate = '${todayStr}' ORDERBY TxnDate ASC MAXRESULTS 100`;
 
   try {
     const response = await fetch(
