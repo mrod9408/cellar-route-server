@@ -1,0 +1,797 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>Cellar Route</title>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --burgundy: #6B1E2E; --burgundy-dark: #4A1320; --burgundy-light: #8B2E42;
+      --gold: #C9A84C; --gold-light: #E8C97A; --cream: #F7F2EA; --cream-dark: #EDE5D6;
+      --charcoal: #1C1C1E; --gray: #6B6B6B; --gray-light: #D4CBBC; --white: #FFFFFF;
+      --green: #2E7D5B; --green-light: #E8F5EE; --orange: #C4621D; --orange-light: #FDF0E8;
+      --shadow: 0 4px 24px rgba(107,30,46,0.12); --radius: 16px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--charcoal); min-height: 100vh; overflow-x: hidden; }
+
+    /* ── LOGIN SCREEN ─────────────────────────────────────────────────────── */
+    #loginScreen {
+      position: fixed; inset: 0; background: var(--burgundy-dark);
+      display: flex; flex-direction: column; align-items: center;
+      justify-content: center; z-index: 9999; padding: 32px 24px;
+      transition: opacity 0.4s;
+    }
+    #loginScreen.hidden { opacity: 0; pointer-events: none; }
+    .login-logo { font-size: 56px; margin-bottom: 12px; }
+    .login-title { font-family: 'Playfair Display', serif; color: var(--cream); font-size: 32px; margin-bottom: 4px; text-align: center; }
+    .login-subtitle { color: var(--gold-light); font-size: 14px; margin-bottom: 44px; letter-spacing: 0.5px; text-align: center; }
+
+    /* PIN STEP */
+    .login-step { width: 100%; max-width: 300px; text-align: center; transition: opacity 0.3s; }
+    .login-step.hidden { display: none; }
+    .pin-label { color: rgba(247,242,234,0.6); font-size: 12px; font-weight: 600; margin-bottom: 18px; text-transform: uppercase; letter-spacing: 1px; }
+    .pin-dots { display: flex; justify-content: center; gap: 14px; margin-bottom: 30px; }
+    .pin-dot { width: 14px; height: 14px; border-radius: 50%; background: rgba(255,255,255,0.2); transition: all 0.15s; }
+    .pin-dot.filled { background: var(--gold); transform: scale(1.1); }
+    .pin-dot.error { background: #F28B82; }
+    .pin-pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .pin-btn {
+      background: rgba(255,255,255,0.1); border: none; border-radius: 14px;
+      color: var(--cream); font-family: 'Playfair Display', serif;
+      font-size: 24px; padding: 16px; cursor: pointer;
+      transition: background 0.15s, transform 0.1s; user-select: none;
+    }
+    .pin-btn:hover { background: rgba(255,255,255,0.2); }
+    .pin-btn:active { transform: scale(0.9); background: var(--gold); color: var(--burgundy-dark); }
+    .pin-btn.del { font-family: 'DM Sans', sans-serif; font-size: 20px; }
+    .pin-btn.empty { background: transparent !important; cursor: default; }
+    .pin-error { color: #F28B82; font-size: 13px; margin-top: 16px; min-height: 18px; font-weight: 500; }
+
+    /* NAME STEP */
+    .name-label { color: rgba(247,242,234,0.7); font-size: 12px; font-weight: 600; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 1px; }
+    .driver-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; width: 100%; max-width: 340px; }
+    .driver-btn {
+      background: rgba(255,255,255,0.08); border: 1.5px solid rgba(255,255,255,0.15);
+      border-radius: 14px; color: var(--cream); font-family: 'DM Sans', sans-serif;
+      font-size: 15px; font-weight: 500; padding: 18px 12px; cursor: pointer;
+      transition: all 0.2s; text-align: center;
+    }
+    .driver-btn:hover { background: var(--gold); border-color: var(--gold); color: var(--burgundy-dark); font-weight: 700; }
+    .driver-btn:active { transform: scale(0.96); }
+    .btn-back { background: none; border: none; color: rgba(247,242,234,0.4); font-size: 13px; font-family: 'DM Sans', sans-serif; cursor: pointer; margin-top: 20px; padding: 8px; }
+    .btn-back:hover { color: var(--cream); }
+
+    /* ── APP CHROME ───────────────────────────────────────────────────────── */
+    .header { background: var(--burgundy-dark); padding: 18px 20px 14px; position: sticky; top: 0; z-index: 100; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 16px rgba(0,0,0,0.3); }
+    .header-left { display: flex; align-items: center; gap: 10px; }
+    .logo-mark { width: 36px; height: 36px; background: var(--gold); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; }
+    .header-title { font-family: 'Playfair Display', serif; color: var(--cream); font-size: 20px; }
+    .header-date { color: var(--gold-light); font-size: 12px; font-weight: 500; }
+    .header-right { display: flex; gap: 8px; align-items: center; }
+    .user-badge { background: rgba(201,168,76,0.2); border: 1px solid var(--gold); border-radius: 20px; padding: 4px 12px; color: var(--gold-light); font-size: 12px; font-weight: 500; }
+    .btn-icon { background: rgba(255,255,255,0.1); border: none; border-radius: 10px; padding: 8px 12px; color: var(--cream); font-size: 13px; font-family: 'DM Sans', sans-serif; font-weight: 500; cursor: pointer; }
+    .btn-icon:hover { background: rgba(255,255,255,0.2); }
+    .tabs { background: var(--burgundy); display: flex; padding: 0 16px; gap: 4px; overflow-x: auto; scrollbar-width: none; }
+    .tabs::-webkit-scrollbar { display: none; }
+    .tab { padding: 12px 16px; color: rgba(247,242,234,0.6); font-size: 13px; font-weight: 500; cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; transition: all 0.2s; }
+    .tab.active { color: var(--gold-light); border-bottom-color: var(--gold); }
+    .main { padding: 16px; max-width: 600px; margin: 0 auto; }
+
+    /* ── STATS ────────────────────────────────────────────────────────────── */
+    .stats-bar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 16px; }
+    .stat-card { background: var(--white); border-radius: var(--radius); padding: 12px 8px; text-align: center; box-shadow: var(--shadow); }
+    .stat-number { font-family: 'Playfair Display', serif; font-size: 22px; color: var(--burgundy); line-height: 1; }
+    .stat-number.warn { color: var(--orange); }
+    .stat-label { font-size: 10px; color: var(--gray); margin-top: 4px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
+
+    /* ── FORMS & BUTTONS ──────────────────────────────────────────────────── */
+    .connect-card { background: var(--white); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); margin-bottom: 16px; border-left: 4px solid var(--gold); }
+    .connect-card h3 { font-family: 'Playfair Display', serif; font-size: 16px; color: var(--burgundy-dark); margin-bottom: 14px; }
+    .form-row { margin-bottom: 12px; }
+    .form-label { display: block; font-size: 11px; font-weight: 600; color: var(--gray); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px; }
+    .form-input { width: 100%; padding: 10px 14px; border: 1.5px solid var(--cream-dark); border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 14px; color: var(--charcoal); background: var(--cream); outline: none; transition: border-color 0.2s; }
+    .form-input:focus { border-color: var(--burgundy); background: var(--white); }
+    .form-select { width: 100%; padding: 10px 14px; border: 1.5px solid var(--cream-dark); border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 14px; color: var(--charcoal); background: var(--cream); outline: none; cursor: pointer; }
+    .btn-primary { width: 100%; padding: 13px; background: var(--burgundy); color: var(--cream); border: none; border-radius: 12px; font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
+    .btn-primary:hover { background: var(--burgundy-light); }
+    .btn-primary:disabled { background: var(--gray-light); cursor: not-allowed; }
+    .btn-secondary { padding: 9px 16px; background: var(--cream-dark); color: var(--burgundy); border: none; border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .btn-gold { padding: 13px; background: var(--gold); color: var(--burgundy-dark); border: none; border-radius: 12px; font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 700; cursor: pointer; width: 100%; }
+    .btn-gold:hover { background: var(--gold-light); }
+
+    /* ── PLANNER ──────────────────────────────────────────────────────────── */
+    .planner-card { background: var(--burgundy-dark); border-radius: var(--radius); padding: 18px; margin-bottom: 16px; color: var(--cream); }
+    .planner-card h3 { font-family: 'Playfair Display', serif; font-size: 16px; color: var(--gold-light); margin-bottom: 14px; }
+    .planner-row { display: flex; gap: 10px; align-items: flex-end; margin-bottom: 12px; }
+    .planner-field { flex: 1; }
+    .planner-label { font-size: 11px; font-weight: 600; color: rgba(247,242,234,0.6); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px; display: block; }
+    .planner-input { width: 100%; padding: 10px 14px; border: 1.5px solid rgba(255,255,255,0.15); border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 14px; color: var(--cream); background: rgba(255,255,255,0.1); outline: none; }
+    .planner-input:focus { border-color: var(--gold); }
+    .planner-input::placeholder { color: rgba(247,242,234,0.4); }
+
+    /* ── CLUSTER CARDS ────────────────────────────────────────────────────── */
+    .cluster-card { background: var(--white); border-radius: var(--radius); padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow); }
+    .cluster-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
+    .cluster-title { font-family: 'Playfair Display', serif; font-size: 16px; color: var(--burgundy-dark); }
+    .cluster-meta { display: flex; gap: 6px; flex-wrap: wrap; }
+    .meta-pill { font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 20px; }
+    .meta-stops { background: var(--cream-dark); color: var(--burgundy); }
+    .meta-cases { background: var(--green-light); color: var(--green); }
+    .meta-cases.over { background: var(--orange-light); color: var(--orange); }
+    .meta-zone { background: #EEF2FF; color: #4338CA; }
+    .cluster-driver-row { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
+    .cluster-driver-select { flex: 1; padding: 9px 12px; border: 1.5px solid var(--cream-dark); border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 13px; color: var(--charcoal); background: var(--cream); outline: none; cursor: pointer; }
+    .cluster-driver-select.assigned { border-color: var(--gold); background: #FDF8EC; color: var(--burgundy-dark); font-weight: 500; }
+    .stop-list { border-top: 1px solid var(--cream-dark); padding-top: 10px; }
+    .stop-row { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--cream-dark); }
+    .stop-row:last-child { border-bottom: none; }
+    .stop-num { width: 24px; height: 24px; background: var(--burgundy); color: var(--cream); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; margin-top: 2px; }
+    .stop-details { flex: 1; min-width: 0; }
+    .stop-customer { font-size: 14px; font-weight: 600; color: var(--charcoal); }
+    .stop-address { font-size: 12px; color: var(--gray); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .stop-cases { font-size: 11px; color: var(--green); font-weight: 600; margin-top: 2px; }
+    .stop-inv { font-size: 10px; color: var(--gray-light); }
+    .btn-map-sm { background: var(--cream-dark); border: none; border-radius: 8px; padding: 6px 8px; font-size: 14px; cursor: pointer; flex-shrink: 0; }
+    .btn-gmaps { display: block; width: 100%; padding: 9px; background: var(--cream-dark); color: var(--burgundy); border: none; border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; text-align: center; margin-top: 10px; }
+
+    /* ── WARN BANNER ──────────────────────────────────────────────────────── */
+    .warn-banner { background: var(--orange-light); border: 1.5px solid var(--orange); border-radius: 12px; padding: 12px 16px; margin-bottom: 14px; font-size: 13px; color: var(--orange); font-weight: 500; display: flex; gap: 8px; }
+
+    /* ── DELIVERY CARDS ───────────────────────────────────────────────────── */
+    .delivery-card { background: var(--white); border-radius: var(--radius); padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow); position: relative; overflow: hidden; }
+    .delivery-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--burgundy); border-radius: 4px 0 0 4px; }
+    .delivery-card.completed::before { background: var(--green); }
+    .delivery-card.assigned::before { background: var(--gold); }
+    .card-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 8px; }
+    .card-top-left { flex: 1; }
+    .invoice-num { font-size: 11px; font-weight: 600; color: var(--gold); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 3px; }
+    .customer-name { font-family: 'Playfair Display', serif; font-size: 16px; color: var(--charcoal); line-height: 1.2; }
+    .card-badges { display: flex; gap: 6px; flex-direction: column; align-items: flex-end; }
+    .amount-badge { background: var(--cream); border: 1.5px solid var(--cream-dark); border-radius: 10px; padding: 4px 10px; font-size: 13px; font-weight: 600; color: var(--burgundy); white-space: nowrap; }
+    .cases-badge { background: var(--green-light); border-radius: 8px; padding: 3px 8px; font-size: 11px; font-weight: 600; color: var(--green); }
+    .cases-badge.unknown { background: var(--cream-dark); color: var(--gray); }
+    .address-row { display: flex; align-items: flex-start; gap: 7px; margin-bottom: 10px; }
+    .address-text { font-size: 13px; color: var(--gray); line-height: 1.4; }
+    .no-address { font-size: 12px; color: var(--gray-light); font-style: italic; }
+    .card-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .driver-select { flex: 1; min-width: 120px; padding: 8px 12px; border: 1.5px solid var(--cream-dark); border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 13px; color: var(--charcoal); background: var(--cream); outline: none; cursor: pointer; }
+    .driver-select.has-driver { border-color: var(--gold); background: #FDF8EC; color: var(--burgundy-dark); font-weight: 500; }
+    .btn-complete { padding: 8px 14px; background: var(--green); color: white; border: none; border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
+    .btn-map { padding: 8px 12px; background: var(--cream-dark); color: var(--burgundy); border: none; border-radius: 10px; font-size: 16px; cursor: pointer; }
+    .completed-banner { display: flex; align-items: center; gap: 6px; background: var(--green-light); color: var(--green); border-radius: 8px; padding: 7px 12px; font-size: 13px; font-weight: 600; width: 100%; }
+    .status-pill { display: inline-block; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; padding: 3px 8px; border-radius: 6px; margin-top: 4px; }
+    .status-pill.unassigned { background: var(--cream-dark); color: var(--gray); }
+    .status-pill.assigned { background: #FDF3D8; color: #8B6914; }
+    .status-pill.completed { background: var(--green-light); color: var(--green); }
+
+    /* ── SECTION / DRIVER FILTER ──────────────────────────────────────────── */
+    .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; margin-top: 8px; }
+    .section-title { font-family: 'Playfair Display', serif; font-size: 17px; color: var(--burgundy-dark); }
+    .badge { background: var(--burgundy); color: var(--cream); font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 20px; }
+    .driver-filter { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding-bottom: 4px; margin-bottom: 16px; }
+    .driver-filter::-webkit-scrollbar { display: none; }
+    .driver-chip { padding: 8px 16px; border-radius: 20px; border: 1.5px solid var(--cream-dark); background: var(--white); color: var(--gray); font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap; transition: all 0.2s; font-family: 'DM Sans', sans-serif; }
+    .driver-chip.active { background: var(--burgundy); border-color: var(--burgundy); color: var(--cream); }
+
+    /* ── SETTINGS ─────────────────────────────────────────────────────────── */
+    .settings-card { background: var(--white); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); margin-bottom: 16px; }
+    .settings-card h3 { font-family: 'Playfair Display', serif; font-size: 16px; color: var(--burgundy-dark); margin-bottom: 14px; }
+    .driver-list { display: flex; flex-direction: column; gap: 8px; }
+    .driver-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--cream); border-radius: 10px; }
+    .driver-row-name { font-size: 14px; font-weight: 500; }
+    .btn-remove { background: none; border: none; color: var(--burgundy); font-size: 16px; cursor: pointer; padding: 4px; }
+    .add-driver-row { display: flex; gap: 8px; margin-top: 10px; }
+    .pin-change-row { display: flex; gap: 8px; margin-top: 10px; }
+
+    /* ── LOADING / EMPTY ──────────────────────────────────────────────────── */
+    .empty-state { text-align: center; padding: 48px 24px; color: var(--gray); }
+    .empty-icon { font-size: 48px; margin-bottom: 12px; }
+    .empty-title { font-family: 'Playfair Display', serif; font-size: 18px; color: var(--burgundy-dark); margin-bottom: 8px; }
+    .empty-text { font-size: 14px; line-height: 1.5; }
+    .loading { text-align: center; padding: 40px; color: var(--gray); }
+    .spinner { width: 36px; height: 36px; border: 3px solid var(--cream-dark); border-top-color: var(--burgundy); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 14px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── TOAST ────────────────────────────────────────────────────────────── */
+    .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px); background: var(--charcoal); color: var(--cream); padding: 12px 20px; border-radius: 12px; font-size: 14px; font-weight: 500; z-index: 9998; transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1); white-space: nowrap; box-shadow: 0 8px 32px rgba(0,0,0,0.3); }
+    .toast.show { transform: translateX(-50%) translateY(0); }
+
+    .view { display: none; }
+    .view.active { display: block; }
+  </style>
+</head>
+<body>
+
+<!-- ═══════════════════════ LOGIN SCREEN ═══════════════════════════════════ -->
+<div id="loginScreen">
+  <div class="login-logo">🍷</div>
+  <div class="login-title">Cellar Route</div>
+  <div class="login-subtitle">Classic Wines Inc.</div>
+
+  <!-- STEP 1: PIN -->
+  <div class="login-step" id="pinStep">
+    <div class="pin-label">Enter your PIN</div>
+    <div class="pin-dots" id="pinDots">
+      <div class="pin-dot" id="dot0"></div>
+      <div class="pin-dot" id="dot1"></div>
+      <div class="pin-dot" id="dot2"></div>
+      <div class="pin-dot" id="dot3"></div>
+    </div>
+    <div class="pin-pad">
+      <button class="pin-btn" onclick="pinPress('1')">1</button>
+      <button class="pin-btn" onclick="pinPress('2')">2</button>
+      <button class="pin-btn" onclick="pinPress('3')">3</button>
+      <button class="pin-btn" onclick="pinPress('4')">4</button>
+      <button class="pin-btn" onclick="pinPress('5')">5</button>
+      <button class="pin-btn" onclick="pinPress('6')">6</button>
+      <button class="pin-btn" onclick="pinPress('7')">7</button>
+      <button class="pin-btn" onclick="pinPress('8')">8</button>
+      <button class="pin-btn" onclick="pinPress('9')">9</button>
+      <button class="pin-btn empty" disabled></button>
+      <button class="pin-btn" onclick="pinPress('0')">0</button>
+      <button class="pin-btn del" onclick="pinDelete()">⌫</button>
+    </div>
+    <div class="pin-error" id="pinError"></div>
+  </div>
+
+  <!-- STEP 2: NAME SELECTION -->
+  <div class="login-step hidden" id="nameStep">
+    <div class="name-label">Who are you?</div>
+    <div class="driver-grid" id="driverGrid"></div>
+    <button class="btn-back" onclick="backToPin()">← Back</button>
+  </div>
+</div>
+
+<!-- ═══════════════════════ MAIN APP ═══════════════════════════════════════ -->
+<div id="appShell" style="display:none">
+  <div class="header">
+    <div class="header-left">
+      <div class="logo-mark">🍷</div>
+      <div>
+        <div class="header-title">Cellar Route</div>
+        <div class="header-date" id="todayDate"></div>
+      </div>
+    </div>
+    <div class="header-right">
+      <span class="user-badge" id="userBadge"></span>
+      <button class="btn-icon" onclick="refreshInvoices()">↻</button>
+      <button class="btn-icon" onclick="showTab('settings')">⚙</button>
+      <button class="btn-icon" onclick="logout()" title="Log out">⏻</button>
+    </div>
+  </div>
+
+  <div class="tabs">
+    <div class="tab active" onclick="showTab('route')">Route Planner</div>
+    <div class="tab" onclick="showTab('deliveries')">All Deliveries</div>
+    <div class="tab" onclick="showTab('bydriver')">By Driver</div>
+    <div class="tab" onclick="showTab('settings')">Settings</div>
+  </div>
+
+  <div class="main">
+
+    <!-- ROUTE PLANNER -->
+    <div class="view active" id="view-route">
+      <div class="connect-card" id="connectCard">
+        <h3>🔌 Connect to QuickBooks</h3>
+        <div class="form-row">
+          <label class="form-label">Access Token</label>
+          <input class="form-input" type="password" id="accessToken" placeholder="Paste your access token" />
+        </div>
+        <div class="form-row">
+          <label class="form-label">Refresh Token</label>
+          <input class="form-input" type="password" id="refreshToken" placeholder="Paste your refresh token" />
+        </div>
+        <div class="form-row">
+          <label class="form-label">Client ID</label>
+          <input class="form-input" type="password" id="clientId" placeholder="From Intuit Developer portal" />
+        </div>
+        <div class="form-row">
+          <label class="form-label">Client Secret</label>
+          <input class="form-input" type="password" id="clientSecret" placeholder="From Intuit Developer portal" />
+        </div>
+        <div class="form-row">
+          <label class="form-label">Company (Realm) ID</label>
+          <input class="form-input" type="text" id="companyId" placeholder="e.g. 9341456538417956" />
+        </div>
+        <div class="form-row">
+          <label class="form-label">Environment</label>
+          <select class="form-select" id="environment">
+            <option value="sandbox">Sandbox (Testing)</option>
+            <option value="production">Production</option>
+          </select>
+        </div>
+        <p style="font-size:12px;color:var(--gray);margin-bottom:12px">🔄 Your token will auto-refresh every hour so the app stays connected all day.</p>
+        <button class="btn-primary" id="fetchBtn" onclick="fetchInvoices()">Pull Today's Deliveries</button>
+      </div>
+
+      <div id="plannerSection" style="display:none">
+        <div class="stats-bar">
+          <div class="stat-card"><div class="stat-number" id="stat-total">0</div><div class="stat-label">Stops</div></div>
+          <div class="stat-card"><div class="stat-number" id="stat-cases">0</div><div class="stat-label">Cases</div></div>
+          <div class="stat-card"><div class="stat-number" id="stat-vans">0</div><div class="stat-label">Vans Min</div></div>
+          <div class="stat-card"><div class="stat-number" id="stat-done">0</div><div class="stat-label">Done</div></div>
+        </div>
+        <div class="planner-card">
+          <h3>🚚 Auto-Route Planner</h3>
+          <div class="planner-row">
+            <div class="planner-field">
+              <label class="planner-label">Drivers today</label>
+              <input class="planner-input" type="number" id="driverCount" min="1" max="20" placeholder="e.g. 4" />
+            </div>
+            <div class="planner-field">
+              <label class="planner-label">Max cases/van</label>
+              <input class="planner-input" type="number" id="caseLimit" value="250" min="1" />
+            </div>
+          </div>
+          <button class="btn-gold" onclick="runAutoRoute()">⚡ Generate Optimal Routes</button>
+        </div>
+        <div id="warningBanners"></div>
+        <div id="clusterList"></div>
+      </div>
+
+      <div id="routeLoading" style="display:none" class="loading">
+        <div class="spinner"></div>Pulling invoices from QuickBooks...
+      </div>
+    </div>
+
+    <!-- ALL DELIVERIES -->
+    <div class="view" id="view-deliveries">
+      <div class="stats-bar" style="grid-template-columns:repeat(3,1fr)">
+        <div class="stat-card"><div class="stat-number" id="d-stat-total">0</div><div class="stat-label">Total</div></div>
+        <div class="stat-card"><div class="stat-number" id="d-stat-assigned">0</div><div class="stat-label">Assigned</div></div>
+        <div class="stat-card"><div class="stat-number" id="d-stat-done">0</div><div class="stat-label">Done</div></div>
+      </div>
+      <div id="deliveriesList"></div>
+    </div>
+
+    <!-- BY DRIVER -->
+    <div class="view" id="view-bydriver">
+      <div class="driver-filter" id="driverFilter"></div>
+      <div id="driverDeliveries"></div>
+    </div>
+
+    <!-- SETTINGS -->
+    <div class="view" id="view-settings">
+      <div class="settings-card">
+        <h3>👥 Manage Drivers</h3>
+        <div class="driver-list" id="driverList"></div>
+        <div class="add-driver-row">
+          <input class="form-input" type="text" id="newDriverName" placeholder="Driver name" />
+          <button class="btn-secondary" onclick="addDriver()">Add</button>
+        </div>
+      </div>
+      <div class="settings-card">
+        <h3>🔐 Change PIN</h3>
+        <p style="font-size:13px;color:var(--gray);margin-bottom:10px">Current PIN is shared with your whole team.</p>
+        <div class="pin-change-row">
+          <input class="form-input" type="password" id="newPin" placeholder="New 4-digit PIN" maxlength="4" />
+          <button class="btn-secondary" onclick="changePin()">Save</button>
+        </div>
+      </div>
+      <div class="settings-card">
+        <h3>🔗 Server URL</h3>
+        <div class="form-row">
+          <input class="form-input" type="text" id="serverUrl" placeholder="https://cellar-route-server-production.up.railway.app" />
+        </div>
+        <button class="btn-primary" onclick="saveSettings()">Save Settings</button>
+      </div>
+      <div class="settings-card">
+        <h3>🗑️ Reset Data</h3>
+        <button class="btn-primary" style="background:var(--gray)" onclick="clearAll()">Clear All Delivery Data</button>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+// ═══════════════════ GEOGRAPHIC ZONES ════════════════════════════════════════
+const ZIP_ZONES = {
+  '06': { name: 'CT', lat: 41.6, lng: -72.7 },
+  '100': { name: 'Manhattan', lat: 40.78, lng: -73.97 }, '101': { name: 'Manhattan', lat: 40.75, lng: -73.99 },
+  '102': { name: 'Manhattan', lat: 40.71, lng: -74.01 }, '103': { name: 'Staten Island', lat: 40.58, lng: -74.15 },
+  '104': { name: 'Bronx', lat: 40.84, lng: -73.87 }, '110': { name: 'Queens', lat: 40.73, lng: -73.79 },
+  '111': { name: 'Queens', lat: 40.72, lng: -73.85 }, '112': { name: 'Brooklyn', lat: 40.65, lng: -73.95 },
+  '113': { name: 'Queens/LI', lat: 40.70, lng: -73.74 }, '114': { name: 'Queens/LI', lat: 40.73, lng: -73.70 },
+  '115': { name: 'Long Island', lat: 40.72, lng: -73.60 }, '116': { name: 'Long Island', lat: 40.80, lng: -73.50 },
+  '117': { name: 'Long Island', lat: 40.82, lng: -73.33 }, '118': { name: 'Long Island', lat: 40.87, lng: -73.20 },
+  '119': { name: 'Long Island', lat: 40.92, lng: -73.10 }, '105': { name: 'Westchester', lat: 41.05, lng: -73.82 },
+  '106': { name: 'Westchester', lat: 41.10, lng: -73.78 }, '107': { name: 'Westchester', lat: 41.00, lng: -73.85 },
+  '108': { name: 'Westchester', lat: 41.15, lng: -73.72 }, '109': { name: 'Westchester', lat: 41.30, lng: -73.75 },
+  '125': { name: 'Hudson Valley', lat: 41.70, lng: -73.93 }, '126': { name: 'Hudson Valley', lat: 41.50, lng: -74.00 },
+  '127': { name: 'Hudson Valley', lat: 41.90, lng: -73.98 }, '128': { name: 'Catskills', lat: 42.10, lng: -74.36 },
+  '120': { name: 'Capital Region', lat: 42.65, lng: -73.75 }, '121': { name: 'Capital Region', lat: 42.75, lng: -73.80 },
+  '122': { name: 'Capital Region', lat: 42.55, lng: -73.70 }, '130': { name: 'Syracuse', lat: 43.05, lng: -76.14 },
+  '140': { name: 'Buffalo', lat: 42.88, lng: -78.88 }, '07': { name: 'NJ North', lat: 40.85, lng: -74.20 },
+  '08': { name: 'NJ South', lat: 39.90, lng: -74.60 },
+};
+function getZone(zip) {
+  if (!zip) return null;
+  const z = zip.toString().replace(/\D/g, '');
+  return ZIP_ZONES[z.slice(0,3)] || ZIP_ZONES[z.slice(0,2)] || null;
+}
+function getCoords(inv) {
+  const addr = inv.shipAddress || inv.billAddress;
+  if (!addr) return null;
+  const zone = getZone(addr.zip);
+  if (!zone) return null;
+  return { lat: zone.lat + (Math.random()-0.5)*0.05, lng: zone.lng + (Math.random()-0.5)*0.05, zone: zone.name };
+}
+
+// ═══════════════════ K-MEANS ══════════════════════════════════════════════════
+function kMeans(points, k, iter=30) {
+  if (!points.length || k<=0) return [];
+  k = Math.min(k, points.length);
+  const shuffled = [...points].sort(()=>Math.random()-0.5);
+  let centroids = shuffled.slice(0,k).map(p=>({lat:p.lat,lng:p.lng}));
+  let asgn = new Array(points.length).fill(0);
+  for (let i=0;i<iter;i++) {
+    for (let p=0;p<points.length;p++) {
+      let best=0,min=Infinity;
+      for (let c=0;c<k;c++) {
+        const d=Math.pow(points[p].lat-centroids[c].lat,2)+Math.pow(points[p].lng-centroids[c].lng,2);
+        if(d<min){min=d;best=c;}
+      }
+      asgn[p]=best;
+    }
+    for (let c=0;c<k;c++) {
+      const pts=points.filter((_,i)=>asgn[i]===c);
+      if(pts.length) centroids[c]={lat:pts.reduce((s,p)=>s+p.lat,0)/pts.length,lng:pts.reduce((s,p)=>s+p.lng,0)/pts.length};
+    }
+  }
+  return asgn;
+}
+
+// ═══════════════════ STATE ════════════════════════════════════════════════════
+let invoices=[], assignments={}, completed={}, clusters=[];
+let drivers=['Maria','John','Carlos','Tamika','Luis','Devon'];
+let serverUrl='https://cellar-route-server-production.up.railway.app';
+let activeTab='route', activeDriverFilter='all';
+let currentUser=null;
+let appPin='2024'; // default PIN — change in Settings
+
+// ═══════════════════ PIN LOGIN ════════════════════════════════════════════════
+let pinEntry='';
+
+function pinPress(digit) {
+  if (pinEntry.length>=4) return;
+  pinEntry += digit;
+  updateDots();
+  if (pinEntry.length===4) setTimeout(checkPin, 150);
+}
+function pinDelete() {
+  pinEntry = pinEntry.slice(0,-1);
+  updateDots();
+  document.getElementById('pinError').textContent='';
+  document.querySelectorAll('.pin-dot').forEach(d=>d.classList.remove('error'));
+}
+function updateDots() {
+  for(let i=0;i<4;i++) {
+    document.getElementById('dot'+i).classList.toggle('filled', i<pinEntry.length);
+  }
+}
+function checkPin() {
+  if (pinEntry===appPin) {
+    document.getElementById('pinStep').classList.add('hidden');
+    document.getElementById('nameStep').classList.remove('hidden');
+    renderNameGrid();
+  } else {
+    document.querySelectorAll('.pin-dot').forEach(d=>{ d.classList.remove('filled'); d.classList.add('error'); });
+    document.getElementById('pinError').textContent='Incorrect PIN. Try again.';
+    pinEntry='';
+    setTimeout(()=>{
+      document.querySelectorAll('.pin-dot').forEach(d=>d.classList.remove('error'));
+    }, 800);
+  }
+}
+function renderNameGrid() {
+  document.getElementById('driverGrid').innerHTML = drivers.map(d=>
+    `<button class="driver-btn" onclick="selectDriver('${d}')">👤 ${d}</button>`
+  ).join('');
+}
+function selectDriver(name) {
+  currentUser = name;
+  document.getElementById('loginScreen').classList.add('hidden');
+  document.getElementById('appShell').style.display='block';
+  document.getElementById('userBadge').textContent='👤 ' + name;
+  initApp();
+  setTimeout(()=>{ document.getElementById('loginScreen').style.display='none'; }, 400);
+}
+function backToPin() {
+  pinEntry='';
+  updateDots();
+  document.getElementById('pinError').textContent='';
+  document.getElementById('nameStep').classList.add('hidden');
+  document.getElementById('pinStep').classList.remove('hidden');
+}
+function logout() {
+  currentUser=null; pinEntry='';
+  updateDots();
+  document.getElementById('pinError').textContent='';
+  document.getElementById('nameStep').classList.add('hidden');
+  document.getElementById('pinStep').classList.remove('hidden');
+  document.getElementById('loginScreen').style.display='flex';
+  document.getElementById('loginScreen').classList.remove('hidden');
+  document.getElementById('appShell').style.display='none';
+}
+function changePin() {
+  const val = document.getElementById('newPin').value.trim();
+  if (!/^\d{4}$/.test(val)) { showToast('PIN must be exactly 4 digits'); return; }
+  appPin = val;
+  document.getElementById('newPin').value='';
+  saveState();
+  showToast('✓ PIN updated');
+}
+
+// ═══════════════════ APP INIT ═════════════════════════════════════════════════
+function initApp() {
+  const now = new Date();
+  document.getElementById('todayDate').textContent =
+    now.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+  const saved = sessionStorage.getItem('cellarRouteState');
+  if (saved) {
+    const s = JSON.parse(saved);
+    invoices=s.invoices||[]; assignments=s.assignments||{}; completed=s.completed||{};
+    drivers=s.drivers||drivers; serverUrl=s.serverUrl||serverUrl; clusters=s.clusters||[];
+    if(s.appPin) appPin=s.appPin;
+  }
+  document.getElementById('serverUrl').value=serverUrl;
+  renderDriverSettings();
+  if (invoices.length>0) {
+    document.getElementById('connectCard').style.display='none';
+    document.getElementById('plannerSection').style.display='block';
+    updateStats();
+    if(clusters.length>0) renderClusters();
+  }
+}
+function saveState() {
+  sessionStorage.setItem('cellarRouteState', JSON.stringify({
+    invoices,assignments,completed,drivers,serverUrl,clusters,appPin
+  }));
+}
+
+// ═══════════════════ TABS ════════════════════════════════════════════════════
+function showTab(tab) {
+  activeTab=tab;
+  document.querySelectorAll('.tab').forEach((t,i)=>{
+    t.classList.toggle('active',['route','deliveries','bydriver','settings'][i]===tab);
+  });
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById('view-'+tab).classList.add('active');
+  if(tab==='deliveries') renderDeliveries();
+  if(tab==='bydriver') renderByDriver();
+  if(tab==='settings') renderDriverSettings();
+}
+
+// ═══════════════════ FETCH INVOICES ══════════════════════════════════════════
+async function fetchInvoices() {
+  const accessToken=document.getElementById('accessToken').value.trim();
+  const refreshToken=document.getElementById('refreshToken').value.trim();
+  const clientId=document.getElementById('clientId').value.trim();
+  const clientSecret=document.getElementById('clientSecret').value.trim();
+  const companyId=document.getElementById('companyId').value.trim();
+  const environment=document.getElementById('environment').value;
+  if(!accessToken||!companyId){showToast('Please enter Access Token and Company ID');return;}
+  document.getElementById('fetchBtn').disabled=true;
+  document.getElementById('fetchBtn').textContent='Connecting...';
+  document.getElementById('connectCard').style.display='none';
+  document.getElementById('routeLoading').style.display='block';
+  try {
+    const base=document.getElementById('serverUrl').value.trim()||serverUrl;
+    // Save credentials to server for auto-refresh
+    if(refreshToken&&clientId&&clientSecret){
+      await fetch(base+'/api/connect',{method:'POST',headers:{'Content-Type':'application/json'},
+        body:JSON.stringify({accessToken,refreshToken,clientId,clientSecret,companyId,environment,expiresIn:3600})});
+    }
+    const url=base+'/api/invoices';
+    const res=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({accessToken,companyId,environment})});
+    const data=await res.json();
+    if(!res.ok) throw new Error(data.error||'Failed to fetch invoices');
+    invoices=(data.invoices||[]).map(inv=>({...inv,cases:extractCases(inv)}));
+    assignments={}; completed={}; clusters=[];
+    saveState();
+    document.getElementById('routeLoading').style.display='none';
+    document.getElementById('plannerSection').style.display='block';
+    updateStats();
+    showToast(`✓ ${invoices.length} invoices loaded`);
+  } catch(err) {
+    document.getElementById('routeLoading').style.display='none';
+    document.getElementById('connectCard').style.display='block';
+    document.getElementById('fetchBtn').disabled=false;
+    document.getElementById('fetchBtn').textContent="Pull Today's Deliveries";
+    showToast('❌ '+err.message);
+  }
+}
+function extractCases(inv) {
+  if(inv.lineItems&&Array.isArray(inv.lineItems)){
+    const t=inv.lineItems.reduce((s,l)=>s+(Number(l.qty)||0),0);
+    if(t>0) return t;
+  }
+  if(inv.totalAmount) return Math.max(1,Math.round(Number(inv.totalAmount)/120));
+  return 1;
+}
+function refreshInvoices() {
+  invoices=[];assignments={};completed={};clusters=[];
+  saveState();
+  document.getElementById('connectCard').style.display='block';
+  document.getElementById('plannerSection').style.display='none';
+  document.getElementById('fetchBtn').disabled=false;
+  document.getElementById('fetchBtn').textContent="Pull Today's Deliveries";
+  document.getElementById('clusterList').innerHTML='';
+  document.getElementById('warningBanners').innerHTML='';
+  showTab('route');
+}
+
+// ═══════════════════ AUTO ROUTE ═══════════════════════════════════════════════
+function runAutoRoute() {
+  const driverCount=parseInt(document.getElementById('driverCount').value)||0;
+  const caseLimit=parseInt(document.getElementById('caseLimit').value)||250;
+  if(!driverCount){showToast('Enter how many drivers you have today');return;}
+  if(!invoices.length){showToast('No invoices loaded');return;}
+  const geocoded=invoices.map(inv=>({inv,coords:getCoords(inv)}));
+  const withCoords=geocoded.filter(g=>g.coords);
+  const noCoords=geocoded.filter(g=>!g.coords);
+  const totalCases=invoices.reduce((s,i)=>s+(i.cases||0),0);
+  const minVans=Math.ceil(totalCases/caseLimit);
+  const effDrivers=Math.max(driverCount,minVans);
+  const pts=withCoords.map(g=>g.coords);
+  const clusterAsgn=kMeans(pts,effDrivers);
+  const raw=Array.from({length:effDrivers},()=>({stops:[],cases:0}));
+  withCoords.forEach((g,i)=>{raw[clusterAsgn[i]].stops.push(g.inv);raw[clusterAsgn[i]].cases+=g.inv.cases||0;});
+  raw.forEach(c=>{c.stops.sort((a,b)=>{const za=(a.shipAddress||a.billAddress||{}).zip||'';const zb=(b.shipAddress||b.billAddress||{}).zip||'';return za.localeCompare(zb);});});
+  noCoords.forEach(g=>{const li=raw.reduce((m,c,i)=>c.cases<raw[m].cases?i:m,0);raw[li].stops.push(g.inv);raw[li].cases+=g.inv.cases||0;});
+  clusters=raw.filter(c=>c.stops.length>0).map((c,i)=>({...c,id:i,driver:drivers[i]||null,zone:getClusterZone(c.stops),overLimit:c.cases>caseLimit}));
+  clusters.forEach((c,i)=>{if(drivers[i]){c.driver=drivers[i];c.stops.forEach(inv=>{assignments[inv.id]=drivers[i];});}});
+  saveState(); updateStats();
+  const warns=[];
+  if(minVans>driverCount) warns.push(`⚠️ You need at least ${minVans} vans for ${totalCases} total cases. Routes split across ${effDrivers} drivers.`);
+  clusters.forEach((c,i)=>{if(c.overLimit) warns.push(`⚠️ Route ${i+1} (${c.zone}) has ${c.cases} cases — over ${caseLimit} limit.`);});
+  document.getElementById('warningBanners').innerHTML=warns.map(w=>`<div class="warn-banner"><span>🟠</span><span>${w}</span></div>`).join('');
+  renderClusters();
+  showToast(`✓ ${clusters.length} routes generated`);
+}
+function getClusterZone(stops) {
+  const zones={};
+  stops.forEach(inv=>{const addr=inv.shipAddress||inv.billAddress;if(addr&&addr.zip){const z=getZone(addr.zip);if(z)zones[z.name]=(zones[z.name]||0)+1;}});
+  const top=Object.entries(zones).sort((a,b)=>b[1]-a[1]);
+  return top.length?top[0][0]:'Mixed';
+}
+
+// ═══════════════════ RENDER CLUSTERS ═════════════════════════════════════════
+function renderClusters() {
+  const list=document.getElementById('clusterList');
+  list.innerHTML='';
+  if(!clusters.length){list.innerHTML=`<div class="empty-state"><div class="empty-icon">🗺️</div><div class="empty-title">No routes yet</div><div class="empty-text">Enter your driver count and hit Generate.</div></div>`;return;}
+  const hdr=document.createElement('div');hdr.className='section-header';
+  hdr.innerHTML=`<div class="section-title">Route Assignments</div><span class="badge">${clusters.length} routes</span>`;
+  list.appendChild(hdr);
+  clusters.forEach((cluster,ci)=>{
+    const card=document.createElement('div');card.className='cluster-card';card.id=`cluster-${ci}`;
+    const mapsUrl=buildGoogleMapsUrl(cluster.stops);
+    card.innerHTML=`
+      <div class="cluster-header">
+        <div class="cluster-title">Route ${ci+1} — ${cluster.zone}</div>
+        <div class="cluster-meta">
+          <span class="meta-pill meta-zone">${cluster.zone}</span>
+          <span class="meta-pill meta-stops">${cluster.stops.length} stops</span>
+          <span class="meta-pill meta-cases ${cluster.overLimit?'over':''}">${cluster.cases} cases</span>
+        </div>
+      </div>
+      <div class="cluster-driver-row">
+        <select class="cluster-driver-select ${cluster.driver?'assigned':''}" onchange="setClusterDriver(${ci},this.value)">
+          <option value="">Assign driver...</option>
+          ${drivers.map(d=>`<option value="${d}" ${cluster.driver===d?'selected':''}>${d}</option>`).join('')}
+        </select>
+        <button class="btn-secondary" onclick="markClusterComplete(${ci})">✓ All Done</button>
+      </div>
+      <div class="stop-list">
+        ${cluster.stops.map((inv,si)=>{
+          const addr=inv.shipAddress||inv.billAddress;const isDone=completed[inv.id];
+          return `<div class="stop-row" style="${isDone?'opacity:0.5':''}">
+            <div class="stop-num" style="${isDone?'background:var(--green)':''}">${isDone?'✓':si+1}</div>
+            <div class="stop-details">
+              <div class="stop-customer">${inv.customerName}</div>
+              <div class="stop-address">${addr?(addr.full||addr.line1||'No address'):'No address'}</div>
+              <div class="stop-cases">📦 ${inv.cases} case${inv.cases!==1?'s':''}</div>
+              <div class="stop-inv">INV #${inv.invoiceNumber} · $${Number(inv.totalAmount||0).toFixed(2)}</div>
+            </div>
+            ${addr?`<button class="btn-map-sm" onclick="openMap('${encodeURIComponent(addr.full||addr.line1||'')}')">🗺</button>`:''}
+          </div>`;
+        }).join('')}
+      </div>
+      ${mapsUrl?`<button class="btn-gmaps" onclick="window.open('${mapsUrl}','_blank')">🗺 Open Full Route in Google Maps</button>`:''}`;
+    list.appendChild(card);
+  });
+}
+function buildGoogleMapsUrl(stops) {
+  const addrs=stops.map(inv=>{const a=inv.shipAddress||inv.billAddress;return a?(a.full||a.line1):null;}).filter(Boolean);
+  if(!addrs.length) return null;
+  if(addrs.length===1) return `https://maps.google.com/?q=${encodeURIComponent(addrs[0])}`;
+  const o=encodeURIComponent(addrs[0]),d=encodeURIComponent(addrs[addrs.length-1]);
+  const wp=addrs.slice(1,-1).map(a=>encodeURIComponent(a)).join('|');
+  return `https://www.google.com/maps/dir/?api=1&origin=${o}&destination=${d}${wp?'&waypoints='+wp:''}&travelmode=driving`;
+}
+function setClusterDriver(ci,name) {
+  if(!clusters[ci]) return;
+  const old=clusters[ci].driver; clusters[ci].driver=name||null;
+  clusters[ci].stops.forEach(inv=>{if(assignments[inv.id]===old)delete assignments[inv.id];if(name)assignments[inv.id]=name;});
+  saveState(); renderClusters(); if(name) showToast(`Route ${ci+1} → ${name}`);
+}
+function markClusterComplete(ci) {
+  if(!clusters[ci]) return;
+  clusters[ci].stops.forEach(inv=>{completed[inv.id]=true;});
+  saveState(); updateStats(); renderClusters(); showToast(`✓ Route ${ci+1} complete`);
+}
+
+// ═══════════════════ DELIVERIES VIEW ══════════════════════════════════════════
+function renderDeliveries() {
+  updateDeliveryStats();
+  const list=document.getElementById('deliveriesList');
+  if(!invoices.length){list.innerHTML=`<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-title">No deliveries yet</div><div class="empty-text">Go to Route Planner to pull today's invoices.</div></div>`;return;}
+  list.innerHTML='';
+  const hdr=document.createElement('div');hdr.className='section-header';
+  hdr.innerHTML=`<div class="section-title">Today's Deliveries</div><span class="badge">${invoices.length}</span>`;
+  list.appendChild(hdr);
+  invoices.forEach(inv=>list.appendChild(buildDeliveryCard(inv)));
+}
+function buildDeliveryCard(inv) {
+  const isDone=completed[inv.id],drv=assignments[inv.id],addr=inv.shipAddress||inv.billAddress;
+  const card=document.createElement('div');
+  card.className=`delivery-card ${isDone?'completed':drv?'assigned':''}`;card.id=`dcard-${inv.id}`;
+  const sc=isDone?'completed':drv?'assigned':'unassigned',st=isDone?'Completed':drv||'Unassigned';
+  const addrHtml=addr?`<div class="address-row"><span>📍</span><span class="address-text">${addr.full||addr.line1}</span></div>`:`<div class="address-row"><span class="no-address">No address on file</span></div>`;
+  const actHtml=isDone?`<div class="completed-banner">✓ Delivered${drv?' by '+drv:''}</div>`:`<select class="driver-select ${drv?'has-driver':''}" onchange="assignDriver('${inv.id}',this.value)"><option value="">Assign driver...</option>${drivers.map(d=>`<option value="${d}" ${drv===d?'selected':''}>${d}</option>`).join('')}</select><button class="btn-complete" onclick="markComplete('${inv.id}')">✓ Done</button>${addr?`<button class="btn-map" onclick="openMap('${encodeURIComponent(addr.full||addr.line1||'')}')">🗺</button>`:''}`;
+  card.innerHTML=`<div class="card-top"><div class="card-top-left"><div class="invoice-num">INV #${inv.invoiceNumber}</div><div class="customer-name">${inv.customerName}</div><span class="status-pill ${sc}">${st}</span></div><div class="card-badges"><div class="amount-badge">$${Number(inv.totalAmount||0).toFixed(2)}</div><div class="cases-badge ${inv.cases?'':'unknown'}">📦 ${inv.cases||'?'} cases</div></div></div>${addrHtml}<div class="card-actions">${actHtml}</div>`;
+  return card;
+}
+function assignDriver(id,name){assignments[id]=name||undefined;if(!name)delete assignments[id];saveState();updateDeliveryStats();const o=document.getElementById(`dcard-${id}`);const inv=invoices.find(i=>i.id===id);if(o&&inv)o.replaceWith(buildDeliveryCard(inv));if(name)showToast(`Assigned to ${name}`);}
+function markComplete(id){completed[id]=true;saveState();updateDeliveryStats();updateStats();const o=document.getElementById(`dcard-${id}`);const inv=invoices.find(i=>i.id===id);if(o&&inv)o.replaceWith(buildDeliveryCard(inv));showToast('✓ Marked delivered!');}
+
+// ═══════════════════ BY DRIVER ════════════════════════════════════════════════
+function renderByDriver() {
+  document.getElementById('driverFilter').innerHTML=['all',...drivers].map(d=>`<div class="driver-chip ${activeDriverFilter===d?'active':''}" onclick="filterByDriver('${d}')">${d==='all'?'All Drivers':d}</div>`).join('');
+  const container=document.getElementById('driverDeliveries');
+  const filtered=activeDriverFilter==='all'?invoices:invoices.filter(i=>assignments[i.id]===activeDriverFilter);
+  if(!filtered.length){container.innerHTML=`<div class="empty-state"><div class="empty-icon">👤</div><div class="empty-title">No deliveries</div><div class="empty-text">${activeDriverFilter==='all'?'No invoices loaded.':activeDriverFilter+' has no deliveries.'}</div></div>`;return;}
+  container.innerHTML='';filtered.forEach(inv=>container.appendChild(buildDeliveryCard(inv)));
+}
+function filterByDriver(d){activeDriverFilter=d;renderByDriver();}
+
+// ═══════════════════ STATS ════════════════════════════════════════════════════
+function updateStats() {
+  const tc=invoices.reduce((s,i)=>s+(i.cases||0),0);
+  const cl=parseInt(document.getElementById('caseLimit')?.value)||250;
+  const mv=Math.ceil(tc/cl);
+  document.getElementById('stat-total').textContent=invoices.length;
+  document.getElementById('stat-cases').textContent=tc;
+  document.getElementById('stat-vans').textContent=mv||'—';
+  document.getElementById('stat-done').textContent=Object.keys(completed).length;
+  document.getElementById('stat-vans').classList.toggle('warn',mv>(parseInt(document.getElementById('driverCount')?.value)||0));
+}
+function updateDeliveryStats() {
+  document.getElementById('d-stat-total').textContent=invoices.length;
+  document.getElementById('d-stat-assigned').textContent=invoices.filter(i=>assignments[i.id]).length;
+  document.getElementById('d-stat-done').textContent=Object.keys(completed).length;
+}
+
+// ═══════════════════ SETTINGS ═════════════════════════════════════════════════
+function renderDriverSettings() {
+  const list=document.getElementById('driverList');if(!list)return;
+  list.innerHTML=drivers.map(d=>`<div class="driver-row"><span class="driver-row-name">👤 ${d}</span><button class="btn-remove" onclick="removeDriver('${d}')">✕</button></div>`).join('');
+}
+function addDriver(){const i=document.getElementById('newDriverName');const n=i.value.trim();if(!n)return;if(drivers.includes(n)){showToast('Already exists');return;}drivers.push(n);i.value='';saveState();renderDriverSettings();showToast(`${n} added`);}
+function removeDriver(n){drivers=drivers.filter(d=>d!==n);saveState();renderDriverSettings();showToast(`${n} removed`);}
+function saveSettings(){serverUrl=document.getElementById('serverUrl').value.trim()||serverUrl;saveState();showToast('Settings saved');}
+function clearAll(){if(!confirm('Clear all delivery data?'))return;invoices=[];assignments={};completed={};clusters=[];saveState();document.getElementById('connectCard').style.display='block';document.getElementById('plannerSection').style.display='none';document.getElementById('clusterList').innerHTML='';document.getElementById('warningBanners').innerHTML='';document.getElementById('fetchBtn').disabled=false;document.getElementById('fetchBtn').textContent="Pull Today's Deliveries";showToast('Data cleared');showTab('route');}
+
+function openMap(a){window.open(`https://maps.google.com/?q=${a}`,'_blank');}
+function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500);}
+
+document.getElementById('newDriverName')?.addEventListener('keydown',e=>{if(e.key==='Enter')addDriver();});
+</script>
+</body>
+</html>
