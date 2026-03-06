@@ -13,26 +13,24 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 // ─── TOKEN STORE ─────────────────────────────────────────────────────────────
-// Stores the current token set in memory on the server
-// Automatically refreshes before expiry so the app never goes stale
 let tokenStore = {
   accessToken: null,
-  refreshToken: null,
-  clientId: null,
-  clientSecret: null,
-  expiresAt: null,      // timestamp when access token expires
-  companyId: null,
-  environment: 'sandbox'
+  refreshToken: process.env.QB_REFRESH_TOKEN || null,
+  clientId: process.env.QB_CLIENT_ID || null,
+  clientSecret: process.env.QB_CLIENT_SECRET || null,
+  companyId: process.env.QB_COMPANY_ID || null,
+  environment: process.env.QB_ENVIRONMENT || 'sandbox',
+  expiresAt: null
 };
 
-// Refresh the access token using the stored refresh token
+// ─── TOKEN REFRESH ────────────────────────────────────────────────────────────
 async function doTokenRefresh() {
   if (!tokenStore.refreshToken || !tokenStore.clientId || !tokenStore.clientSecret) {
-    console.log('No refresh token stored — skipping auto-refresh');
+    console.log('Missing credentials — cannot refresh token');
     return false;
   }
   try {
-    console.log('Auto-refreshing access token...');
+    console.log('Refreshing access token...');
     const credentials = Buffer.from(`${tokenStore.clientId}:${tokenStore.clientSecret}`).toString('base64');
     const response = await fetch('https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer', {
       method: 'POST',
@@ -45,68 +43,77 @@ async function doTokenRefresh() {
     });
     const data = await response.json();
     if (!response.ok) {
-      console.error('Auto-refresh failed:', data.error);
+      console.error('Token refresh failed:', data.error);
       return false;
     }
     tokenStore.accessToken = data.access_token;
     tokenStore.refreshToken = data.refresh_token; // Intuit rotates refresh tokens
     tokenStore.expiresAt = Date.now() + (data.expires_in - 300) * 1000; // refresh 5 min early
-    console.log('Access token refreshed successfully');
+    console.log('✓ Access token refreshed successfully');
     return true;
   } catch (err) {
-    console.error('Auto-refresh error:', err);
+    console.error('Token refresh error:', err);
     return false;
   }
 }
 
-// Get a valid access token — refreshes automatically if expiring soon
+// Get a valid access token — auto-refreshes if expired
 async function getValidAccessToken() {
-  if (!tokenStore.accessToken) return null;
-  if (tokenStore.expiresAt && Date.now() >= tokenStore.expiresAt) {
+  if (!tokenStore.accessToken || (tokenStore.expiresAt && Date.now() >= tokenStore.expiresAt)) {
     const success = await doTokenRefresh();
     if (!success) return null;
   }
   return tokenStore.accessToken;
 }
 
-// Auto-refresh timer — checks every 50 minutes
+// Auto-refresh every 50 minutes
 setInterval(async () => {
-  if (tokenStore.refreshToken && tokenStore.expiresAt && Date.now() >= tokenStore.expiresAt) {
-    await doTokenRefresh();
-  }
+  await doTokenRefresh();
 }, 50 * 60 * 1000);
 
-// ─── SAVE CREDENTIALS ────────────────────────────────────────────────────────
-// Called once when the app first connects — stores credentials server-side
+// ─── STARTUP: GET INITIAL TOKEN ───────────────────────────────────────────────
+async function startup() {
+  console.log('Cellar Route Server starting...');
+  console.log(`Environment: ${tokenStore.environment}`);
+  console.log(`Company ID: ${tokenStore.companyId}`);
+
+  if (tokenStore.refreshToken && tokenStore.clientId && tokenStore.clientSecret) {
+    console.log('Credentials found in environment variables — fetching initial access token...');
+    const success = await doTokenRefresh();
+    if (success) {
+      console.log('✓ Ready! Auto-refresh is active.');
+    } else {
+      console.log('⚠️ Could not get initial token — check your Railway environment variables.');
+    }
+  } else {
+    console.log('⚠️ No credentials in environment variables. Manual connection required.');
+  }
+}
+
+// ─── SAVE CREDENTIALS (manual override from app) ─────────────────────────────
 app.post('/api/connect', async (req, res) => {
   const { accessToken, refreshToken, clientId, clientSecret, companyId, environment, expiresIn } = req.body;
-
-  if (!accessToken || !refreshToken || !clientId || !clientSecret || !companyId) {
+  if (!accessToken || !companyId) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
-
-  tokenStore = {
-    accessToken,
-    refreshToken,
-    clientId,
-    clientSecret,
-    companyId,
-    environment: environment || 'sandbox',
-    expiresAt: Date.now() + ((expiresIn || 3600) - 300) * 1000
-  };
-
-  console.log(`Credentials stored for company ${companyId} (${environment})`);
+  // Override store with manually provided credentials
+  if (refreshToken) tokenStore.refreshToken = refreshToken;
+  if (clientId) tokenStore.clientId = clientId;
+  if (clientSecret) tokenStore.clientSecret = clientSecret;
+  tokenStore.accessToken = accessToken;
+  tokenStore.companyId = companyId;
+  tokenStore.environment = environment || tokenStore.environment;
+  tokenStore.expiresAt = Date.now() + ((expiresIn || 3600) - 300) * 1000;
+  console.log(`Credentials updated manually for company ${companyId}`);
   res.json({ success: true, message: 'Credentials saved. Token will auto-refresh.' });
 });
 
 // ─── REFRESH TOKEN (manual) ───────────────────────────────────────────────────
 app.post('/api/refresh-token', async (req, res) => {
   const { refreshToken, clientId, clientSecret } = req.body;
-
   if (!refreshToken || !clientId || !clientSecret) {
-    return res.status(400).json({ error: 'Missing required fields: refreshToken, clientId, clientSecret' });
+    return res.status(400).json({ error: 'Missing required fields' });
   }
-
   try {
     const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
     const response = await fetch('https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer', {
@@ -118,18 +125,13 @@ app.post('/api/refresh-token', async (req, res) => {
       },
       body: `grant_type=refresh_token&refresh_token=${encodeURIComponent(refreshToken)}`
     });
-
     const data = await response.json();
-
     if (!response.ok) {
       return res.status(response.status).json({ error: data.error || 'Token refresh failed', details: data });
     }
-
-    // Update the token store with new tokens
     tokenStore.accessToken = data.access_token;
     tokenStore.refreshToken = data.refresh_token;
     tokenStore.expiresAt = Date.now() + (data.expires_in - 300) * 1000;
-
     res.json({
       accessToken: data.access_token,
       refreshToken: data.refresh_token,
@@ -143,59 +145,42 @@ app.post('/api/refresh-token', async (req, res) => {
 
 // ─── FETCH INVOICES ───────────────────────────────────────────────────────────
 app.post('/api/invoices', async (req, res) => {
-  const { companyId, environment } = req.body;
+  // Use server-stored token first, fall back to request token
+  let accessToken = await getValidAccessToken() || req.body.accessToken;
+  const companyId = tokenStore.companyId || req.body.companyId;
+  const environment = tokenStore.environment || req.body.environment;
 
-  // Use server-stored token if available, otherwise fall back to request token
-  let accessToken = await getValidAccessToken();
-  const effectiveCompanyId = companyId || tokenStore.companyId;
-  const effectiveEnv = environment || tokenStore.environment;
-
-  if (!accessToken) {
-    accessToken = req.body.accessToken;
+  if (!accessToken || !companyId) {
+    return res.status(400).json({ error: 'Not connected to QuickBooks. Check Railway environment variables.' });
   }
 
-  if (!accessToken || !effectiveCompanyId) {
-    return res.status(400).json({ error: 'Missing required fields: accessToken, companyId' });
-  }
-
-  const baseUrl = effectiveEnv === 'production'
+  const baseUrl = environment === 'production'
     ? 'https://quickbooks.api.intuit.com'
     : 'https://sandbox-quickbooks.api.intuit.com';
 
   const today = new Date();
   const todayStr = today.toISOString().split('T')[0];
 
-  const query = effectiveEnv === 'production'
+  const query = environment === 'production'
     ? `SELECT * FROM Invoice WHERE TxnDate = '${todayStr}' ORDERBY TxnDate ASC MAXRESULTS 100`
     : `SELECT * FROM Invoice ORDERBY TxnDate DESC MAXRESULTS 100`;
 
   try {
     const response = await fetch(
-      `${baseUrl}/v3/company/${effectiveCompanyId}/query?query=${encodeURIComponent(query)}&minorversion=65`,
-      {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Accept': 'application/json'
-        }
-      }
+      `${baseUrl}/v3/company/${companyId}/query?query=${encodeURIComponent(query)}&minorversion=65`,
+      { method: 'GET', headers: { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' } }
     );
-
     const data = await response.json();
-
     if (!response.ok) {
       return res.status(response.status).json({ error: 'QuickBooks API error', details: data });
     }
 
     const invoices = data.QueryResponse?.Invoice || [];
-
     const formatAddress = (addr) => {
       if (!addr) return null;
       return {
-        line1: addr.Line1 || '',
-        line2: addr.Line2 || '',
-        city: addr.City || '',
-        state: addr.CountrySubDivisionCode || '',
+        line1: addr.Line1 || '', line2: addr.Line2 || '',
+        city: addr.City || '', state: addr.CountrySubDivisionCode || '',
         zip: addr.PostalCode || '',
         full: [addr.Line1, addr.City, addr.CountrySubDivisionCode, addr.PostalCode].filter(Boolean).join(', ')
       };
@@ -219,11 +204,10 @@ app.post('/api/invoices', async (req, res) => {
     res.json({
       count: formatted.length,
       invoices: formatted,
-      environment: effectiveEnv,
-      tokenAutoRefresh: true,
+      environment,
+      autoRefresh: true,
       queriedAt: new Date().toISOString()
     });
-
   } catch (err) {
     console.error('Invoice fetch error:', err);
     res.status(500).json({ error: 'Server error fetching invoices' });
@@ -232,73 +216,45 @@ app.post('/api/invoices', async (req, res) => {
 
 // ─── FETCH CUSTOMERS ──────────────────────────────────────────────────────────
 app.post('/api/customers', async (req, res) => {
-  const { companyId, environment } = req.body;
+  let accessToken = await getValidAccessToken() || req.body.accessToken;
+  const companyId = tokenStore.companyId || req.body.companyId;
+  const environment = tokenStore.environment || req.body.environment;
 
-  let accessToken = await getValidAccessToken();
-  const effectiveCompanyId = companyId || tokenStore.companyId;
-  const effectiveEnv = environment || tokenStore.environment;
-
-  if (!accessToken) accessToken = req.body.accessToken;
-  if (!accessToken || !effectiveCompanyId) {
-    return res.status(400).json({ error: 'Missing required fields: accessToken, companyId' });
+  if (!accessToken || !companyId) {
+    return res.status(400).json({ error: 'Not connected to QuickBooks.' });
   }
 
-  const baseUrl = effectiveEnv === 'production'
+  const baseUrl = environment === 'production'
     ? 'https://quickbooks.api.intuit.com'
     : 'https://sandbox-quickbooks.api.intuit.com';
 
-  const query = `SELECT * FROM Customer WHERE Active = true ORDERBY DisplayName ASC MAXRESULTS 200`;
-
   try {
     const response = await fetch(
-      `${baseUrl}/v3/company/${effectiveCompanyId}/query?query=${encodeURIComponent(query)}&minorversion=65`,
-      {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${accessToken}`,
-          'Accept': 'application/json'
-        }
-      }
+      `${baseUrl}/v3/company/${companyId}/query?query=${encodeURIComponent('SELECT * FROM Customer WHERE Active = true ORDERBY DisplayName ASC MAXRESULTS 200')}&minorversion=65`,
+      { method: 'GET', headers: { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' } }
     );
-
     const data = await response.json();
-
     if (!response.ok) {
       return res.status(response.status).json({ error: 'QuickBooks API error', details: data });
     }
 
-    const customers = data.QueryResponse?.Customer || [];
-
     const formatAddress = (addr) => {
       if (!addr) return null;
       return {
-        line1: addr.Line1 || '',
-        line2: addr.Line2 || '',
-        city: addr.City || '',
-        state: addr.CountrySubDivisionCode || '',
+        line1: addr.Line1 || '', line2: addr.Line2 || '',
+        city: addr.City || '', state: addr.CountrySubDivisionCode || '',
         zip: addr.PostalCode || '',
         full: [addr.Line1, addr.City, addr.CountrySubDivisionCode, addr.PostalCode].filter(Boolean).join(', ')
       };
     };
 
-    const formatted = customers.map(c => ({
-      id: c.Id,
-      displayName: c.DisplayName,
-      companyName: c.CompanyName || null,
-      email: c.PrimaryEmailAddr?.Address || null,
-      phone: c.PrimaryPhone?.FreeFormNumber || null,
-      balance: c.Balance,
-      shipAddress: formatAddress(c.ShipAddr),
-      billAddress: formatAddress(c.BillAddr)
+    const formatted = (data.QueryResponse?.Customer || []).map(c => ({
+      id: c.Id, displayName: c.DisplayName, companyName: c.CompanyName || null,
+      email: c.PrimaryEmailAddr?.Address || null, phone: c.PrimaryPhone?.FreeFormNumber || null,
+      balance: c.Balance, shipAddress: formatAddress(c.ShipAddr), billAddress: formatAddress(c.BillAddr)
     }));
 
-    res.json({
-      count: formatted.length,
-      customers: formatted,
-      environment: effectiveEnv,
-      queriedAt: new Date().toISOString()
-    });
-
+    res.json({ count: formatted.length, customers: formatted, environment, queriedAt: new Date().toISOString() });
   } catch (err) {
     console.error('Customer fetch error:', err);
     res.status(500).json({ error: 'Server error fetching customers' });
@@ -307,18 +263,16 @@ app.post('/api/customers', async (req, res) => {
 
 // ─── TOKEN STATUS ─────────────────────────────────────────────────────────────
 app.get('/api/token-status', (req, res) => {
-  const hasToken = !!tokenStore.accessToken;
-  const expiresIn = tokenStore.expiresAt ? Math.round((tokenStore.expiresAt - Date.now()) / 1000) : null;
   res.json({
-    connected: hasToken,
-    expiresInSeconds: expiresIn,
+    connected: !!tokenStore.accessToken,
+    expiresInSeconds: tokenStore.expiresAt ? Math.round((tokenStore.expiresAt - Date.now()) / 1000) : null,
     environment: tokenStore.environment,
     companyId: tokenStore.companyId
   });
 });
 
-// ─── START SERVER ─────────────────────────────────────────────────────────────
-app.listen(PORT, () => {
+// ─── START ────────────────────────────────────────────────────────────────────
+app.listen(PORT, async () => {
   console.log(`Cellar Route Server running on port ${PORT}`);
-  console.log(`App available at http://localhost:${PORT}/`);
+  await startup();
 });
