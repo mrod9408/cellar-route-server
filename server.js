@@ -6,8 +6,13 @@ const path = require('path');
 const app = express();
 const PORT = process.env.PORT || 8080;
 
-app.use(cors());
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(express.json());
+app.options('*', cors());
 
 // Serve the Cellar Route frontend app from /public folder
 app.use(express.static(path.join(__dirname, 'public')));
