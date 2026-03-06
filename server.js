@@ -71,8 +71,11 @@ app.post('/api/invoices', async (req, res) => {
   const today = new Date();
   const todayStr = today.toISOString().split('T')[0];
 
-  // Query for invoices created today (by invoice date)
-  const query = `SELECT * FROM Invoice WHERE TxnDate = '${todayStr}' ORDERBY TxnDate ASC MAXRESULTS 100`;
+  // Production: pull today's invoices by invoice date (TxnDate)
+  // Sandbox: pull most recent 100 invoices for testing (sandbox has no today's invoices)
+  const query = environment === 'production'
+    ? `SELECT * FROM Invoice WHERE TxnDate = '${todayStr}' ORDERBY TxnDate ASC MAXRESULTS 100`
+    : `SELECT * FROM Invoice ORDERBY TxnDate DESC MAXRESULTS 100`;
 
   try {
     const response = await fetch(
@@ -97,18 +100,34 @@ app.post('/api/invoices', async (req, res) => {
 
     const invoices = data.QueryResponse?.Invoice || [];
 
+    // Helper to format address object
+    const formatAddress = (addr) => {
+      if (!addr) return null;
+      return {
+        line1: addr.Line1 || '',
+        line2: addr.Line2 || '',
+        city: addr.City || '',
+        state: addr.CountrySubDivisionCode || '',
+        zip: addr.PostalCode || '',
+        full: [addr.Line1, addr.City, addr.CountrySubDivisionCode, addr.PostalCode]
+          .filter(Boolean)
+          .join(', ')
+      };
+    };
+
     // Map to a clean format for the app
     const formatted = invoices.map(inv => ({
       id: inv.Id,
-      docNumber: inv.DocNumber,
+      invoiceNumber: inv.DocNumber || 'N/A',
       customerName: inv.CustomerRef?.name || 'Unknown',
       customerId: inv.CustomerRef?.value,
+      invoiceDate: inv.TxnDate,
       dueDate: inv.DueDate,
       balance: inv.Balance,
       totalAmount: inv.TotalAmt,
       status: inv.EmailStatus,
-      shipAddress: inv.ShipAddr || null,
-      billAddress: inv.BillAddr || null
+      shipAddress: formatAddress(inv.ShipAddr),
+      billAddress: formatAddress(inv.BillAddr)
     }));
 
     res.json({
@@ -161,6 +180,21 @@ app.post('/api/customers', async (req, res) => {
 
     const customers = data.QueryResponse?.Customer || [];
 
+    // Helper to format address object
+    const formatAddress = (addr) => {
+      if (!addr) return null;
+      return {
+        line1: addr.Line1 || '',
+        line2: addr.Line2 || '',
+        city: addr.City || '',
+        state: addr.CountrySubDivisionCode || '',
+        zip: addr.PostalCode || '',
+        full: [addr.Line1, addr.City, addr.CountrySubDivisionCode, addr.PostalCode]
+          .filter(Boolean)
+          .join(', ')
+      };
+    };
+
     // Map to a clean format
     const formatted = customers.map(c => ({
       id: c.Id,
@@ -169,8 +203,8 @@ app.post('/api/customers', async (req, res) => {
       email: c.PrimaryEmailAddr?.Address || null,
       phone: c.PrimaryPhone?.FreeFormNumber || null,
       balance: c.Balance,
-      shipAddress: c.ShipAddr || null,
-      billAddress: c.BillAddr || null
+      shipAddress: formatAddress(c.ShipAddr),
+      billAddress: formatAddress(c.BillAddr)
     }));
 
     res.json({
