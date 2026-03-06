@@ -20,7 +20,8 @@ let tokenStore = {
   clientSecret: process.env.QB_CLIENT_SECRET || null,
   companyId: process.env.QB_COMPANY_ID || null,
   environment: process.env.QB_ENVIRONMENT || 'sandbox',
-  expiresAt: null
+  expiresAt: null,
+  refreshTokenExpiresAt: Date.now() + (101 * 24 * 60 * 60 * 1000) // ~101 days from first run
 };
 
 // ─── TOKEN REFRESH ────────────────────────────────────────────────────────────
@@ -49,6 +50,8 @@ async function doTokenRefresh() {
     tokenStore.accessToken = data.access_token;
     tokenStore.refreshToken = data.refresh_token; // Intuit rotates refresh tokens
     tokenStore.expiresAt = Date.now() + (data.expires_in - 300) * 1000; // refresh 5 min early
+    // Intuit refresh tokens last ~101 days — reset the expiry clock on each rotation
+    tokenStore.refreshTokenExpiresAt = Date.now() + (101 * 24 * 60 * 60 * 1000);
     console.log('✓ Access token refreshed successfully');
     return true;
   } catch (err) {
@@ -263,9 +266,15 @@ app.post('/api/customers', async (req, res) => {
 
 // ─── TOKEN STATUS ─────────────────────────────────────────────────────────────
 app.get('/api/token-status', (req, res) => {
+  const refreshTokenExpiresInDays = tokenStore.refreshTokenExpiresAt
+    ? Math.round((tokenStore.refreshTokenExpiresAt - Date.now()) / (1000 * 60 * 60 * 24))
+    : null;
   res.json({
     connected: !!tokenStore.accessToken,
     expiresInSeconds: tokenStore.expiresAt ? Math.round((tokenStore.expiresAt - Date.now()) / 1000) : null,
+    refreshTokenExpiresInDays,
+    refreshTokenExpiringSoon: refreshTokenExpiresInDays !== null && refreshTokenExpiresInDays <= 14,
+    refreshTokenExpired: refreshTokenExpiresInDays !== null && refreshTokenExpiresInDays <= 0,
     environment: tokenStore.environment,
     companyId: tokenStore.companyId
   });
