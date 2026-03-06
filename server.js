@@ -12,7 +12,94 @@ app.use(express.json());
 // Serve the Cellar Route frontend app from /public folder
 app.use(express.static(path.join(__dirname, 'public')));
 
-// Refresh OAuth token
+// ─── TOKEN STORE ─────────────────────────────────────────────────────────────
+// Stores the current token set in memory on the server
+// Automatically refreshes before expiry so the app never goes stale
+let tokenStore = {
+  accessToken: null,
+  refreshToken: null,
+  clientId: null,
+  clientSecret: null,
+  expiresAt: null,      // timestamp when access token expires
+  companyId: null,
+  environment: 'sandbox'
+};
+
+// Refresh the access token using the stored refresh token
+async function doTokenRefresh() {
+  if (!tokenStore.refreshToken || !tokenStore.clientId || !tokenStore.clientSecret) {
+    console.log('No refresh token stored — skipping auto-refresh');
+    return false;
+  }
+  try {
+    console.log('Auto-refreshing access token...');
+    const credentials = Buffer.from(`${tokenStore.clientId}:${tokenStore.clientSecret}`).toString('base64');
+    const response = await fetch('https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${credentials}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept': 'application/json'
+      },
+      body: `grant_type=refresh_token&refresh_token=${encodeURIComponent(tokenStore.refreshToken)}`
+    });
+    const data = await response.json();
+    if (!response.ok) {
+      console.error('Auto-refresh failed:', data.error);
+      return false;
+    }
+    tokenStore.accessToken = data.access_token;
+    tokenStore.refreshToken = data.refresh_token; // Intuit rotates refresh tokens
+    tokenStore.expiresAt = Date.now() + (data.expires_in - 300) * 1000; // refresh 5 min early
+    console.log('Access token refreshed successfully');
+    return true;
+  } catch (err) {
+    console.error('Auto-refresh error:', err);
+    return false;
+  }
+}
+
+// Get a valid access token — refreshes automatically if expiring soon
+async function getValidAccessToken() {
+  if (!tokenStore.accessToken) return null;
+  if (tokenStore.expiresAt && Date.now() >= tokenStore.expiresAt) {
+    const success = await doTokenRefresh();
+    if (!success) return null;
+  }
+  return tokenStore.accessToken;
+}
+
+// Auto-refresh timer — checks every 50 minutes
+setInterval(async () => {
+  if (tokenStore.refreshToken && tokenStore.expiresAt && Date.now() >= tokenStore.expiresAt) {
+    await doTokenRefresh();
+  }
+}, 50 * 60 * 1000);
+
+// ─── SAVE CREDENTIALS ────────────────────────────────────────────────────────
+// Called once when the app first connects — stores credentials server-side
+app.post('/api/connect', async (req, res) => {
+  const { accessToken, refreshToken, clientId, clientSecret, companyId, environment, expiresIn } = req.body;
+
+  if (!accessToken || !refreshToken || !clientId || !clientSecret || !companyId) {
+    return res.status(400).json({ error: 'Missing required fields' });
+  }
+
+  tokenStore = {
+    accessToken,
+    refreshToken,
+    clientId,
+    clientSecret,
+    companyId,
+    environment: environment || 'sandbox',
+    expiresAt: Date.now() + ((expiresIn || 3600) - 300) * 1000
+  };
+
+  console.log(`Credentials stored for company ${companyId} (${environment})`);
+  res.json({ success: true, message: 'Credentials saved. Token will auto-refresh.' });
+});
+
+// ─── REFRESH TOKEN (manual) ───────────────────────────────────────────────────
 app.post('/api/refresh-token', async (req, res) => {
   const { refreshToken, clientId, clientSecret } = req.body;
 
@@ -38,6 +125,11 @@ app.post('/api/refresh-token', async (req, res) => {
       return res.status(response.status).json({ error: data.error || 'Token refresh failed', details: data });
     }
 
+    // Update the token store with new tokens
+    tokenStore.accessToken = data.access_token;
+    tokenStore.refreshToken = data.refresh_token;
+    tokenStore.expiresAt = Date.now() + (data.expires_in - 300) * 1000;
+
     res.json({
       accessToken: data.access_token,
       refreshToken: data.refresh_token,
@@ -49,31 +141,37 @@ app.post('/api/refresh-token', async (req, res) => {
   }
 });
 
-// Fetch invoices from QuickBooks
+// ─── FETCH INVOICES ───────────────────────────────────────────────────────────
 app.post('/api/invoices', async (req, res) => {
-  const { accessToken, companyId, environment } = req.body;
+  const { companyId, environment } = req.body;
 
-  if (!accessToken || !companyId) {
+  // Use server-stored token if available, otherwise fall back to request token
+  let accessToken = await getValidAccessToken();
+  const effectiveCompanyId = companyId || tokenStore.companyId;
+  const effectiveEnv = environment || tokenStore.environment;
+
+  if (!accessToken) {
+    accessToken = req.body.accessToken;
+  }
+
+  if (!accessToken || !effectiveCompanyId) {
     return res.status(400).json({ error: 'Missing required fields: accessToken, companyId' });
   }
 
-  const baseUrl = environment === 'production'
+  const baseUrl = effectiveEnv === 'production'
     ? 'https://quickbooks.api.intuit.com'
     : 'https://sandbox-quickbooks.api.intuit.com';
 
-  // Get today's date in YYYY-MM-DD format
   const today = new Date();
   const todayStr = today.toISOString().split('T')[0];
 
-  // Production: pull today's invoices by invoice date (TxnDate)
-  // Sandbox: pull most recent 100 invoices for testing (sandbox has no today's invoices)
-  const query = environment === 'production'
+  const query = effectiveEnv === 'production'
     ? `SELECT * FROM Invoice WHERE TxnDate = '${todayStr}' ORDERBY TxnDate ASC MAXRESULTS 100`
     : `SELECT * FROM Invoice ORDERBY TxnDate DESC MAXRESULTS 100`;
 
   try {
     const response = await fetch(
-      `${baseUrl}/v3/company/${companyId}/query?query=${encodeURIComponent(query)}&minorversion=65`,
+      `${baseUrl}/v3/company/${effectiveCompanyId}/query?query=${encodeURIComponent(query)}&minorversion=65`,
       {
         method: 'GET',
         headers: {
@@ -86,15 +184,11 @@ app.post('/api/invoices', async (req, res) => {
     const data = await response.json();
 
     if (!response.ok) {
-      return res.status(response.status).json({
-        error: 'QuickBooks API error',
-        details: data
-      });
+      return res.status(response.status).json({ error: 'QuickBooks API error', details: data });
     }
 
     const invoices = data.QueryResponse?.Invoice || [];
 
-    // Helper to format address object
     const formatAddress = (addr) => {
       if (!addr) return null;
       return {
@@ -103,13 +197,10 @@ app.post('/api/invoices', async (req, res) => {
         city: addr.City || '',
         state: addr.CountrySubDivisionCode || '',
         zip: addr.PostalCode || '',
-        full: [addr.Line1, addr.City, addr.CountrySubDivisionCode, addr.PostalCode]
-          .filter(Boolean)
-          .join(', ')
+        full: [addr.Line1, addr.City, addr.CountrySubDivisionCode, addr.PostalCode].filter(Boolean).join(', ')
       };
     };
 
-    // Map to a clean format for the app
     const formatted = invoices.map(inv => ({
       id: inv.Id,
       invoiceNumber: inv.DocNumber || 'N/A',
@@ -120,6 +211,7 @@ app.post('/api/invoices', async (req, res) => {
       balance: inv.Balance,
       totalAmount: inv.TotalAmt,
       status: inv.EmailStatus,
+      lineItems: (inv.Line || []).map(l => ({ qty: l.SalesItemLineDetail?.Qty || 0, description: l.Description || '' })),
       shipAddress: formatAddress(inv.ShipAddr),
       billAddress: formatAddress(inv.BillAddr)
     }));
@@ -127,7 +219,8 @@ app.post('/api/invoices', async (req, res) => {
     res.json({
       count: formatted.length,
       invoices: formatted,
-      environment: environment || 'sandbox',
+      environment: effectiveEnv,
+      tokenAutoRefresh: true,
       queriedAt: new Date().toISOString()
     });
 
@@ -137,15 +230,20 @@ app.post('/api/invoices', async (req, res) => {
   }
 });
 
-// Fetch active customers from QuickBooks
+// ─── FETCH CUSTOMERS ──────────────────────────────────────────────────────────
 app.post('/api/customers', async (req, res) => {
-  const { accessToken, companyId, environment } = req.body;
+  const { companyId, environment } = req.body;
 
-  if (!accessToken || !companyId) {
+  let accessToken = await getValidAccessToken();
+  const effectiveCompanyId = companyId || tokenStore.companyId;
+  const effectiveEnv = environment || tokenStore.environment;
+
+  if (!accessToken) accessToken = req.body.accessToken;
+  if (!accessToken || !effectiveCompanyId) {
     return res.status(400).json({ error: 'Missing required fields: accessToken, companyId' });
   }
 
-  const baseUrl = environment === 'production'
+  const baseUrl = effectiveEnv === 'production'
     ? 'https://quickbooks.api.intuit.com'
     : 'https://sandbox-quickbooks.api.intuit.com';
 
@@ -153,7 +251,7 @@ app.post('/api/customers', async (req, res) => {
 
   try {
     const response = await fetch(
-      `${baseUrl}/v3/company/${companyId}/query?query=${encodeURIComponent(query)}&minorversion=65`,
+      `${baseUrl}/v3/company/${effectiveCompanyId}/query?query=${encodeURIComponent(query)}&minorversion=65`,
       {
         method: 'GET',
         headers: {
@@ -166,15 +264,11 @@ app.post('/api/customers', async (req, res) => {
     const data = await response.json();
 
     if (!response.ok) {
-      return res.status(response.status).json({
-        error: 'QuickBooks API error',
-        details: data
-      });
+      return res.status(response.status).json({ error: 'QuickBooks API error', details: data });
     }
 
     const customers = data.QueryResponse?.Customer || [];
 
-    // Helper to format address object
     const formatAddress = (addr) => {
       if (!addr) return null;
       return {
@@ -183,13 +277,10 @@ app.post('/api/customers', async (req, res) => {
         city: addr.City || '',
         state: addr.CountrySubDivisionCode || '',
         zip: addr.PostalCode || '',
-        full: [addr.Line1, addr.City, addr.CountrySubDivisionCode, addr.PostalCode]
-          .filter(Boolean)
-          .join(', ')
+        full: [addr.Line1, addr.City, addr.CountrySubDivisionCode, addr.PostalCode].filter(Boolean).join(', ')
       };
     };
 
-    // Map to a clean format
     const formatted = customers.map(c => ({
       id: c.Id,
       displayName: c.DisplayName,
@@ -204,7 +295,7 @@ app.post('/api/customers', async (req, res) => {
     res.json({
       count: formatted.length,
       customers: formatted,
-      environment: environment || 'sandbox',
+      environment: effectiveEnv,
       queriedAt: new Date().toISOString()
     });
 
@@ -214,8 +305,20 @@ app.post('/api/customers', async (req, res) => {
   }
 });
 
-// Start server
+// ─── TOKEN STATUS ─────────────────────────────────────────────────────────────
+app.get('/api/token-status', (req, res) => {
+  const hasToken = !!tokenStore.accessToken;
+  const expiresIn = tokenStore.expiresAt ? Math.round((tokenStore.expiresAt - Date.now()) / 1000) : null;
+  res.json({
+    connected: hasToken,
+    expiresInSeconds: expiresIn,
+    environment: tokenStore.environment,
+    companyId: tokenStore.companyId
+  });
+});
+
+// ─── START SERVER ─────────────────────────────────────────────────────────────
 app.listen(PORT, () => {
   console.log(`Cellar Route Server running on port ${PORT}`);
-  console.log(`Health check: http://localhost:${PORT}/`);
+  console.log(`App available at http://localhost:${PORT}/`);
 });
