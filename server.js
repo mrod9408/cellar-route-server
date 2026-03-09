@@ -55,7 +55,6 @@ async function doTokenRefresh() {
     tokenStore.accessToken = data.access_token;
     tokenStore.refreshToken = data.refresh_token; // Intuit rotates refresh tokens
     tokenStore.expiresAt = Date.now() + (data.expires_in - 300) * 1000; // refresh 5 min early
-    // Intuit refresh tokens last ~101 days — reset the expiry clock on each rotation
     tokenStore.refreshTokenExpiresAt = Date.now() + (101 * 24 * 60 * 60 * 1000);
     console.log('✓ Access token refreshed successfully');
     return true;
@@ -98,13 +97,20 @@ async function startup() {
   }
 }
 
+// ─── CLIENT CONFIG (safe to expose to frontend) ───────────────────────────────
+// Serves non-secret config values to the frontend so tokens are never hardcoded in source
+app.get('/api/config', (req, res) => {
+  res.json({
+    mapboxToken: process.env.MAPBOX_TOKEN || ''
+  });
+});
+
 // ─── SAVE CREDENTIALS (manual override from app) ─────────────────────────────
 app.post('/api/connect', async (req, res) => {
   const { accessToken, refreshToken, clientId, clientSecret, companyId, environment, expiresIn } = req.body;
   if (!accessToken || !companyId) {
     return res.status(400).json({ error: 'Missing required fields' });
   }
-  // Override store with manually provided credentials
   if (refreshToken) tokenStore.refreshToken = refreshToken;
   if (clientId) tokenStore.clientId = clientId;
   if (clientSecret) tokenStore.clientSecret = clientSecret;
@@ -161,11 +167,9 @@ app.get('/api/invoices', async (req, res) => {
     return res.status(400).json({ error: 'Not connected to QuickBooks. Check Railway environment variables.' });
   }
 
-  // Try both possible production endpoints
   const baseUrls = environment === 'production'
     ? ['https://quickbooks.api.intuit.com', 'https://qbo.api.intuit.com', 'https://c1.qbo.intuit.com', 'https://c3.qbo.intuit.com', 'https://c5.qbo.intuit.com']
     : ['https://sandbox-quickbooks.api.intuit.com'];
-  let baseUrl = baseUrls[0];
 
   const today = new Date();
   const todayStr = today.toISOString().split('T')[0];
@@ -204,8 +208,7 @@ app.get('/api/invoices', async (req, res) => {
       const city = addr.City || '';
       const state = addr.CountrySubDivisionCode || '';
       const zip = addr.PostalCode || '';
-      // Build the best possible full address for Google Maps
-      const full = [line2, city, state, zip].filter(Boolean).join(', ') 
+      const full = [line2, city, state, zip].filter(Boolean).join(', ')
         || [line1, line2].filter(Boolean).join(' ')
         || line1;
       return { line1, line2, city, state, zip, full };
@@ -256,10 +259,10 @@ app.get('/api/customers', async (req, res) => {
   try {
     const custHeaders = { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' };
     const custUrl = `${baseUrl}/v3/company/${companyId}/query?query=${encodeURIComponent('SELECT * FROM Customer WHERE Active = true ORDERBY DisplayName ASC MAXRESULTS 200')}&minorversion=65`;
-    
+
     let response = await fetch(custUrl, { method: 'GET', headers: custHeaders, redirect: 'manual' });
-    
-    if (response.status === 301 || response.status === 302 || response.status === 307 || response.status === 308) {
+
+    if ([301, 302, 307, 308].includes(response.status)) {
       const redirectUrl = response.headers.get('location');
       console.log(`Following QB redirect to: ${redirectUrl}`);
       response = await fetch(redirectUrl, { method: 'GET', headers: custHeaders });
@@ -313,7 +316,6 @@ app.get('/api/token-status', (req, res) => {
 });
 
 // ─── OAUTH AUTHORIZE ─────────────────────────────────────────────────────────
-// Visit /authorize in your browser to kick off the production OAuth flow
 app.get('/authorize', (req, res) => {
   const clientId = tokenStore.clientId || process.env.QB_CLIENT_ID;
   const redirectUri = `https://cellar-route-server-production.up.railway.app/callback`;
@@ -324,7 +326,6 @@ app.get('/authorize', (req, res) => {
 });
 
 // ─── OAUTH CALLBACK ───────────────────────────────────────────────────────────
-// Intuit redirects here after authorization with the code
 app.get('/callback', async (req, res) => {
   const { code, realmId, error } = req.query;
 
@@ -357,7 +358,6 @@ app.get('/callback', async (req, res) => {
       return res.send(`<h2>Token exchange failed</h2><pre>${JSON.stringify(data, null, 2)}</pre>`);
     }
 
-    // Store tokens
     tokenStore.accessToken = data.access_token;
     tokenStore.refreshToken = data.refresh_token;
     tokenStore.companyId = realmId;
