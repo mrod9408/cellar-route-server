@@ -1071,54 +1071,126 @@ function runAutoRoute() {
   const selectedInvoices = invoices.filter(inv => selectedInvoiceIds.has(inv.id));
   if (!selectedInvoices.length) { showToast('No invoices selected'); return; }
 
-  // Lock coords onto every invoice now so the map always uses the same values
-  selectedInvoices.forEach(inv => {
-    if (!inv._coords) inv._coords = getCoords(inv);
-  });
+  // Lock coords onto every invoice now — map always reads these same values
+  selectedInvoices.forEach(inv => { if (!inv._coords) inv._coords = getCoords(inv); });
 
-  // Build territory-based vans
-  const vans = buildTerritoryRoutes(selectedInvoices, driverCount, caseLimit);
   const totalCases = selectedInvoices.reduce((s, i) => s + (i.cases || 0), 0);
 
-  // Map vans to clusters with color, driver, display name
-  clusters = vans.map((van, i) => {
+  // Step 1: Get geography-aware territory groupings
+  const geoVans = buildTerritoryRoutes(selectedInvoices, driverCount, caseLimit);
+
+  // Step 2: If geoVans count matches driverCount, use as-is
+  //         If geoVans < driverCount, split largest vans to fill driver slots
+  //         If geoVans > driverCount, merge smallest vans into the nearest territory
+  let finalVans = rebalanceVans(geoVans, driverCount, caseLimit);
+
+  // Step 3: Build cluster objects
+  clusters = finalVans.map((van, i) => {
     const label = van.subRegion ? `${van.territory} — ${van.subRegion}` : van.territory;
     return {
-      id: i,
-      stops: van.stops,
-      cases: van.cases,
-      zone: label,
-      territory: van.territory,
-      subRegion: van.subRegion,
+      id: i, stops: van.stops, cases: van.cases,
+      zone: label, territory: van.territory, subRegion: van.subRegion,
       driver: drivers[i] || null,
       overLimit: van.cases > caseLimit,
       color: ROUTE_COLORS[i % ROUTE_COLORS.length]
     };
   });
 
-  // Auto-assign drivers in priority order
+  // Auto-assign drivers
   clusters.forEach((c, i) => {
-    if (drivers[i]) {
-      c.driver = drivers[i];
-      c.stops.forEach(inv => { assignments[inv.id] = drivers[i]; });
-    }
+    if (drivers[i]) { c.driver = drivers[i]; c.stops.forEach(inv => { assignments[inv.id] = drivers[i]; }); }
   });
 
-  // Build warnings
+  // Warnings
   const warns = [];
-  if (clusters.length > driverCount) {
-    warns.push(`⚠️ ${clusters.length} routes needed but only ${driverCount} drivers entered — consider adding more drivers or increasing the case limit.`);
+  const overLimit = clusters.filter(c => c.overLimit);
+  if (overLimit.length) {
+    overLimit.forEach(c => warns.push(`⚠️ Route ${clusters.indexOf(c)+1} (${c.zone}) has ${c.cases} cases — over ${caseLimit} limit.`));
   }
-  clusters.forEach((c, i) => {
-    if (c.overLimit) warns.push(`⚠️ Route ${i+1} (${c.zone}) has ${c.cases} cases — over ${caseLimit} limit.`);
-  });
 
-  saveState();
-  updateStats();
+  saveState(); updateStats();
   document.getElementById('warningBanners').innerHTML = warns.map(w =>
     `<div class="warn-banner"><span>🟠</span><span>${w}</span></div>`).join('');
   renderClusters();
   showToast(`✓ ${clusters.length} routes generated`);
+}
+
+// ── REBALANCE: adjust van count to exactly match driverCount ─────────────────
+function rebalanceVans(geoVans, driverCount, caseLimit) {
+  let vans = geoVans.map(v => ({ ...v, stops: [...v.stops] }));
+
+  // If we have more geo vans than drivers: merge smallest into geographically closest
+  while (vans.length > driverCount) {
+    // Find the smallest van by stop count
+    vans.sort((a, b) => a.stops.length - b.stops.length);
+    const small = vans.shift(); // remove smallest
+
+    // Find best receiving van: same territory first, then fewest cases
+    let best = vans.find(v => v.territory === small.territory);
+    if (!best) best = vans.reduce((m, v) => v.cases < m.cases ? v : m, vans[0]);
+
+    best.stops = sortByDrivingPath([...best.stops, ...small.stops]);
+    best.cases += small.cases;
+    best.overLimit = best.cases > caseLimit;
+    // Update zone label to reflect merge
+    if (best.territory !== small.territory) {
+      best.territory = best.territory + ' + ' + small.territory;
+      best.zone = best.territory;
+      best.subRegion = null;
+    }
+  }
+
+  // If we have fewer geo vans than drivers: split largest vans by subRegion or halve them
+  while (vans.length < driverCount) {
+    // Find the largest van by stop count that has more than 1 stop
+    vans.sort((a, b) => b.stops.length - a.stops.length);
+    const big = vans[0];
+    if (big.stops.length < 2) break; // can't split further
+
+    // Try to split by subRegion first
+    const subGroups = {};
+    big.stops.forEach(inv => {
+      const sr = getSubRegionForInvoice(inv);
+      if (!subGroups[sr]) subGroups[sr] = [];
+      subGroups[sr].push(inv);
+    });
+
+    const subKeys = Object.keys(subGroups);
+    if (subKeys.length > 1) {
+      // Split into subRegion groups
+      vans.splice(0, 1); // remove big van
+      subKeys.forEach(sr => {
+        const srStops = sortByDrivingPath(subGroups[sr]);
+        const srCases = srStops.reduce((s, i) => s + (i.cases || 0), 0);
+        vans.push({ territory: big.territory, subRegion: sr, stops: srStops, cases: srCases, overLimit: srCases > caseLimit });
+      });
+    } else {
+      // Same subRegion — split in half by stop count
+      vans.splice(0, 1);
+      const half = Math.ceil(big.stops.length / 2);
+      const sorted = sortByDrivingPath(big.stops);
+      const first  = sorted.slice(0, half);
+      const second = sorted.slice(half);
+      const firstCases  = first.reduce((s, i)  => s + (i.cases || 0), 0);
+      const secondCases = second.reduce((s, i) => s + (i.cases || 0), 0);
+      vans.push({ territory: big.territory, subRegion: big.subRegion ? big.subRegion + ' A' : 'Part 1', stops: first,  cases: firstCases,  overLimit: firstCases  > caseLimit });
+      vans.push({ territory: big.territory, subRegion: big.subRegion ? big.subRegion + ' B' : 'Part 2', stops: second, cases: secondCases, overLimit: secondCases > caseLimit });
+    }
+  }
+
+  // Final sort: re-order vans by territory priority for consistent display
+  const priority = ['NYC','Long Island','NJ','CT','Westchester','Hudson Valley'];
+  vans.sort((a, b) => {
+    const at = a.territory.split(' + ')[0];
+    const bt = b.territory.split(' + ')[0];
+    const ai = priority.findIndex(p => at.includes(p));
+    const bi = priority.findIndex(p => bt.includes(p));
+    if (ai === -1 && bi === -1) return a.territory.localeCompare(b.territory);
+    if (ai === -1) return 1; if (bi === -1) return -1;
+    return ai - bi;
+  });
+
+  return vans;
 }
 
 // ═══════════════════ RENDER CLUSTERS ═════════════════════════════════════════
@@ -1205,12 +1277,32 @@ function markClusterComplete(ci) {
 }
 
 // ═══════════════════ MAP ══════════════════════════════════════════════════════
-function initOrRefreshMap() {
+async function initOrRefreshMap() {
   if (!clusters.length) {
     document.getElementById('mapEmptyState').style.display='block';
     document.getElementById('mapContent').style.display='none';
     return;
   }
+
+  // If token still empty, try fetching it now (handles case where initApp fetch failed)
+  if (!MAPBOX_TOKEN) {
+    try {
+      const base = document.getElementById('serverUrl')?.value.trim() || serverUrl;
+      const cfg = await fetch(base + '/api/config').then(r => r.json()).catch(() => ({}));
+      if (cfg.mapboxToken) MAPBOX_TOKEN = cfg.mapboxToken;
+    } catch(e) {}
+  }
+
+  if (!MAPBOX_TOKEN) {
+    document.getElementById('mapEmptyState').style.display='block';
+    document.getElementById('mapEmptyState').innerHTML = `
+      <div class="empty-icon">⚠️</div>
+      <div class="empty-title">Map token not loaded</div>
+      <div class="empty-text">Make sure MAPBOX_TOKEN is set in your Railway environment variables and the server has redeployed.</div>`;
+    document.getElementById('mapContent').style.display='none';
+    return;
+  }
+
   document.getElementById('mapEmptyState').style.display='none';
   document.getElementById('mapContent').style.display='block';
 
@@ -1220,7 +1312,7 @@ function initOrRefreshMap() {
     `<div class="legend-item"><div class="legend-dot" style="background:${c.color}"></div>Route ${i+1}${c.driver?' · '+c.driver:''}</div>`
   ).join('');
 
-  // Collect all stops with coords
+  // Collect all stops that have locked coords
   const allStops = [];
   clusters.forEach((cluster, ci) => {
     cluster.stops.forEach((inv, si) => {
@@ -1231,76 +1323,108 @@ function initOrRefreshMap() {
 
   if (!allStops.length) {
     document.getElementById('mapEmptyState').style.display='block';
+    document.getElementById('mapEmptyState').innerHTML = `
+      <div class="empty-icon">📍</div>
+      <div class="empty-title">No mappable stops</div>
+      <div class="empty-text">None of today's stops have ZIP codes that could be geocoded. Check that your QuickBooks addresses include ZIP codes.</div>`;
     document.getElementById('mapContent').style.display='none';
     return;
   }
 
-  // Calculate center
-  const avgLat = allStops.reduce((s,s2)=>s+s2.coords.lat,0)/allStops.length;
-  const avgLng = allStops.reduce((s,s2)=>s+s2.coords.lng,0)/allStops.length;
-
-  // Destroy old map
-  if (mapInstance) { mapInstance.remove(); mapInstance = null; }
+  // Destroy old map instance cleanly
+  if (mapInstance) { try { mapInstance.remove(); } catch(e) {} mapInstance = null; }
   mapMarkers = [];
 
-  mapboxgl.accessToken = MAPBOX_TOKEN;
-  mapInstance = new mapboxgl.Map({
-    container: 'routeMap',
-    style: 'mapbox://styles/mapbox/satellite-streets-v12',
-    center: [avgLng, avgLat],
-    zoom: 9,
-    attributionControl: false
-  });
+  // Small delay to let the DOM settle after display:block
+  await new Promise(r => setTimeout(r, 50));
 
-  mapInstance.addControl(new mapboxgl.NavigationControl(), 'top-right');
+  try {
+    mapboxgl.accessToken = MAPBOX_TOKEN;
+    const avgLat = allStops.reduce((s,s2)=>s+s2.coords.lat,0)/allStops.length;
+    const avgLng = allStops.reduce((s,s2)=>s+s2.coords.lng,0)/allStops.length;
 
-  mapInstance.on('load', () => {
-    allStops.forEach(({ inv, ci, si, coords, color }) => {
-      // Custom marker element
-      const el = document.createElement('div');
-      el.style.cssText = `
-        width:30px;height:30px;border-radius:50%;background:${color};
-        border:2.5px solid white;display:flex;align-items:center;justify-content:center;
-        color:white;font-size:11px;font-weight:700;cursor:pointer;
-        box-shadow:0 2px 8px rgba(0,0,0,0.4);transition:transform 0.15s;
-        font-family:'DM Sans',sans-serif;
-      `;
-      el.textContent = si+1;
-      el.addEventListener('mouseenter', ()=>{ el.style.transform='scale(1.25)'; });
-      el.addEventListener('mouseleave', ()=>{ el.style.transform='scale(1)'; });
-
-      const addr = inv.shipAddress || inv.billAddress;
-      const addrText = addr ? (addr.full || addr.line1 || 'No address') : 'No address';
-      const cluster = clusters[ci];
-
-      const popupHtml = `
-        <div class="popup-inv">INV #${inv.invoiceNumber} · Route ${ci+1}</div>
-        <div class="popup-customer">${inv.customerName}</div>
-        <div class="popup-address">📍 ${addrText}</div>
-        <div class="popup-meta">
-          <span class="popup-cases">📦 ${inv.cases} cases</span>
-          <span class="popup-route" style="background:${color}">Route ${ci+1}${cluster.driver?' · '+cluster.driver:''}</span>
-        </div>
-        <button class="popup-reassign-btn" onclick="openReassignPanel('${inv.id}',${ci})">↔ Move to Different Route</button>`;
-
-      const popup = new mapboxgl.Popup({ offset: 18, closeButton: true, maxWidth: '260px' })
-        .setHTML(popupHtml);
-
-      const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
-        .setLngLat([coords.lng, coords.lat])
-        .setPopup(popup)
-        .addTo(mapInstance);
-
-      mapMarkers.push({ marker, inv, ci });
+    mapInstance = new mapboxgl.Map({
+      container: 'routeMap',
+      style: 'mapbox://styles/mapbox/satellite-streets-v12',
+      center: [avgLng, avgLat],
+      zoom: 9,
+      attributionControl: false
     });
 
-    // Fit map to all markers
-    if (allStops.length > 1) {
-      const bounds = allStops.reduce((b, s) => b.extend([s.coords.lng, s.coords.lat]),
-        new mapboxgl.LngLatBounds([allStops[0].coords.lng, allStops[0].coords.lat],[allStops[0].coords.lng, allStops[0].coords.lat]));
-      mapInstance.fitBounds(bounds, { padding: 60, maxZoom: 13 });
-    }
-  });
+    mapInstance.addControl(new mapboxgl.NavigationControl(), 'top-right');
+
+    mapInstance.on('error', (e) => {
+      console.error('Mapbox error:', e);
+      showToast('Map error — check token in Railway');
+    });
+
+    mapInstance.on('load', () => {
+      // Add warehouse marker
+      const warehouseEl = document.createElement('div');
+      warehouseEl.style.cssText = `
+        width:36px;height:36px;border-radius:50%;background:#4A1320;
+        border:3px solid #C9A84C;display:flex;align-items:center;justify-content:center;
+        color:#C9A84C;font-size:16px;cursor:pointer;
+        box-shadow:0 2px 10px rgba(0,0,0,0.5);z-index:10;
+      `;
+      warehouseEl.textContent = '🏭';
+      warehouseEl.title = 'Warehouse — 52 Poplar St, Stamford CT';
+      new mapboxgl.Marker({ element: warehouseEl, anchor: 'center' })
+        .setLngLat([-73.5387, 41.0534])
+        .setPopup(new mapboxgl.Popup({ offset:18 }).setHTML(
+          `<div class="popup-inv">WAREHOUSE</div><div class="popup-customer">52 Poplar St</div><div class="popup-address">Stamford, CT 06902</div>`
+        ))
+        .addTo(mapInstance);
+
+      // Add stop markers
+      allStops.forEach(({ inv, ci, si, coords, color }) => {
+        const el = document.createElement('div');
+        el.style.cssText = `
+          width:30px;height:30px;border-radius:50%;background:${color};
+          border:2.5px solid white;display:flex;align-items:center;justify-content:center;
+          color:white;font-size:11px;font-weight:700;cursor:pointer;
+          box-shadow:0 2px 8px rgba(0,0,0,0.4);transition:transform 0.15s;
+          font-family:'DM Sans',sans-serif;
+        `;
+        el.textContent = si + 1;
+        el.addEventListener('mouseenter', () => { el.style.transform='scale(1.25)'; });
+        el.addEventListener('mouseleave', () => { el.style.transform='scale(1)'; });
+
+        const addr = inv.shipAddress || inv.billAddress;
+        const addrText = addr ? (addr.full || addr.line1 || 'No address') : 'No address';
+        const cluster = clusters[ci];
+
+        const popup = new mapboxgl.Popup({ offset: 18, closeButton: true, maxWidth: '260px' })
+          .setHTML(`
+            <div class="popup-inv">INV #${inv.invoiceNumber} · Route ${ci+1}</div>
+            <div class="popup-customer">${inv.customerName}</div>
+            <div class="popup-address">📍 ${addrText}</div>
+            <div class="popup-meta">
+              <span class="popup-cases">📦 ${inv.cases} cases</span>
+              <span class="popup-route" style="background:${color}">Route ${ci+1}${cluster.driver?' · '+cluster.driver:''}</span>
+            </div>
+            <button class="popup-reassign-btn" onclick="openReassignPanel('${inv.id}',${ci})">↔ Move to Different Route</button>`);
+
+        const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
+          .setLngLat([coords.lng, coords.lat])
+          .setPopup(popup)
+          .addTo(mapInstance);
+
+        mapMarkers.push({ marker, inv, ci });
+      });
+
+      // Fit bounds to include warehouse + all stops
+      const allPoints = [[-73.5387, 41.0534], ...allStops.map(s => [s.coords.lng, s.coords.lat])];
+      const bounds = allPoints.reduce(
+        (b, p) => b.extend(p),
+        new mapboxgl.LngLatBounds(allPoints[0], allPoints[0])
+      );
+      mapInstance.fitBounds(bounds, { padding: 70, maxZoom: 12 });
+    });
+  } catch(err) {
+    console.error('Map init error:', err);
+    showToast('Could not initialize map: ' + err.message);
+  }
 }
 
 // Read coords locked onto the invoice during route generation — never regenerate randomly
