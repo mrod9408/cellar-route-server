@@ -457,66 +457,306 @@ const ROUTE_COLORS = [
   '#C026D3', '#065F46', '#9333EA', '#1D4ED8'
 ];
 
-// ═══════════════════ GEOGRAPHIC ZONES ════════════════════════════════════════
-const ZIP_ZONES = {
-  '06': { name: 'CT', lat: 41.6, lng: -72.7 },
-  '100': { name: 'Manhattan', lat: 40.78, lng: -73.97 }, '101': { name: 'Manhattan', lat: 40.75, lng: -73.99 },
-  '102': { name: 'Manhattan', lat: 40.71, lng: -74.01 }, '103': { name: 'Staten Island', lat: 40.58, lng: -74.15 },
-  '104': { name: 'Bronx', lat: 40.84, lng: -73.87 }, '110': { name: 'Queens', lat: 40.73, lng: -73.79 },
-  '111': { name: 'Queens', lat: 40.72, lng: -73.85 }, '112': { name: 'Brooklyn', lat: 40.65, lng: -73.95 },
-  '113': { name: 'Queens/LI', lat: 40.70, lng: -73.74 }, '114': { name: 'Queens/LI', lat: 40.73, lng: -73.70 },
-  '115': { name: 'Long Island', lat: 40.72, lng: -73.60 }, '116': { name: 'Long Island', lat: 40.80, lng: -73.50 },
-  '117': { name: 'Long Island', lat: 40.82, lng: -73.33 }, '118': { name: 'Long Island', lat: 40.87, lng: -73.20 },
-  '119': { name: 'Long Island', lat: 40.92, lng: -73.10 }, '105': { name: 'Westchester', lat: 41.05, lng: -73.82 },
-  '106': { name: 'Westchester', lat: 41.10, lng: -73.78 }, '107': { name: 'Westchester', lat: 41.00, lng: -73.85 },
-  '108': { name: 'Westchester', lat: 41.15, lng: -73.72 }, '109': { name: 'Westchester', lat: 41.30, lng: -73.75 },
-  '125': { name: 'Hudson Valley', lat: 41.70, lng: -73.93 }, '126': { name: 'Hudson Valley', lat: 41.50, lng: -74.00 },
-  '127': { name: 'Hudson Valley', lat: 41.90, lng: -73.98 }, '128': { name: 'Catskills', lat: 42.10, lng: -74.36 },
-  '120': { name: 'Capital Region', lat: 42.65, lng: -73.75 }, '121': { name: 'Capital Region', lat: 42.75, lng: -73.80 },
-  '122': { name: 'Capital Region', lat: 42.55, lng: -73.70 }, '130': { name: 'Syracuse', lat: 43.05, lng: -76.14 },
-  '140': { name: 'Buffalo', lat: 42.88, lng: -78.88 }, '07': { name: 'NJ North', lat: 40.85, lng: -74.20 },
-  '08': { name: 'NJ South', lat: 39.90, lng: -74.60 },
+// ═══════════════════ TERRITORY-BASED ROUTING ENGINE ═════════════════════════
+//
+// WAREHOUSE: 52 Poplar St, Stamford CT 06902  (lat 41.0534, lng -73.5387)
+//
+// PASS-THROUGH LOGIC (from Stamford heading south/west):
+//   • CT near Stamford (06901-06910) + Westchester → combine if under case limit
+//   • Westchester + NYC → combine if under case limit (I-95/Hutch south corridor)
+//   • If combined exceeds case limit → split into separate vans
+//
+// STOP ORDER within each van: sorted by driving distance from warehouse
+//   Stamford → CT-near stops → Westchester North → Westchester South → NYC → (back)
+//   For Long Island: Westchester South → Queens → Nassau → Suffolk
+//   For NJ: Staten Island / Lower Manhattan → NJ
+//
+// OVERFLOW: territory > caseLimit → split by subRegion → chunk if still too big
+
+const WAREHOUSE = { lat: 41.0534, lng: -73.5387, label: 'Stamford, CT' };
+
+const ZIP_MAP = {
+  // ── MANHATTAN ──────────────────────────────────────────────────────────────
+  '100': { territory:'NYC', subRegion:'Manhattan',    lat:40.78, lng:-73.97, driveOrder:50 },
+  '101': { territory:'NYC', subRegion:'Manhattan',    lat:40.75, lng:-73.99, driveOrder:51 },
+  '102': { territory:'NYC', subRegion:'Manhattan',    lat:40.71, lng:-74.01, driveOrder:52 },
+  // ── BRONX ──────────────────────────────────────────────────────────────────
+  '104': { territory:'NYC', subRegion:'Bronx',        lat:40.84, lng:-73.87, driveOrder:40 },
+  // ── STATEN ISLAND ──────────────────────────────────────────────────────────
+  '103': { territory:'NYC', subRegion:'Staten Island',lat:40.58, lng:-74.15, driveOrder:70 },
+  // ── BROOKLYN ───────────────────────────────────────────────────────────────
+  '112': { territory:'NYC', subRegion:'Brooklyn',     lat:40.65, lng:-73.95, driveOrder:60 },
+  // ── QUEENS ─────────────────────────────────────────────────────────────────
+  '110': { territory:'NYC', subRegion:'Queens',       lat:40.73, lng:-73.79, driveOrder:55 },
+  '111': { territory:'NYC', subRegion:'Queens',       lat:40.72, lng:-73.85, driveOrder:55 },
+  '113': { territory:'NYC', subRegion:'Queens',       lat:40.70, lng:-73.74, driveOrder:56 },
+  '114': { territory:'NYC', subRegion:'Queens',       lat:40.73, lng:-73.70, driveOrder:57 },
+  // ── LONG ISLAND ────────────────────────────────────────────────────────────
+  '115': { territory:'Long Island', subRegion:'Nassau',  lat:40.72, lng:-73.60, driveOrder:65 },
+  '116': { territory:'Long Island', subRegion:'Nassau',  lat:40.80, lng:-73.50, driveOrder:66 },
+  '117': { territory:'Long Island', subRegion:'Suffolk', lat:40.82, lng:-73.33, driveOrder:75 },
+  '118': { territory:'Long Island', subRegion:'Suffolk', lat:40.87, lng:-73.20, driveOrder:80 },
+  '119': { territory:'Long Island', subRegion:'Suffolk', lat:40.92, lng:-73.10, driveOrder:85 },
+  // ── WESTCHESTER ────────────────────────────────────────────────────────────
+  '105': { territory:'Westchester', subRegion:'Westchester South', lat:41.05, lng:-73.82, driveOrder:20 },
+  '106': { territory:'Westchester', subRegion:'Westchester South', lat:41.10, lng:-73.78, driveOrder:21 },
+  '107': { territory:'Westchester', subRegion:'Westchester South', lat:41.00, lng:-73.85, driveOrder:22 },
+  '108': { territory:'Westchester', subRegion:'Westchester North', lat:41.15, lng:-73.72, driveOrder:15 },
+  '109': { territory:'Westchester', subRegion:'Westchester North', lat:41.30, lng:-73.75, driveOrder:12 },
+  // ── HUDSON VALLEY ──────────────────────────────────────────────────────────
+  '125': { territory:'Hudson Valley', subRegion:'Mid-Hudson',   lat:41.70, lng:-73.93, driveOrder:8  },
+  '126': { territory:'Hudson Valley', subRegion:'Mid-Hudson',   lat:41.50, lng:-74.00, driveOrder:9  },
+  '127': { territory:'Hudson Valley', subRegion:'Upper Hudson', lat:41.90, lng:-73.98, driveOrder:5  },
+  '128': { territory:'Hudson Valley', subRegion:'Catskills',    lat:42.10, lng:-74.36, driveOrder:4  },
+  // ── NEW JERSEY ─────────────────────────────────────────────────────────────
+  '070': { territory:'NJ', subRegion:'NJ North',   lat:40.92, lng:-74.17, driveOrder:45 },
+  '071': { territory:'NJ', subRegion:'NJ North',   lat:40.86, lng:-74.07, driveOrder:46 },
+  '072': { territory:'NJ', subRegion:'NJ North',   lat:40.80, lng:-74.12, driveOrder:47 },
+  '073': { territory:'NJ', subRegion:'NJ North',   lat:40.73, lng:-74.17, driveOrder:48 },
+  '074': { territory:'NJ', subRegion:'NJ North',   lat:41.00, lng:-74.30, driveOrder:44 },
+  '075': { territory:'NJ', subRegion:'NJ North',   lat:40.95, lng:-74.13, driveOrder:44 },
+  '076': { territory:'NJ', subRegion:'NJ North',   lat:40.88, lng:-74.25, driveOrder:45 },
+  '077': { territory:'NJ', subRegion:'NJ Central', lat:40.57, lng:-74.15, driveOrder:58 },
+  '078': { territory:'NJ', subRegion:'NJ North',   lat:40.77, lng:-74.32, driveOrder:49 },
+  '079': { territory:'NJ', subRegion:'NJ North',   lat:40.83, lng:-74.32, driveOrder:46 },
+  '080': { territory:'NJ', subRegion:'NJ South',   lat:39.93, lng:-74.99, driveOrder:80 },
+  '081': { territory:'NJ', subRegion:'NJ South',   lat:39.95, lng:-74.20, driveOrder:78 },
+  '082': { territory:'NJ', subRegion:'NJ South',   lat:39.72, lng:-75.11, driveOrder:85 },
+  '083': { territory:'NJ', subRegion:'NJ South',   lat:39.50, lng:-75.02, driveOrder:90 },
+  '084': { territory:'NJ', subRegion:'NJ Central', lat:40.22, lng:-74.76, driveOrder:65 },
+  '085': { territory:'NJ', subRegion:'NJ Central', lat:40.22, lng:-74.76, driveOrder:65 },
+  '086': { territory:'NJ', subRegion:'NJ Central', lat:40.22, lng:-74.76, driveOrder:65 },
+  '087': { territory:'NJ', subRegion:'NJ Central', lat:40.43, lng:-74.42, driveOrder:60 },
+  '088': { territory:'NJ', subRegion:'NJ Central', lat:40.50, lng:-74.30, driveOrder:59 },
+  '089': { territory:'NJ', subRegion:'NJ Central', lat:40.45, lng:-74.38, driveOrder:60 },
+  // ── CONNECTICUT — near Stamford (pass-through eligible) ───────────────────
+  '069': { territory:'CT', subRegion:'CT Near Stamford', lat:41.08, lng:-73.55, driveOrder:2  },
+  '068': { territory:'CT', subRegion:'CT Near Stamford', lat:41.05, lng:-73.54, driveOrder:2  },
+  '066': { territory:'CT', subRegion:'CT West',          lat:41.45, lng:-73.42, driveOrder:6  },
+  '067': { territory:'CT', subRegion:'CT West',          lat:41.60, lng:-73.05, driveOrder:7  },
+  '065': { territory:'CT', subRegion:'CT South',         lat:41.16, lng:-73.20, driveOrder:10 },
+  '064': { territory:'CT', subRegion:'CT South',         lat:41.35, lng:-73.08, driveOrder:11 },
+  '063': { territory:'CT', subRegion:'CT South',         lat:41.30, lng:-72.92, driveOrder:13 },
+  '060': { territory:'CT', subRegion:'CT Central',       lat:41.76, lng:-72.68, driveOrder:18 },
+  '061': { territory:'CT', subRegion:'CT Central',       lat:41.82, lng:-72.52, driveOrder:19 },
+  '062': { territory:'CT', subRegion:'CT East',          lat:41.56, lng:-72.08, driveOrder:25 },
 };
-function getZone(zip) {
+
+// driveOrder: lower = closer to warehouse / earlier on the route south
+// Pass-through eligibility: CT Near Stamford can merge with Westchester;
+// Westchester can merge with NYC if combined cases fit one van.
+const PASSTHROUGH_CHAINS = [
+  // Each chain is tried in order — first that fits within caseLimit becomes one van
+  ['CT Near Stamford', 'Westchester', 'NYC'],   // full corridor run
+  ['CT Near Stamford', 'Westchester'],           // stamford + westchester only
+  ['Westchester', 'NYC'],                        // westchester + nyc without stamford CT
+];
+
+// Priority order for standalone vans (when not merged)
+const TERRITORY_PRIORITY = [
+  'Westchester+NYC', 'CT Near Stamford+Westchester+NYC',
+  'CT Near Stamford+Westchester',
+  'NYC', 'Long Island', 'NJ', 'CT', 'Westchester', 'Hudson Valley'
+];
+
+function getZipInfo(zip) {
   if (!zip) return null;
-  const z = zip.toString().replace(/\D/g, '');
-  return ZIP_ZONES[z.slice(0,3)] || ZIP_ZONES[z.slice(0,2)] || null;
+  const z = zip.toString().replace(/\D/g, '').padStart(5, '0');
+  return ZIP_MAP[z.slice(0,3)] || ZIP_MAP[z.slice(0,2).padStart(3,'0')] || null;
 }
+
 function getCoords(inv) {
   const addr = inv.shipAddress || inv.billAddress;
   if (!addr) return null;
-  const zone = getZone(addr.zip);
-  if (!zone) return null;
-  return { lat: zone.lat + (Math.random()-0.5)*0.05, lng: zone.lng + (Math.random()-0.5)*0.05, zone: zone.name };
+  const info = getZipInfo(addr.zip);
+  if (!info) return null;
+  const seed = (inv.id ? parseInt(inv.id, 10) : 0) % 100;
+  const scatter = 0.025;
+  return {
+    lat:       info.lat + ((seed % 10) - 5) / 10 * scatter,
+    lng:       info.lng + (Math.floor(seed / 10) - 5) / 10 * scatter,
+    territory: info.territory,
+    subRegion: info.subRegion,
+    driveOrder: info.driveOrder
+  };
 }
+
+function getTerritoryForInvoice(inv) {
+  const addr = inv.shipAddress || inv.billAddress;
+  if (!addr) return 'Unknown';
+  const info = getZipInfo(addr.zip);
+  if (info) return info.territory;
+  const st = (addr.state || '').toUpperCase();
+  if (st === 'NJ') return 'NJ';
+  if (st === 'CT') return 'CT';
+  return 'Unknown';
+}
+
+function getSubRegionForInvoice(inv) {
+  const addr = inv.shipAddress || inv.billAddress;
+  if (!addr) return 'Unknown';
+  const info = getZipInfo(addr.zip);
+  return info ? info.subRegion : 'Unknown';
+}
+
+function getDriveOrderForInvoice(inv) {
+  const addr = inv.shipAddress || inv.billAddress;
+  if (!addr) return 99;
+  const info = getZipInfo(addr.zip);
+  return info ? (info.driveOrder || 99) : 99;
+}
+
 function getStateFromInvoice(inv) {
   const addr = inv.shipAddress || inv.billAddress;
   if (!addr) return 'Unknown';
+  const info = getZipInfo(addr.zip);
+  if (info) {
+    const t = info.territory;
+    if (t === 'NYC') return 'NY — New York City';
+    if (t === 'Long Island') return 'NY — Long Island';
+    if (t === 'Westchester') return 'NY — Westchester';
+    if (t === 'Hudson Valley') return 'NY — Hudson Valley';
+    if (t === 'NJ') return 'NJ — New Jersey';
+    if (t === 'CT') {
+      const sr = info.subRegion;
+      if (sr === 'CT Near Stamford') return 'CT — Near Stamford';
+      return 'CT — Connecticut';
+    }
+  }
   return addr.state || 'Unknown';
 }
 
-// ═══════════════════ K-MEANS ══════════════════════════════════════════════════
-function kMeans(points, k, iter=30) {
-  if (!points.length || k<=0) return [];
-  k = Math.min(k, points.length);
-  const shuffled = [...points].sort(()=>Math.random()-0.5);
-  let centroids = shuffled.slice(0,k).map(p=>({lat:p.lat,lng:p.lng}));
-  let asgn = new Array(points.length).fill(0);
-  for (let i=0;i<iter;i++) {
-    for (let p=0;p<points.length;p++) {
-      let best=0,min=Infinity;
-      for (let c=0;c<k;c++) {
-        const d=Math.pow(points[p].lat-centroids[c].lat,2)+Math.pow(points[p].lng-centroids[c].lng,2);
-        if(d<min){min=d;best=c;}
-      }
-      asgn[p]=best;
+// ── CORE SORT: order stops along the driving path from Stamford ──────────────
+function sortByDrivingPath(stops) {
+  return [...stops].sort((a, b) => getDriveOrderForInvoice(a) - getDriveOrderForInvoice(b));
+}
+
+// ── SPLIT TERRITORY INTO VANS (handles overflow by subRegion then chunk) ──────
+function splitIntoVans(territory, stops, caseLimit) {
+  const totalCases = stops.reduce((s, i) => s + (i.cases || 0), 0);
+  if (totalCases <= caseLimit) {
+    return [{ territory, subRegion: null, stops: sortByDrivingPath(stops), cases: totalCases }];
+  }
+  // Split by subRegion
+  const bySubRegion = {};
+  stops.forEach(inv => {
+    const sr = getSubRegionForInvoice(inv);
+    if (!bySubRegion[sr]) bySubRegion[sr] = [];
+    bySubRegion[sr].push(inv);
+  });
+  const vans = [];
+  Object.entries(bySubRegion).forEach(([sr, srStops]) => {
+    const srCases = srStops.reduce((s, i) => s + (i.cases || 0), 0);
+    if (srCases <= caseLimit) {
+      vans.push({ territory, subRegion: sr, stops: sortByDrivingPath(srStops), cases: srCases });
+    } else {
+      // Chunk by case limit
+      let chunk = [], chunkCases = 0, ci = 0;
+      sortByDrivingPath(srStops).forEach(inv => {
+        if (chunkCases + (inv.cases || 0) > caseLimit && chunk.length > 0) {
+          vans.push({ territory, subRegion: `${sr} (Van ${++ci})`, stops: chunk, cases: chunkCases });
+          chunk = []; chunkCases = 0;
+        }
+        chunk.push(inv); chunkCases += (inv.cases || 0);
+      });
+      if (chunk.length) vans.push({ territory, subRegion: `${sr} (Van ${++ci})`, stops: chunk, cases: chunkCases });
     }
-    for (let c=0;c<k;c++) {
-      const pts=points.filter((_,i)=>asgn[i]===c);
-      if(pts.length) centroids[c]={lat:pts.reduce((s,p)=>s+p.lat,0)/pts.length,lng:pts.reduce((s,p)=>s+p.lng,0)/pts.length};
+  });
+  return vans;
+}
+
+// ── MAIN TERRITORY ROUTER ─────────────────────────────────────────────────────
+function buildTerritoryRoutes(selectedInvoices, driverCount, caseLimit) {
+  // Step 1: Group by territory
+  const byTerritory = {};
+  selectedInvoices.forEach(inv => {
+    const t = getTerritoryForInvoice(inv);
+    if (!byTerritory[t]) byTerritory[t] = [];
+    byTerritory[t].push(inv);
+  });
+
+  // Step 2: Separate CT Near Stamford from rest of CT for pass-through logic
+  const ctAll = byTerritory['CT'] || [];
+  const ctNearStamford = ctAll.filter(inv => getSubRegionForInvoice(inv) === 'CT Near Stamford');
+  const ctOther        = ctAll.filter(inv => getSubRegionForInvoice(inv) !== 'CT Near Stamford');
+
+  const westchester = byTerritory['Westchester'] || [];
+  const nyc         = byTerritory['NYC']         || [];
+
+  // Step 3: Try pass-through chains — merge if combined cases fit one van
+  // Chain: CT Near Stamford → Westchester → NYC
+  let mergedVan = null;
+  if (ctNearStamford.length || westchester.length || nyc.length) {
+    for (const chain of PASSTHROUGH_CHAINS) {
+      const pools = {
+        'CT Near Stamford': ctNearStamford,
+        'Westchester':      westchester,
+        'NYC':              nyc,
+      };
+      // Check if all segments in this chain have stops
+      const chainStops = chain.flatMap(seg => pools[seg] || []);
+      if (!chainStops.length) continue;
+      // Only try chains where all non-empty segments are present
+      const presentSegs = chain.filter(seg => (pools[seg] || []).length > 0);
+      if (presentSegs.length < 2) continue; // single segment — handle as standalone below
+      const chainCases = chainStops.reduce((s, i) => s + (i.cases || 0), 0);
+      if (chainCases <= caseLimit) {
+        mergedVan = {
+          territory: presentSegs.join(' + '),
+          subRegion: null,
+          stops: sortByDrivingPath(chainStops),
+          cases: chainCases,
+          merged: true,
+          mergedSegments: presentSegs
+        };
+        break;
+      }
     }
   }
-  return asgn;
+
+  // Step 4: Build van list
+  let vans = [];
+  const handledByMerge = new Set(mergedVan ? mergedVan.mergedSegments : []);
+
+  if (mergedVan) {
+    vans.push(mergedVan);
+  }
+
+  // Standalone territories not absorbed into the merged van
+  const standaloneOrder = ['NYC', 'Long Island', 'NJ', 'CT', 'Westchester', 'Hudson Valley'];
+
+  // Handle CT Near Stamford if not merged
+  if (!handledByMerge.has('CT Near Stamford') && ctNearStamford.length) {
+    vans.push(...splitIntoVans('CT Near Stamford', ctNearStamford, caseLimit));
+  }
+  // Handle Westchester if not merged
+  if (!handledByMerge.has('Westchester') && westchester.length) {
+    vans.push(...splitIntoVans('Westchester', westchester, caseLimit));
+  }
+  // Handle NYC if not merged
+  if (!handledByMerge.has('NYC') && nyc.length) {
+    vans.push(...splitIntoVans('NYC', nyc, caseLimit));
+  }
+
+  // All other territories
+  standaloneOrder.forEach(territory => {
+    if (territory === 'NYC' || territory === 'Westchester' || territory === 'CT') return; // handled above
+    const stops = byTerritory[territory] || [];
+    if (!stops.length) return;
+    vans.push(...splitIntoVans(territory, stops, caseLimit));
+  });
+
+  // CT other (non-Stamford) standalone
+  if (ctOther.length) {
+    vans.push(...splitIntoVans('CT', ctOther, caseLimit));
+  }
+
+  // Unknown territory fallback
+  if (byTerritory['Unknown'] && byTerritory['Unknown'].length) {
+    vans.push(...splitIntoVans('Unknown', byTerritory['Unknown'], caseLimit));
+  }
+
+  return vans;
 }
 
 // ═══════════════════ STATE ════════════════════════════════════════════════════
@@ -824,42 +1064,61 @@ function updateSelectionSummary() {
 
 // ═══════════════════ AUTO ROUTE ═══════════════════════════════════════════════
 function runAutoRoute() {
-  const driverCount=parseInt(document.getElementById('driverCount').value)||0;
-  const caseLimit=parseInt(document.getElementById('caseLimit').value)||250;
-  if(!driverCount){showToast('Enter how many drivers you have today');return;}
+  const driverCount = parseInt(document.getElementById('driverCount').value) || 0;
+  const caseLimit   = parseInt(document.getElementById('caseLimit').value)   || 250;
+  if (!driverCount) { showToast('Enter how many drivers you have today'); return; }
 
   const selectedInvoices = invoices.filter(inv => selectedInvoiceIds.has(inv.id));
-  if(!selectedInvoices.length){showToast('No invoices selected');return;}
+  if (!selectedInvoices.length) { showToast('No invoices selected'); return; }
 
-  const geocoded=selectedInvoices.map(inv=>({inv,coords:getCoords(inv)}));
-  const withCoords=geocoded.filter(g=>g.coords);
-  const noCoords=geocoded.filter(g=>!g.coords);
-  const totalCases=selectedInvoices.reduce((s,i)=>s+(i.cases||0),0);
-  const minVans=Math.ceil(totalCases/caseLimit);
-  const effDrivers=Math.max(driverCount,minVans);
-  const pts=withCoords.map(g=>g.coords);
-  const clusterAsgn=kMeans(pts,effDrivers);
-  const raw=Array.from({length:effDrivers},()=>({stops:[],cases:0}));
-  withCoords.forEach((g,i)=>{raw[clusterAsgn[i]].stops.push(g.inv);raw[clusterAsgn[i]].cases+=g.inv.cases||0;});
-  raw.forEach(c=>{c.stops.sort((a,b)=>{const za=(a.shipAddress||a.billAddress||{}).zip||'';const zb=(b.shipAddress||b.billAddress||{}).zip||'';return za.localeCompare(zb);});});
-  noCoords.forEach(g=>{const li=raw.reduce((m,c,i)=>c.cases<raw[m].cases?i:m,0);raw[li].stops.push(g.inv);raw[li].cases+=g.inv.cases||0;});
-  clusters=raw.filter(c=>c.stops.length>0).map((c,i)=>({...c,id:i,driver:drivers[i]||null,zone:getClusterZone(c.stops),overLimit:c.cases>caseLimit,color:ROUTE_COLORS[i%ROUTE_COLORS.length]}));
-  clusters.forEach((c,i)=>{if(drivers[i]){c.driver=drivers[i];c.stops.forEach(inv=>{assignments[inv.id]=drivers[i];});}});
-  saveState(); updateStats();
+  // Lock coords onto every invoice now so the map always uses the same values
+  selectedInvoices.forEach(inv => {
+    if (!inv._coords) inv._coords = getCoords(inv);
+  });
 
-  const warns=[];
-  if(minVans>driverCount) warns.push(`⚠️ You need at least ${minVans} vans for ${totalCases} total cases. Routes split across ${effDrivers} drivers.`);
-  clusters.forEach((c,i)=>{if(c.overLimit) warns.push(`⚠️ Route ${i+1} (${c.zone}) has ${c.cases} cases — over ${caseLimit} limit.`);});
-  document.getElementById('warningBanners').innerHTML=warns.map(w=>`<div class="warn-banner"><span>🟠</span><span>${w}</span></div>`).join('');
+  // Build territory-based vans
+  const vans = buildTerritoryRoutes(selectedInvoices, driverCount, caseLimit);
+  const totalCases = selectedInvoices.reduce((s, i) => s + (i.cases || 0), 0);
+
+  // Map vans to clusters with color, driver, display name
+  clusters = vans.map((van, i) => {
+    const label = van.subRegion ? `${van.territory} — ${van.subRegion}` : van.territory;
+    return {
+      id: i,
+      stops: van.stops,
+      cases: van.cases,
+      zone: label,
+      territory: van.territory,
+      subRegion: van.subRegion,
+      driver: drivers[i] || null,
+      overLimit: van.cases > caseLimit,
+      color: ROUTE_COLORS[i % ROUTE_COLORS.length]
+    };
+  });
+
+  // Auto-assign drivers in priority order
+  clusters.forEach((c, i) => {
+    if (drivers[i]) {
+      c.driver = drivers[i];
+      c.stops.forEach(inv => { assignments[inv.id] = drivers[i]; });
+    }
+  });
+
+  // Build warnings
+  const warns = [];
+  if (clusters.length > driverCount) {
+    warns.push(`⚠️ ${clusters.length} routes needed but only ${driverCount} drivers entered — consider adding more drivers or increasing the case limit.`);
+  }
+  clusters.forEach((c, i) => {
+    if (c.overLimit) warns.push(`⚠️ Route ${i+1} (${c.zone}) has ${c.cases} cases — over ${caseLimit} limit.`);
+  });
+
+  saveState();
+  updateStats();
+  document.getElementById('warningBanners').innerHTML = warns.map(w =>
+    `<div class="warn-banner"><span>🟠</span><span>${w}</span></div>`).join('');
   renderClusters();
   showToast(`✓ ${clusters.length} routes generated`);
-}
-
-function getClusterZone(stops) {
-  const zones={};
-  stops.forEach(inv=>{const addr=inv.shipAddress||inv.billAddress;if(addr&&addr.zip){const z=getZone(addr.zip);if(z)zones[z.name]=(zones[z.name]||0)+1;}});
-  const top=Object.entries(zones).sort((a,b)=>b[1]-a[1]);
-  return top.length?top[0][0]:'Mixed';
 }
 
 // ═══════════════════ RENDER CLUSTERS ═════════════════════════════════════════
@@ -919,12 +1178,19 @@ function renderClusters() {
 }
 
 function buildGoogleMapsUrl(stops) {
-  const addrs=stops.map(inv=>{const a=inv.shipAddress||inv.billAddress;return a?(a.full||a.line1):null;}).filter(Boolean);
-  if(!addrs.length) return null;
-  if(addrs.length===1) return `https://maps.google.com/?q=${encodeURIComponent(addrs[0])}`;
-  const o=encodeURIComponent(addrs[0]),d=encodeURIComponent(addrs[addrs.length-1]);
-  const wp=addrs.slice(1,-1).map(a=>encodeURIComponent(a)).join('|');
-  return `https://www.google.com/maps/dir/?api=1&origin=${o}&destination=${d}${wp?'&waypoints='+wp:''}&travelmode=driving`;
+  const addrs = stops.map(inv => {
+    const a = inv.shipAddress || inv.billAddress;
+    return a ? (a.full || a.line1) : null;
+  }).filter(Boolean);
+  if (!addrs.length) return null;
+  // Always origin from the warehouse at 52 Poplar St Stamford CT
+  const warehouseAddr = encodeURIComponent('52 Poplar St, Stamford, CT 06902');
+  if (addrs.length === 1) {
+    return `https://www.google.com/maps/dir/?api=1&origin=${warehouseAddr}&destination=${encodeURIComponent(addrs[0])}&travelmode=driving`;
+  }
+  const dest = encodeURIComponent(addrs[addrs.length - 1]);
+  const wp   = addrs.slice(0, -1).map(a => encodeURIComponent(a)).join('|');
+  return `https://www.google.com/maps/dir/?api=1&origin=${warehouseAddr}&destination=${dest}&waypoints=${wp}&travelmode=driving`;
 }
 function setClusterDriver(ci,name) {
   if(!clusters[ci]) return;
@@ -1037,13 +1303,9 @@ function initOrRefreshMap() {
   });
 }
 
-// Use stored coords or regenerate from zone
-const _coordCache = {};
+// Read coords locked onto the invoice during route generation — never regenerate randomly
 function getStopCoords(inv) {
-  if (_coordCache[inv.id]) return _coordCache[inv.id];
-  const c = getCoords(inv);
-  if (c) _coordCache[inv.id] = c;
-  return c;
+  return inv._coords || null;
 }
 
 // ═══════════════════ REASSIGN STOP ════════════════════════════════════════════
