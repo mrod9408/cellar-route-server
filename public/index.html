@@ -5,6 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
   <title>Cellar Route</title>
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
+  <link href="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.css" rel="stylesheet" />
+  <script src="https://api.mapbox.com/mapbox-gl-js/v3.3.0/mapbox-gl.js"></script>
   <style>
     :root {
       --burgundy: #6B1E2E; --burgundy-dark: #4A1320; --burgundy-light: #8B2E42;
@@ -27,8 +29,6 @@
     .login-logo { font-size: 56px; margin-bottom: 12px; }
     .login-title { font-family: 'Playfair Display', serif; color: var(--cream); font-size: 32px; margin-bottom: 4px; text-align: center; }
     .login-subtitle { color: var(--gold-light); font-size: 14px; margin-bottom: 44px; letter-spacing: 0.5px; text-align: center; }
-
-    /* PIN STEP */
     .login-step { width: 100%; max-width: 300px; text-align: center; transition: opacity 0.3s; }
     .login-step.hidden { display: none; }
     .pin-label { color: rgba(247,242,234,0.6); font-size: 12px; font-weight: 600; margin-bottom: 18px; text-transform: uppercase; letter-spacing: 1px; }
@@ -37,27 +37,15 @@
     .pin-dot.filled { background: var(--gold); transform: scale(1.1); }
     .pin-dot.error { background: #F28B82; }
     .pin-pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-    .pin-btn {
-      background: rgba(255,255,255,0.1); border: none; border-radius: 14px;
-      color: var(--cream); font-family: 'Playfair Display', serif;
-      font-size: 24px; padding: 16px; cursor: pointer;
-      transition: background 0.15s, transform 0.1s; user-select: none;
-    }
+    .pin-btn { background: rgba(255,255,255,0.1); border: none; border-radius: 14px; color: var(--cream); font-family: 'Playfair Display', serif; font-size: 24px; padding: 16px; cursor: pointer; transition: background 0.15s, transform 0.1s; user-select: none; }
     .pin-btn:hover { background: rgba(255,255,255,0.2); }
     .pin-btn:active { transform: scale(0.9); background: var(--gold); color: var(--burgundy-dark); }
     .pin-btn.del { font-family: 'DM Sans', sans-serif; font-size: 20px; }
     .pin-btn.empty { background: transparent !important; cursor: default; }
     .pin-error { color: #F28B82; font-size: 13px; margin-top: 16px; min-height: 18px; font-weight: 500; }
-
-    /* NAME STEP */
     .name-label { color: rgba(247,242,234,0.7); font-size: 12px; font-weight: 600; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 1px; }
     .driver-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; width: 100%; max-width: 340px; }
-    .driver-btn {
-      background: rgba(255,255,255,0.08); border: 1.5px solid rgba(255,255,255,0.15);
-      border-radius: 14px; color: var(--cream); font-family: 'DM Sans', sans-serif;
-      font-size: 15px; font-weight: 500; padding: 18px 12px; cursor: pointer;
-      transition: all 0.2s; text-align: center;
-    }
+    .driver-btn { background: rgba(255,255,255,0.08); border: 1.5px solid rgba(255,255,255,0.15); border-radius: 14px; color: var(--cream); font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 500; padding: 18px 12px; cursor: pointer; transition: all 0.2s; text-align: center; }
     .driver-btn:hover { background: var(--gold); border-color: var(--gold); color: var(--burgundy-dark); font-weight: 700; }
     .driver-btn:active { transform: scale(0.96); }
     .btn-back { background: none; border: none; color: rgba(247,242,234,0.4); font-size: 13px; font-family: 'DM Sans', sans-serif; cursor: pointer; margin-top: 20px; padding: 8px; }
@@ -101,6 +89,33 @@
     .btn-gold { padding: 13px; background: var(--gold); color: var(--burgundy-dark); border: none; border-radius: 12px; font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 700; cursor: pointer; width: 100%; }
     .btn-gold:hover { background: var(--gold-light); }
 
+    /* ── INVOICE SELECTION LIST ───────────────────────────────────────────── */
+    .invoice-select-card { background: var(--white); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); margin-bottom: 16px; }
+    .invoice-select-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; flex-wrap: wrap; gap: 8px; }
+    .invoice-select-header h3 { font-family: 'Playfair Display', serif; font-size: 16px; color: var(--burgundy-dark); }
+    .select-actions { display: flex; gap: 8px; }
+    .btn-xs { padding: 5px 12px; background: var(--cream-dark); color: var(--burgundy); border: none; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 600; cursor: pointer; }
+    .btn-xs:hover { background: var(--gray-light); }
+    .state-group { margin-bottom: 10px; border: 1.5px solid var(--cream-dark); border-radius: 12px; overflow: hidden; }
+    .state-group-header { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: var(--cream); cursor: pointer; user-select: none; }
+    .state-group-header:hover { background: var(--cream-dark); }
+    .state-toggle-check { width: 18px; height: 18px; accent-color: var(--burgundy); cursor: pointer; flex-shrink: 0; }
+    .state-name { font-weight: 700; font-size: 13px; color: var(--burgundy-dark); flex: 1; text-transform: uppercase; letter-spacing: 0.5px; }
+    .state-count { font-size: 12px; color: var(--gray); font-weight: 500; }
+    .state-chevron { font-size: 11px; color: var(--gray); transition: transform 0.2s; }
+    .state-chevron.open { transform: rotate(180deg); }
+    .invoice-rows { border-top: 1px solid var(--cream-dark); }
+    .invoice-row { display: flex; align-items: center; gap: 10px; padding: 9px 14px; border-bottom: 1px solid var(--cream-dark); transition: background 0.15s; }
+    .invoice-row:last-child { border-bottom: none; }
+    .invoice-row:hover { background: #FAF7F2; }
+    .invoice-row.unchecked { opacity: 0.45; }
+    .inv-check { width: 16px; height: 16px; accent-color: var(--burgundy); cursor: pointer; flex-shrink: 0; }
+    .inv-customer { flex: 1; font-size: 13px; font-weight: 500; color: var(--charcoal); min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .inv-city { font-size: 12px; color: var(--gray); white-space: nowrap; }
+    .inv-cases { font-size: 12px; color: var(--green); font-weight: 600; white-space: nowrap; }
+    .inv-amount { font-size: 12px; color: var(--burgundy); font-weight: 600; white-space: nowrap; }
+    .selection-summary { background: var(--cream); border-radius: 10px; padding: 10px 14px; margin-top: 12px; font-size: 13px; color: var(--burgundy-dark); font-weight: 500; display: flex; justify-content: space-between; align-items: center; }
+
     /* ── PLANNER ──────────────────────────────────────────────────────────── */
     .planner-card { background: var(--burgundy-dark); border-radius: var(--radius); padding: 18px; margin-bottom: 16px; color: var(--cream); }
     .planner-card h3 { font-family: 'Playfair Display', serif; font-size: 16px; color: var(--gold-light); margin-bottom: 14px; }
@@ -121,13 +136,14 @@
     .meta-cases { background: var(--green-light); color: var(--green); }
     .meta-cases.over { background: var(--orange-light); color: var(--orange); }
     .meta-zone { background: #EEF2FF; color: #4338CA; }
+    .cluster-color-dot { width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; display: inline-block; margin-right: 6px; vertical-align: middle; }
     .cluster-driver-row { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
     .cluster-driver-select { flex: 1; padding: 9px 12px; border: 1.5px solid var(--cream-dark); border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 13px; color: var(--charcoal); background: var(--cream); outline: none; cursor: pointer; }
     .cluster-driver-select.assigned { border-color: var(--gold); background: #FDF8EC; color: var(--burgundy-dark); font-weight: 500; }
     .stop-list { border-top: 1px solid var(--cream-dark); padding-top: 10px; }
     .stop-row { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--cream-dark); }
     .stop-row:last-child { border-bottom: none; }
-    .stop-num { width: 24px; height: 24px; background: var(--burgundy); color: var(--cream); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; margin-top: 2px; }
+    .stop-num { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; margin-top: 2px; color: white; }
     .stop-details { flex: 1; min-width: 0; }
     .stop-customer { font-size: 14px; font-weight: 600; color: var(--charcoal); }
     .stop-address { font-size: 12px; color: var(--gray); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
@@ -135,6 +151,23 @@
     .stop-inv { font-size: 10px; color: var(--gray-light); }
     .btn-map-sm { background: var(--cream-dark); border: none; border-radius: 8px; padding: 6px 8px; font-size: 14px; cursor: pointer; flex-shrink: 0; }
     .btn-gmaps { display: block; width: 100%; padding: 9px; background: var(--cream-dark); color: var(--burgundy); border: none; border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; text-align: center; margin-top: 10px; }
+
+    /* ── MAP VIEW ─────────────────────────────────────────────────────────── */
+    #view-map { display: none; }
+    #view-map.active { display: block; }
+    .map-toolbar { background: var(--white); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 12px; box-shadow: var(--shadow); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .map-toolbar-title { font-family: 'Playfair Display', serif; font-size: 15px; color: var(--burgundy-dark); flex: 1; }
+    .route-legend { display: flex; gap: 8px; flex-wrap: wrap; }
+    .legend-item { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--charcoal); font-weight: 500; }
+    .legend-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
+    #routeMap { width: 100%; height: 520px; border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
+    .map-reassign-panel { background: var(--white); border-radius: var(--radius); padding: 16px; margin-top: 12px; box-shadow: var(--shadow); display: none; border-left: 4px solid var(--gold); }
+    .map-reassign-panel.visible { display: block; }
+    .map-reassign-panel h4 { font-family: 'Playfair Display', serif; font-size: 15px; color: var(--burgundy-dark); margin-bottom: 10px; }
+    .reassign-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+    .reassign-select { flex: 1; min-width: 140px; padding: 9px 12px; border: 1.5px solid var(--cream-dark); border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 13px; color: var(--charcoal); background: var(--cream); outline: none; }
+    .btn-reassign { padding: 9px 18px; background: var(--burgundy); color: var(--cream); border: none; border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; }
+    .btn-cancel-reassign { padding: 9px 14px; background: var(--cream-dark); color: var(--gray); border: none; border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 13px; cursor: pointer; }
 
     /* ── WARN BANNER ──────────────────────────────────────────────────────── */
     .warn-banner { background: var(--orange-light); border: 1.5px solid var(--orange); border-radius: 12px; padding: 12px 16px; margin-bottom: 14px; font-size: 13px; color: var(--orange); font-weight: 500; display: flex; gap: 8px; }
@@ -200,6 +233,18 @@
 
     .view { display: none; }
     .view.active { display: block; }
+
+    /* Mapbox popup overrides */
+    .mapboxgl-popup-content { font-family: 'DM Sans', sans-serif; border-radius: 12px; padding: 14px 16px; box-shadow: 0 8px 32px rgba(0,0,0,0.18); min-width: 200px; }
+    .mapboxgl-popup-close-button { font-size: 16px; color: var(--gray); padding: 4px 8px; }
+    .popup-inv { font-size: 10px; font-weight: 700; color: var(--gold); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 3px; }
+    .popup-customer { font-family: 'Playfair Display', serif; font-size: 15px; color: var(--charcoal); margin-bottom: 5px; line-height: 1.2; }
+    .popup-address { font-size: 12px; color: var(--gray); margin-bottom: 6px; line-height: 1.4; }
+    .popup-meta { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+    .popup-cases { font-size: 11px; font-weight: 600; color: var(--green); background: var(--green-light); padding: 2px 8px; border-radius: 6px; }
+    .popup-route { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 6px; color: white; }
+    .popup-reassign-btn { width: 100%; padding: 7px; background: var(--burgundy); color: var(--cream); border: none; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 600; cursor: pointer; }
+    .popup-reassign-btn:hover { background: var(--burgundy-light); }
   </style>
 </head>
 <body>
@@ -209,15 +254,11 @@
   <div class="login-logo">🍷</div>
   <div class="login-title">Cellar Route</div>
   <div class="login-subtitle">Classic Wines Inc.</div>
-
-  <!-- STEP 1: PIN -->
   <div class="login-step" id="pinStep">
     <div class="pin-label">Enter your PIN</div>
     <div class="pin-dots" id="pinDots">
-      <div class="pin-dot" id="dot0"></div>
-      <div class="pin-dot" id="dot1"></div>
-      <div class="pin-dot" id="dot2"></div>
-      <div class="pin-dot" id="dot3"></div>
+      <div class="pin-dot" id="dot0"></div><div class="pin-dot" id="dot1"></div>
+      <div class="pin-dot" id="dot2"></div><div class="pin-dot" id="dot3"></div>
     </div>
     <div class="pin-pad">
       <button class="pin-btn" onclick="pinPress('1')">1</button>
@@ -235,8 +276,6 @@
     </div>
     <div class="pin-error" id="pinError"></div>
   </div>
-
-  <!-- STEP 2: NAME SELECTION -->
   <div class="login-step hidden" id="nameStep">
     <div class="name-label">Who are you?</div>
     <div class="driver-grid" id="driverGrid"></div>
@@ -264,6 +303,7 @@
 
   <div class="tabs">
     <div class="tab active" onclick="showTab('route')">Route Planner</div>
+    <div class="tab" onclick="showTab('map')">Route Map</div>
     <div class="tab" onclick="showTab('deliveries')">All Deliveries</div>
     <div class="tab" onclick="showTab('bydriver')">By Driver</div>
     <div class="tab" onclick="showTab('settings')">Settings</div>
@@ -271,14 +311,13 @@
 
   <div class="main">
 
-    <!-- ROUTE PLANNER -->
+    <!-- ══ ROUTE PLANNER ══ -->
     <div class="view active" id="view-route">
-      <!-- TOKEN STATUS BANNER -->
-      <div id="tokenBanner" style="display:none;border-radius:var(--radius);padding:14px 16px;margin-bottom:16px;font-size:13px;font-weight:500;display:none;align-items:flex-start;gap:10px;"></div>
+      <div id="tokenBanner" style="display:none;border-radius:var(--radius);padding:14px 16px;margin-bottom:16px;font-size:13px;font-weight:500;align-items:flex-start;gap:10px;"></div>
 
       <div class="connect-card" id="connectCard">
         <h3>🔌 QuickBooks</h3>
-        <p style="font-size:13px;color:var(--gray);margin-bottom:16px">Credentials are stored securely on the server. Just hit the button below to pull today's deliveries.</p>
+        <p style="font-size:13px;color:var(--gray);margin-bottom:16px">Credentials are stored securely on the server. Hit the button below to pull today's deliveries.</p>
         <p style="font-size:12px;color:var(--green);background:var(--green-light);padding:10px 14px;border-radius:10px;margin-bottom:14px">🔄 Auto-refresh is active — tokens renew automatically all day.</p>
         <button class="btn-primary" id="fetchBtn" onclick="fetchInvoices()">Pull Today's Deliveries</button>
       </div>
@@ -290,6 +329,23 @@
           <div class="stat-card"><div class="stat-number" id="stat-vans">0</div><div class="stat-label">Vans Min</div></div>
           <div class="stat-card"><div class="stat-number" id="stat-done">0</div><div class="stat-label">Done</div></div>
         </div>
+
+        <!-- INVOICE SELECTION -->
+        <div class="invoice-select-card" id="invoiceSelectCard">
+          <div class="invoice-select-header">
+            <h3>📋 Select Invoices to Route</h3>
+            <div class="select-actions">
+              <button class="btn-xs" onclick="selectAllInvoices()">All</button>
+              <button class="btn-xs" onclick="deselectAllInvoices()">None</button>
+            </div>
+          </div>
+          <div id="invoiceStateGroups"></div>
+          <div class="selection-summary">
+            <span id="selectionSummaryText">0 invoices selected</span>
+            <span id="selectionCasesText" style="color:var(--green);font-weight:600;"></span>
+          </div>
+        </div>
+
         <div class="planner-card">
           <h3>🚚 Auto-Route Planner</h3>
           <div class="planner-row">
@@ -304,6 +360,7 @@
           </div>
           <button class="btn-gold" onclick="runAutoRoute()">⚡ Generate Optimal Routes</button>
         </div>
+
         <div id="warningBanners"></div>
         <div id="clusterList"></div>
       </div>
@@ -313,7 +370,31 @@
       </div>
     </div>
 
-    <!-- ALL DELIVERIES -->
+    <!-- ══ ROUTE MAP ══ -->
+    <div class="view" id="view-map">
+      <div id="mapEmptyState" class="empty-state" style="display:none">
+        <div class="empty-icon">🗺️</div>
+        <div class="empty-title">No routes yet</div>
+        <div class="empty-text">Generate routes in the Route Planner tab first, then come back here to see them on the map.</div>
+      </div>
+      <div id="mapContent" style="display:none">
+        <div class="map-toolbar">
+          <div class="map-toolbar-title">🗺 Route Map</div>
+          <div class="route-legend" id="routeLegend"></div>
+        </div>
+        <div id="routeMap"></div>
+        <div class="map-reassign-panel" id="reassignPanel">
+          <h4 id="reassignTitle">Move stop to a different route</h4>
+          <div class="reassign-row">
+            <select class="reassign-select" id="reassignSelect"></select>
+            <button class="btn-reassign" onclick="confirmReassign()">Move Stop</button>
+            <button class="btn-cancel-reassign" onclick="cancelReassign()">Cancel</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ ALL DELIVERIES ══ -->
     <div class="view" id="view-deliveries">
       <div class="stats-bar" style="grid-template-columns:repeat(3,1fr)">
         <div class="stat-card"><div class="stat-number" id="d-stat-total">0</div><div class="stat-label">Total</div></div>
@@ -323,13 +404,13 @@
       <div id="deliveriesList"></div>
     </div>
 
-    <!-- BY DRIVER -->
+    <!-- ══ BY DRIVER ══ -->
     <div class="view" id="view-bydriver">
       <div class="driver-filter" id="driverFilter"></div>
       <div id="driverDeliveries"></div>
     </div>
 
-    <!-- SETTINGS -->
+    <!-- ══ SETTINGS ══ -->
     <div class="view" id="view-settings">
       <div class="settings-card">
         <h3>👥 Manage Drivers</h3>
@@ -366,6 +447,16 @@
 <div class="toast" id="toast"></div>
 
 <script>
+// ═══════════════════ CONFIG ═══════════════════════════════════════════════════
+let MAPBOX_TOKEN = '';
+
+// Route colors — each cluster gets a distinct color
+const ROUTE_COLORS = [
+  '#E05A2B', '#2E7D5B', '#4338CA', '#B5432A',
+  '#0369A1', '#7C3AED', '#B45309', '#0F766E',
+  '#C026D3', '#065F46', '#9333EA', '#1D4ED8'
+];
+
 // ═══════════════════ GEOGRAPHIC ZONES ════════════════════════════════════════
 const ZIP_ZONES = {
   '06': { name: 'CT', lat: 41.6, lng: -72.7 },
@@ -398,6 +489,11 @@ function getCoords(inv) {
   if (!zone) return null;
   return { lat: zone.lat + (Math.random()-0.5)*0.05, lng: zone.lng + (Math.random()-0.5)*0.05, zone: zone.name };
 }
+function getStateFromInvoice(inv) {
+  const addr = inv.shipAddress || inv.billAddress;
+  if (!addr) return 'Unknown';
+  return addr.state || 'Unknown';
+}
 
 // ═══════════════════ K-MEANS ══════════════════════════════════════════════════
 function kMeans(points, k, iter=30) {
@@ -425,31 +521,33 @@ function kMeans(points, k, iter=30) {
 
 // ═══════════════════ STATE ════════════════════════════════════════════════════
 let invoices=[], assignments={}, completed={}, clusters=[];
+let selectedInvoiceIds = new Set();
 let drivers=['Maria','John','Carlos','Tamika','Luis','Devon'];
 let serverUrl='https://cellar-route-server-production.up.railway.app';
 let activeTab='route', activeDriverFilter='all';
 let currentUser=null;
-let appPin='2024'; // default PIN — change in Settings
+let appPin='2024';
+
+// Map state
+let mapInstance = null;
+let mapMarkers = [];
+let selectedStopForReassign = null; // { invId, currentClusterIdx }
+let openPopup = null;
 
 // ═══════════════════ PIN LOGIN ════════════════════════════════════════════════
 let pinEntry='';
-
 function pinPress(digit) {
   if (pinEntry.length>=4) return;
-  pinEntry += digit;
-  updateDots();
+  pinEntry += digit; updateDots();
   if (pinEntry.length===4) setTimeout(checkPin, 150);
 }
 function pinDelete() {
-  pinEntry = pinEntry.slice(0,-1);
-  updateDots();
+  pinEntry = pinEntry.slice(0,-1); updateDots();
   document.getElementById('pinError').textContent='';
   document.querySelectorAll('.pin-dot').forEach(d=>d.classList.remove('error'));
 }
 function updateDots() {
-  for(let i=0;i<4;i++) {
-    document.getElementById('dot'+i).classList.toggle('filled', i<pinEntry.length);
-  }
+  for(let i=0;i<4;i++) document.getElementById('dot'+i).classList.toggle('filled', i<pinEntry.length);
 }
 function checkPin() {
   if (pinEntry===appPin) {
@@ -460,15 +558,12 @@ function checkPin() {
     document.querySelectorAll('.pin-dot').forEach(d=>{ d.classList.remove('filled'); d.classList.add('error'); });
     document.getElementById('pinError').textContent='Incorrect PIN. Try again.';
     pinEntry='';
-    setTimeout(()=>{
-      document.querySelectorAll('.pin-dot').forEach(d=>d.classList.remove('error'));
-    }, 800);
+    setTimeout(()=>{ document.querySelectorAll('.pin-dot').forEach(d=>d.classList.remove('error')); }, 800);
   }
 }
 function renderNameGrid() {
   document.getElementById('driverGrid').innerHTML = drivers.map(d=>
-    `<button class="driver-btn" onclick="selectDriver('${d}')">👤 ${d}</button>`
-  ).join('');
+    `<button class="driver-btn" onclick="selectDriver('${d}')">👤 ${d}</button>`).join('');
 }
 function selectDriver(name) {
   currentUser = name;
@@ -479,15 +574,13 @@ function selectDriver(name) {
   setTimeout(()=>{ document.getElementById('loginScreen').style.display='none'; }, 400);
 }
 function backToPin() {
-  pinEntry='';
-  updateDots();
+  pinEntry=''; updateDots();
   document.getElementById('pinError').textContent='';
   document.getElementById('nameStep').classList.add('hidden');
   document.getElementById('pinStep').classList.remove('hidden');
 }
 function logout() {
-  currentUser=null; pinEntry='';
-  updateDots();
+  currentUser=null; pinEntry=''; updateDots();
   document.getElementById('pinError').textContent='';
   document.getElementById('nameStep').classList.add('hidden');
   document.getElementById('pinStep').classList.remove('hidden');
@@ -498,14 +591,17 @@ function logout() {
 function changePin() {
   const val = document.getElementById('newPin').value.trim();
   if (!/^\d{4}$/.test(val)) { showToast('PIN must be exactly 4 digits'); return; }
-  appPin = val;
-  document.getElementById('newPin').value='';
-  saveState();
-  showToast('✓ PIN updated');
+  appPin = val; document.getElementById('newPin').value='';
+  saveState(); showToast('✓ PIN updated');
 }
 
 // ═══════════════════ APP INIT ═════════════════════════════════════════════════
-function initApp() {
+async function initApp() {
+  try {
+    const base = (document.getElementById('serverUrl')?.value.trim()) || serverUrl;
+    const cfg = await fetch(base + '/api/config').then(r => r.json()).catch(() => ({}));
+    if (cfg.mapboxToken) MAPBOX_TOKEN = cfg.mapboxToken;
+  } catch(e) { console.warn('Could not load config from server'); }
   const now = new Date();
   document.getElementById('todayDate').textContent =
     now.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
@@ -515,6 +611,8 @@ function initApp() {
     invoices=s.invoices||[]; assignments=s.assignments||{}; completed=s.completed||{};
     drivers=s.drivers||drivers; serverUrl=s.serverUrl||serverUrl; clusters=s.clusters||[];
     if(s.appPin) appPin=s.appPin;
+    if(s.selectedInvoiceIds) selectedInvoiceIds=new Set(s.selectedInvoiceIds);
+    else { selectedInvoiceIds = new Set(invoices.map(i=>i.id)); }
   }
   document.getElementById('serverUrl').value=serverUrl;
   renderDriverSettings();
@@ -523,12 +621,14 @@ function initApp() {
     document.getElementById('connectCard').style.display='none';
     document.getElementById('plannerSection').style.display='block';
     updateStats();
+    renderInvoiceSelectionList();
     if(clusters.length>0) renderClusters();
   }
 }
 function saveState() {
   sessionStorage.setItem('cellarRouteState', JSON.stringify({
-    invoices,assignments,completed,drivers,serverUrl,clusters,appPin
+    invoices, assignments, completed, drivers, serverUrl, clusters, appPin,
+    selectedInvoiceIds: [...selectedInvoiceIds]
   }));
 }
 
@@ -536,13 +636,16 @@ function saveState() {
 function showTab(tab) {
   activeTab=tab;
   document.querySelectorAll('.tab').forEach((t,i)=>{
-    t.classList.toggle('active',['route','deliveries','bydriver','settings'][i]===tab);
+    t.classList.toggle('active',['route','map','deliveries','bydriver','settings'][i]===tab);
   });
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.getElementById('view-'+tab).classList.add('active');
   if(tab==='deliveries') renderDeliveries();
   if(tab==='bydriver') renderByDriver();
   if(tab==='settings') renderDriverSettings();
+  if(tab==='map') {
+    setTimeout(()=>{ initOrRefreshMap(); }, 80);
+  }
 }
 
 // ═══════════════════ FETCH INVOICES ══════════════════════════════════════════
@@ -553,16 +656,17 @@ async function fetchInvoices() {
   document.getElementById('routeLoading').style.display='block';
   try {
     const base=document.getElementById('serverUrl').value.trim()||serverUrl;
-    const url=base+'/api/invoices';
-    const res=await fetch(url,{method:'GET',headers:{'Content-Type':'application/json'}});
+    const res=await fetch(base+'/api/invoices',{method:'GET',headers:{'Content-Type':'application/json'}});
     const data=await res.json();
     if(!res.ok) throw new Error(data.error||'Failed to fetch invoices');
     invoices=(data.invoices||[]).map(inv=>({...inv,cases:extractCases(inv)}));
     assignments={}; completed={}; clusters=[];
+    selectedInvoiceIds = new Set(invoices.map(i=>i.id)); // select all by default
     saveState();
     document.getElementById('routeLoading').style.display='none';
     document.getElementById('plannerSection').style.display='block';
     updateStats();
+    renderInvoiceSelectionList();
     showToast(`✓ ${invoices.length} invoices loaded`);
   } catch(err) {
     document.getElementById('routeLoading').style.display='none';
@@ -581,7 +685,7 @@ function extractCases(inv) {
   return 1;
 }
 function refreshInvoices() {
-  invoices=[];assignments={};completed={};clusters=[];
+  invoices=[];assignments={};completed={};clusters=[];selectedInvoiceIds=new Set();
   saveState();
   document.getElementById('connectCard').style.display='block';
   document.getElementById('plannerSection').style.display='none';
@@ -589,7 +693,133 @@ function refreshInvoices() {
   document.getElementById('fetchBtn').textContent="Pull Today's Deliveries";
   document.getElementById('clusterList').innerHTML='';
   document.getElementById('warningBanners').innerHTML='';
+  document.getElementById('invoiceStateGroups').innerHTML='';
   showTab('route');
+}
+
+// ═══════════════════ INVOICE SELECTION LIST ═══════════════════════════════════
+function renderInvoiceSelectionList() {
+  // Group by state
+  const byState = {};
+  invoices.forEach(inv => {
+    const state = getStateFromInvoice(inv);
+    if (!byState[state]) byState[state] = [];
+    byState[state].push(inv);
+  });
+  const sorted = Object.keys(byState).sort((a,b)=>a.localeCompare(b));
+  const container = document.getElementById('invoiceStateGroups');
+  container.innerHTML = '';
+
+  sorted.forEach(state => {
+    const group = byState[state];
+    const allChecked = group.every(inv => selectedInvoiceIds.has(inv.id));
+    const someChecked = group.some(inv => selectedInvoiceIds.has(inv.id));
+
+    const groupEl = document.createElement('div');
+    groupEl.className = 'state-group';
+    groupEl.id = `state-group-${state.replace(/\s/g,'_')}`;
+
+    const totalCases = group.reduce((s,i)=>s+(i.cases||0),0);
+
+    groupEl.innerHTML = `
+      <div class="state-group-header" onclick="toggleStateGroup('${state}')">
+        <input type="checkbox" class="state-toggle-check" id="state-check-${state.replace(/\s/g,'_')}"
+          ${allChecked?'checked':''} ${!allChecked&&someChecked?'indeterminate':''}
+          onclick="event.stopPropagation();toggleStateCheck('${state}',this.checked)" />
+        <span class="state-name">${state}</span>
+        <span class="state-count">${group.length} stop${group.length!==1?'s':''} · ${totalCases} cases</span>
+        <span class="state-chevron open" id="chevron-${state.replace(/\s/g,'_')}">▼</span>
+      </div>
+      <div class="invoice-rows" id="rows-${state.replace(/\s/g,'_')}">
+        ${group.map(inv => {
+          const addr = inv.shipAddress || inv.billAddress;
+          const city = addr ? (addr.city || addr.line2 || '') : '';
+          const checked = selectedInvoiceIds.has(inv.id);
+          return `<div class="invoice-row ${checked?'':'unchecked'}" id="inv-row-${inv.id}">
+            <input type="checkbox" class="inv-check" ${checked?'checked':''}
+              onchange="toggleInvoiceCheck('${inv.id}', this.checked, '${state}')" />
+            <span class="inv-customer">${inv.customerName}</span>
+            <span class="inv-city">${city}</span>
+            <span class="inv-cases">📦 ${inv.cases}</span>
+            <span class="inv-amount">$${Number(inv.totalAmount||0).toFixed(0)}</span>
+          </div>`;
+        }).join('')}
+      </div>`;
+    container.appendChild(groupEl);
+
+    // Set indeterminate state
+    const cb = groupEl.querySelector(`#state-check-${state.replace(/\s/g,'_')}`);
+    if (!allChecked && someChecked) cb.indeterminate = true;
+  });
+
+  updateSelectionSummary();
+}
+
+function toggleStateGroup(state) {
+  const key = state.replace(/\s/g,'_');
+  const rows = document.getElementById(`rows-${key}`);
+  const chev = document.getElementById(`chevron-${key}`);
+  if (!rows) return;
+  const isOpen = chev.classList.contains('open');
+  rows.style.display = isOpen ? 'none' : 'block';
+  chev.classList.toggle('open', !isOpen);
+}
+
+function toggleStateCheck(state, checked) {
+  const byState = {};
+  invoices.forEach(inv => {
+    const s = getStateFromInvoice(inv);
+    if (!byState[s]) byState[s] = [];
+    byState[s].push(inv);
+  });
+  (byState[state]||[]).forEach(inv => {
+    if (checked) selectedInvoiceIds.add(inv.id);
+    else selectedInvoiceIds.delete(inv.id);
+    const row = document.getElementById(`inv-row-${inv.id}`);
+    if (row) {
+      row.classList.toggle('unchecked', !checked);
+      const cb = row.querySelector('.inv-check');
+      if (cb) cb.checked = checked;
+    }
+  });
+  updateSelectionSummary();
+  saveState();
+}
+
+function toggleInvoiceCheck(id, checked, state) {
+  if (checked) selectedInvoiceIds.add(id);
+  else selectedInvoiceIds.delete(id);
+  const row = document.getElementById(`inv-row-${id}`);
+  if (row) row.classList.toggle('unchecked', !checked);
+
+  // Update state-level checkbox
+  const key = state.replace(/\s/g,'_');
+  const stateInvs = invoices.filter(inv => getStateFromInvoice(inv)===state);
+  const allChecked = stateInvs.every(inv => selectedInvoiceIds.has(inv.id));
+  const someChecked = stateInvs.some(inv => selectedInvoiceIds.has(inv.id));
+  const stateCb = document.getElementById(`state-check-${key}`);
+  if (stateCb) { stateCb.checked = allChecked; stateCb.indeterminate = !allChecked && someChecked; }
+
+  updateSelectionSummary();
+  saveState();
+}
+
+function selectAllInvoices() {
+  invoices.forEach(inv => selectedInvoiceIds.add(inv.id));
+  renderInvoiceSelectionList();
+  saveState();
+}
+function deselectAllInvoices() {
+  selectedInvoiceIds.clear();
+  renderInvoiceSelectionList();
+  saveState();
+}
+
+function updateSelectionSummary() {
+  const sel = invoices.filter(inv => selectedInvoiceIds.has(inv.id));
+  const totalCases = sel.reduce((s,i)=>s+(i.cases||0),0);
+  document.getElementById('selectionSummaryText').textContent = `${sel.length} of ${invoices.length} invoices selected`;
+  document.getElementById('selectionCasesText').textContent = `${totalCases} cases`;
 }
 
 // ═══════════════════ AUTO ROUTE ═══════════════════════════════════════════════
@@ -597,11 +827,14 @@ function runAutoRoute() {
   const driverCount=parseInt(document.getElementById('driverCount').value)||0;
   const caseLimit=parseInt(document.getElementById('caseLimit').value)||250;
   if(!driverCount){showToast('Enter how many drivers you have today');return;}
-  if(!invoices.length){showToast('No invoices loaded');return;}
-  const geocoded=invoices.map(inv=>({inv,coords:getCoords(inv)}));
+
+  const selectedInvoices = invoices.filter(inv => selectedInvoiceIds.has(inv.id));
+  if(!selectedInvoices.length){showToast('No invoices selected');return;}
+
+  const geocoded=selectedInvoices.map(inv=>({inv,coords:getCoords(inv)}));
   const withCoords=geocoded.filter(g=>g.coords);
   const noCoords=geocoded.filter(g=>!g.coords);
-  const totalCases=invoices.reduce((s,i)=>s+(i.cases||0),0);
+  const totalCases=selectedInvoices.reduce((s,i)=>s+(i.cases||0),0);
   const minVans=Math.ceil(totalCases/caseLimit);
   const effDrivers=Math.max(driverCount,minVans);
   const pts=withCoords.map(g=>g.coords);
@@ -610,9 +843,10 @@ function runAutoRoute() {
   withCoords.forEach((g,i)=>{raw[clusterAsgn[i]].stops.push(g.inv);raw[clusterAsgn[i]].cases+=g.inv.cases||0;});
   raw.forEach(c=>{c.stops.sort((a,b)=>{const za=(a.shipAddress||a.billAddress||{}).zip||'';const zb=(b.shipAddress||b.billAddress||{}).zip||'';return za.localeCompare(zb);});});
   noCoords.forEach(g=>{const li=raw.reduce((m,c,i)=>c.cases<raw[m].cases?i:m,0);raw[li].stops.push(g.inv);raw[li].cases+=g.inv.cases||0;});
-  clusters=raw.filter(c=>c.stops.length>0).map((c,i)=>({...c,id:i,driver:drivers[i]||null,zone:getClusterZone(c.stops),overLimit:c.cases>caseLimit}));
+  clusters=raw.filter(c=>c.stops.length>0).map((c,i)=>({...c,id:i,driver:drivers[i]||null,zone:getClusterZone(c.stops),overLimit:c.cases>caseLimit,color:ROUTE_COLORS[i%ROUTE_COLORS.length]}));
   clusters.forEach((c,i)=>{if(drivers[i]){c.driver=drivers[i];c.stops.forEach(inv=>{assignments[inv.id]=drivers[i];});}});
   saveState(); updateStats();
+
   const warns=[];
   if(minVans>driverCount) warns.push(`⚠️ You need at least ${minVans} vans for ${totalCases} total cases. Routes split across ${effDrivers} drivers.`);
   clusters.forEach((c,i)=>{if(c.overLimit) warns.push(`⚠️ Route ${i+1} (${c.zone}) has ${c.cases} cases — over ${caseLimit} limit.`);});
@@ -620,6 +854,7 @@ function runAutoRoute() {
   renderClusters();
   showToast(`✓ ${clusters.length} routes generated`);
 }
+
 function getClusterZone(stops) {
   const zones={};
   stops.forEach(inv=>{const addr=inv.shipAddress||inv.billAddress;if(addr&&addr.zip){const z=getZone(addr.zip);if(z)zones[z.name]=(zones[z.name]||0)+1;}});
@@ -635,12 +870,21 @@ function renderClusters() {
   const hdr=document.createElement('div');hdr.className='section-header';
   hdr.innerHTML=`<div class="section-title">Route Assignments</div><span class="badge">${clusters.length} routes</span>`;
   list.appendChild(hdr);
+
+  // Add "View on Map" button
+  const mapBtn=document.createElement('button');
+  mapBtn.className='btn-gold'; mapBtn.style.marginBottom='16px';
+  mapBtn.textContent='🗺 View All Routes on Map';
+  mapBtn.onclick=()=>showTab('map');
+  list.appendChild(mapBtn);
+
   clusters.forEach((cluster,ci)=>{
     const card=document.createElement('div');card.className='cluster-card';card.id=`cluster-${ci}`;
     const mapsUrl=buildGoogleMapsUrl(cluster.stops);
+    const colorDot=`<span class="cluster-color-dot" style="background:${cluster.color}"></span>`;
     card.innerHTML=`
       <div class="cluster-header">
-        <div class="cluster-title">Route ${ci+1} — ${cluster.zone}</div>
+        <div class="cluster-title">${colorDot}Route ${ci+1} — ${cluster.zone}</div>
         <div class="cluster-meta">
           <span class="meta-pill meta-zone">${cluster.zone}</span>
           <span class="meta-pill meta-stops">${cluster.stops.length} stops</span>
@@ -658,7 +902,7 @@ function renderClusters() {
         ${cluster.stops.map((inv,si)=>{
           const addr=inv.shipAddress||inv.billAddress;const isDone=completed[inv.id];
           return `<div class="stop-row" style="${isDone?'opacity:0.5':''}">
-            <div class="stop-num" style="${isDone?'background:var(--green)':''}">${isDone?'✓':si+1}</div>
+            <div class="stop-num" style="background:${isDone?'var(--green)':cluster.color}">${isDone?'✓':si+1}</div>
             <div class="stop-details">
               <div class="stop-customer">${inv.customerName}</div>
               <div class="stop-address">${addr?([addr.line1,addr.line2].filter(Boolean).join(', ')||'No address'):'No address'}</div>
@@ -673,6 +917,7 @@ function renderClusters() {
     list.appendChild(card);
   });
 }
+
 function buildGoogleMapsUrl(stops) {
   const addrs=stops.map(inv=>{const a=inv.shipAddress||inv.billAddress;return a?(a.full||a.line1):null;}).filter(Boolean);
   if(!addrs.length) return null;
@@ -691,6 +936,166 @@ function markClusterComplete(ci) {
   if(!clusters[ci]) return;
   clusters[ci].stops.forEach(inv=>{completed[inv.id]=true;});
   saveState(); updateStats(); renderClusters(); showToast(`✓ Route ${ci+1} complete`);
+}
+
+// ═══════════════════ MAP ══════════════════════════════════════════════════════
+function initOrRefreshMap() {
+  if (!clusters.length) {
+    document.getElementById('mapEmptyState').style.display='block';
+    document.getElementById('mapContent').style.display='none';
+    return;
+  }
+  document.getElementById('mapEmptyState').style.display='none';
+  document.getElementById('mapContent').style.display='block';
+
+  // Build legend
+  const legend = document.getElementById('routeLegend');
+  legend.innerHTML = clusters.map((c,i)=>
+    `<div class="legend-item"><div class="legend-dot" style="background:${c.color}"></div>Route ${i+1}${c.driver?' · '+c.driver:''}</div>`
+  ).join('');
+
+  // Collect all stops with coords
+  const allStops = [];
+  clusters.forEach((cluster, ci) => {
+    cluster.stops.forEach((inv, si) => {
+      const coords = getStopCoords(inv);
+      if (coords) allStops.push({ inv, ci, si, coords, color: cluster.color });
+    });
+  });
+
+  if (!allStops.length) {
+    document.getElementById('mapEmptyState').style.display='block';
+    document.getElementById('mapContent').style.display='none';
+    return;
+  }
+
+  // Calculate center
+  const avgLat = allStops.reduce((s,s2)=>s+s2.coords.lat,0)/allStops.length;
+  const avgLng = allStops.reduce((s,s2)=>s+s2.coords.lng,0)/allStops.length;
+
+  // Destroy old map
+  if (mapInstance) { mapInstance.remove(); mapInstance = null; }
+  mapMarkers = [];
+
+  mapboxgl.accessToken = MAPBOX_TOKEN;
+  mapInstance = new mapboxgl.Map({
+    container: 'routeMap',
+    style: 'mapbox://styles/mapbox/satellite-streets-v12',
+    center: [avgLng, avgLat],
+    zoom: 9,
+    attributionControl: false
+  });
+
+  mapInstance.addControl(new mapboxgl.NavigationControl(), 'top-right');
+
+  mapInstance.on('load', () => {
+    allStops.forEach(({ inv, ci, si, coords, color }) => {
+      // Custom marker element
+      const el = document.createElement('div');
+      el.style.cssText = `
+        width:30px;height:30px;border-radius:50%;background:${color};
+        border:2.5px solid white;display:flex;align-items:center;justify-content:center;
+        color:white;font-size:11px;font-weight:700;cursor:pointer;
+        box-shadow:0 2px 8px rgba(0,0,0,0.4);transition:transform 0.15s;
+        font-family:'DM Sans',sans-serif;
+      `;
+      el.textContent = si+1;
+      el.addEventListener('mouseenter', ()=>{ el.style.transform='scale(1.25)'; });
+      el.addEventListener('mouseleave', ()=>{ el.style.transform='scale(1)'; });
+
+      const addr = inv.shipAddress || inv.billAddress;
+      const addrText = addr ? (addr.full || addr.line1 || 'No address') : 'No address';
+      const cluster = clusters[ci];
+
+      const popupHtml = `
+        <div class="popup-inv">INV #${inv.invoiceNumber} · Route ${ci+1}</div>
+        <div class="popup-customer">${inv.customerName}</div>
+        <div class="popup-address">📍 ${addrText}</div>
+        <div class="popup-meta">
+          <span class="popup-cases">📦 ${inv.cases} cases</span>
+          <span class="popup-route" style="background:${color}">Route ${ci+1}${cluster.driver?' · '+cluster.driver:''}</span>
+        </div>
+        <button class="popup-reassign-btn" onclick="openReassignPanel('${inv.id}',${ci})">↔ Move to Different Route</button>`;
+
+      const popup = new mapboxgl.Popup({ offset: 18, closeButton: true, maxWidth: '260px' })
+        .setHTML(popupHtml);
+
+      const marker = new mapboxgl.Marker({ element: el, anchor: 'center' })
+        .setLngLat([coords.lng, coords.lat])
+        .setPopup(popup)
+        .addTo(mapInstance);
+
+      mapMarkers.push({ marker, inv, ci });
+    });
+
+    // Fit map to all markers
+    if (allStops.length > 1) {
+      const bounds = allStops.reduce((b, s) => b.extend([s.coords.lng, s.coords.lat]),
+        new mapboxgl.LngLatBounds([allStops[0].coords.lng, allStops[0].coords.lat],[allStops[0].coords.lng, allStops[0].coords.lat]));
+      mapInstance.fitBounds(bounds, { padding: 60, maxZoom: 13 });
+    }
+  });
+}
+
+// Use stored coords or regenerate from zone
+const _coordCache = {};
+function getStopCoords(inv) {
+  if (_coordCache[inv.id]) return _coordCache[inv.id];
+  const c = getCoords(inv);
+  if (c) _coordCache[inv.id] = c;
+  return c;
+}
+
+// ═══════════════════ REASSIGN STOP ════════════════════════════════════════════
+function openReassignPanel(invId, currentClusterIdx) {
+  selectedStopForReassign = { invId, currentClusterIdx };
+  const inv = invoices.find(i=>i.id==invId);
+  const panel = document.getElementById('reassignPanel');
+  document.getElementById('reassignTitle').textContent =
+    `Move "${inv?inv.customerName:invId}" to a different route`;
+  const sel = document.getElementById('reassignSelect');
+  sel.innerHTML = clusters
+    .filter((_,i)=>i!==currentClusterIdx)
+    .map((c,_)=>{
+      const realIdx = clusters.indexOf(c);
+      return `<option value="${realIdx}">Route ${realIdx+1} — ${c.zone}${c.driver?' ('+c.driver+')':''} · ${c.cases} cases</option>`;
+    }).join('');
+  panel.classList.add('visible');
+  // Close any open popups
+  if (mapInstance) mapInstance.closePopup && mapInstance.closePopup();
+}
+
+function confirmReassign() {
+  if (!selectedStopForReassign) return;
+  const { invId, currentClusterIdx } = selectedStopForReassign;
+  const targetIdx = parseInt(document.getElementById('reassignSelect').value);
+  if (isNaN(targetIdx)) return;
+
+  const fromCluster = clusters[currentClusterIdx];
+  const toCluster = clusters[targetIdx];
+  const inv = fromCluster.stops.find(i=>i.id==invId);
+  if (!inv) return;
+
+  // Move stop
+  fromCluster.stops = fromCluster.stops.filter(i=>i.id!=invId);
+  fromCluster.cases = fromCluster.stops.reduce((s,i)=>s+(i.cases||0),0);
+  toCluster.stops.push(inv);
+  toCluster.cases = toCluster.stops.reduce((s,i)=>s+(i.cases||0),0);
+
+  // Update assignment
+  if (toCluster.driver) assignments[inv.id] = toCluster.driver;
+  else delete assignments[inv.id];
+
+  saveState();
+  cancelReassign();
+  renderClusters();
+  initOrRefreshMap();
+  showToast(`✓ Moved to Route ${targetIdx+1}`);
+}
+
+function cancelReassign() {
+  selectedStopForReassign = null;
+  document.getElementById('reassignPanel').classList.remove('visible');
 }
 
 // ═══════════════════ DELIVERIES VIEW ══════════════════════════════════════════
@@ -729,10 +1134,11 @@ function filterByDriver(d){activeDriverFilter=d;renderByDriver();}
 
 // ═══════════════════ STATS ════════════════════════════════════════════════════
 function updateStats() {
-  const tc=invoices.reduce((s,i)=>s+(i.cases||0),0);
+  const sel = invoices.filter(i=>selectedInvoiceIds.has(i.id));
+  const tc=sel.reduce((s,i)=>s+(i.cases||0),0);
   const cl=parseInt(document.getElementById('caseLimit')?.value)||250;
   const mv=Math.ceil(tc/cl);
-  document.getElementById('stat-total').textContent=invoices.length;
+  document.getElementById('stat-total').textContent=sel.length;
   document.getElementById('stat-cases').textContent=tc;
   document.getElementById('stat-vans').textContent=mv||'—';
   document.getElementById('stat-done').textContent=Object.keys(completed).length;
@@ -752,14 +1158,11 @@ function renderDriverSettings() {
 function addDriver(){const i=document.getElementById('newDriverName');const n=i.value.trim();if(!n)return;if(drivers.includes(n)){showToast('Already exists');return;}drivers.push(n);i.value='';saveState();renderDriverSettings();showToast(`${n} added`);}
 function removeDriver(n){drivers=drivers.filter(d=>d!==n);saveState();renderDriverSettings();showToast(`${n} removed`);}
 function saveSettings(){serverUrl=document.getElementById('serverUrl').value.trim()||serverUrl;saveState();showToast('Settings saved');}
-function clearAll(){if(!confirm('Clear all delivery data?'))return;invoices=[];assignments={};completed={};clusters=[];saveState();document.getElementById('connectCard').style.display='block';document.getElementById('plannerSection').style.display='none';document.getElementById('clusterList').innerHTML='';document.getElementById('warningBanners').innerHTML='';document.getElementById('fetchBtn').disabled=false;document.getElementById('fetchBtn').textContent="Pull Today's Deliveries";showToast('Data cleared');showTab('route');}
+function clearAll(){if(!confirm('Clear all delivery data?'))return;invoices=[];assignments={};completed={};clusters=[];selectedInvoiceIds=new Set();saveState();document.getElementById('connectCard').style.display='block';document.getElementById('plannerSection').style.display='none';document.getElementById('clusterList').innerHTML='';document.getElementById('warningBanners').innerHTML='';document.getElementById('invoiceStateGroups').innerHTML='';document.getElementById('fetchBtn').disabled=false;document.getElementById('fetchBtn').textContent="Pull Today's Deliveries";showToast('Data cleared');showTab('route');}
 
-function openMap(a){
-  if(!a||a.trim()===''){showToast('No address available');return;}
-  const url='https://maps.google.com/?q='+a;
-  window.open(url,'_blank');
-}
-// ═══════════════════ TOKEN STATUS CHECK ══════════════════════════════════════
+function openMap(a){if(!a||a.trim()===''){showToast('No address available');return;}window.open('https://maps.google.com/?q='+a,'_blank');}
+
+// ═══════════════════ TOKEN STATUS ════════════════════════════════════════════
 async function checkTokenStatus() {
   try {
     const base = document.getElementById('serverUrl')?.value.trim() || serverUrl;
@@ -768,47 +1171,18 @@ async function checkTokenStatus() {
     const data = await res.json();
     const banner = document.getElementById('tokenBanner');
     if (!banner) return;
-
     if (!data.connected) {
-      // Token completely missing or expired
-      banner.style.display = 'flex';
-      banner.style.background = '#FDF0E8';
-      banner.style.border = '1.5px solid var(--orange)';
-      banner.style.color = 'var(--orange)';
-      banner.innerHTML = `<span style="font-size:20px">⚠️</span>
-        <div>
-          <strong>QuickBooks token expired</strong><br>
-          <span style="font-weight:400">Your refresh token has expired. Go to the Intuit OAuth Playground, get a new refresh token, and update <strong>QB_REFRESH_TOKEN</strong> in Railway.</span>
-        </div>`;
-    } else if (data.expiresInSeconds !== null && data.expiresInSeconds < 86400) {
-      // Access token expiring within 24 hours (unusual but worth flagging)
-      banner.style.display = 'flex';
-      banner.style.background = '#FDF3D8';
-      banner.style.border = '1.5px solid var(--gold)';
-      banner.style.color = '#8B6914';
-      banner.innerHTML = `<span style="font-size:20px">🔔</span>
-        <div>
-          <strong>Token refreshing soon</strong><br>
-          <span style="font-weight:400">Access token expires in ${Math.round(data.expiresInSeconds/60)} minutes. Auto-refresh is active.</span>
-        </div>`;
+      banner.style.display='flex';banner.style.background='#FDF0E8';banner.style.border='1.5px solid var(--orange)';banner.style.color='var(--orange)';
+      banner.innerHTML=`<span style="font-size:20px">⚠️</span><div><strong>QuickBooks token expired</strong><br><span style="font-weight:400">Update QB_REFRESH_TOKEN in Railway.</span></div>`;
     } else if (data.connected) {
-      // All good — show brief green confirmation then hide
-      banner.style.display = 'flex';
-      banner.style.background = 'var(--green-light)';
-      banner.style.border = '1.5px solid var(--green)';
-      banner.style.color = 'var(--green)';
-      banner.innerHTML = `<span style="font-size:20px">✓</span>
-        <div><strong>QuickBooks connected</strong><br>
-        <span style="font-weight:400">Auto-refresh active · ${data.environment}</span></div>`;
-      setTimeout(() => { banner.style.display = 'none'; }, 4000);
+      banner.style.display='flex';banner.style.background='var(--green-light)';banner.style.border='1.5px solid var(--green)';banner.style.color='var(--green)';
+      banner.innerHTML=`<span style="font-size:20px">✓</span><div><strong>QuickBooks connected</strong><br><span style="font-weight:400">Auto-refresh active · ${data.environment}</span></div>`;
+      setTimeout(()=>{ banner.style.display='none'; }, 4000);
     }
-  } catch(e) {
-    // Server unreachable — silent fail
-  }
+  } catch(e) {}
 }
 
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500);}
-
 document.getElementById('newDriverName')?.addEventListener('keydown',e=>{if(e.key==='Enter')addDriver();});
 </script>
 </body>
