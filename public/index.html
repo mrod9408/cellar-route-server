@@ -538,7 +538,7 @@ function getZipInfo(zip) {
 }
 
 function getCoords(inv) {
-  const addr = inv.shipAddress || inv.billAddress;
+  const addr = (inv.shipAddress?.zip ? inv.shipAddress : null) || (inv.billAddress?.zip ? inv.billAddress : null) || inv.shipAddress || inv.billAddress;
   if (!addr) return null;
   const info = getZipInfo(addr.zip);
   if (!info) return null;
@@ -554,7 +554,7 @@ function getCoords(inv) {
 }
 
 function getTerritoryForInvoice(inv) {
-  const addr = inv.shipAddress || inv.billAddress;
+  const addr = (inv.shipAddress?.zip ? inv.shipAddress : null) || (inv.billAddress?.zip ? inv.billAddress : null) || inv.shipAddress || inv.billAddress;
   if (!addr) return 'Unknown';
   const info = getZipInfo(addr.zip);
   if (info) return info.territory;
@@ -565,21 +565,21 @@ function getTerritoryForInvoice(inv) {
 }
 
 function getSubRegionForInvoice(inv) {
-  const addr = inv.shipAddress || inv.billAddress;
+  const addr = (inv.shipAddress?.zip ? inv.shipAddress : null) || (inv.billAddress?.zip ? inv.billAddress : null) || inv.shipAddress || inv.billAddress;
   if (!addr) return 'Unknown';
   const info = getZipInfo(addr.zip);
   return info ? info.subRegion : 'Unknown';
 }
 
 function getDriveOrderForInvoice(inv) {
-  const addr = inv.shipAddress || inv.billAddress;
+  const addr = (inv.shipAddress?.zip ? inv.shipAddress : null) || (inv.billAddress?.zip ? inv.billAddress : null) || inv.shipAddress || inv.billAddress;
   if (!addr) return 99;
   const info = getZipInfo(addr.zip);
   return info ? (info.driveOrder || 99) : 99;
 }
 
 function getStateFromInvoice(inv) {
-  const addr = inv.shipAddress || inv.billAddress;
+  const addr = (inv.shipAddress?.zip ? inv.shipAddress : null) || (inv.billAddress?.zip ? inv.billAddress : null) || inv.shipAddress || inv.billAddress;
   if (!addr) return 'Unknown';
   const info = getZipInfo(addr.zip);
   if (info) {
@@ -913,7 +913,7 @@ function renderInvoiceSelectionList() {
       </div>
       <div class="invoice-rows" id="rows-${state.replace(/\s/g,'_')}">
         ${group.map(inv => {
-          const addr = inv.shipAddress || inv.billAddress;
+          const addr = (inv.shipAddress?.zip ? inv.shipAddress : null) || (inv.billAddress?.zip ? inv.billAddress : null) || inv.shipAddress || inv.billAddress;
           const city = addr ? (addr.city || addr.line2 || '') : '';
           const checked = selectedInvoiceIds.has(inv.id);
           return `<div class="invoice-row ${checked?'':'unchecked'}" id="inv-row-${inv.id}">
@@ -1296,7 +1296,7 @@ async function initOrRefreshMap() {
         zIndex: 100 + si
       });
 
-      const addr = inv.shipAddress || inv.billAddress;
+      const addr = (inv.shipAddress?.zip ? inv.shipAddress : null) || (inv.billAddress?.zip ? inv.billAddress : null) || inv.shipAddress || inv.billAddress;
       const addrText = addr ? (addr.full || addr.line1 || 'No address') : 'No address';
 
       marker.addListener('click', () => {
