@@ -57,6 +57,7 @@ async function doTokenRefresh() {
     tokenStore.expiresAt = Date.now() + (data.expires_in - 300) * 1000; // refresh 5 min early
     tokenStore.refreshTokenExpiresAt = Date.now() + (101 * 24 * 60 * 60 * 1000);
     console.log('✓ Access token refreshed successfully');
+    await saveRefreshTokenToRailway(data.refresh_token);
     return true;
   } catch (err) {
     console.error('Token refresh error:', err);
@@ -71,6 +72,33 @@ async function getValidAccessToken() {
     if (!success) return null;
   }
   return tokenStore.accessToken;
+}
+
+
+// ─── SAVE REFRESH TOKEN BACK TO RAILWAY ──────────────────────────────────────
+async function saveRefreshTokenToRailway(newRefreshToken) {
+  const railwayToken  = process.env.RAILWAY_TOKEN;
+  const projectId     = process.env.RAILWAY_PROJECT_ID;
+  const serviceId     = process.env.RAILWAY_SERVICE_ID;
+  const environmentId = process.env.RAILWAY_ENVIRONMENT_ID;
+  if (!railwayToken || !projectId || !serviceId || !environmentId) {
+    console.log("Railway credentials not set — skipping auto-save of refresh token");
+    return;
+  }
+  try {
+    const mutation = `mutation UpsertVariables($input: VariableCollectionUpsertInput!) { variableCollectionUpsert(input: $input) }`;
+    const variables = { input: { projectId, serviceId, environmentId, variables: { QB_REFRESH_TOKEN: newRefreshToken } } };
+    const response = await fetch("https://backboard.railway.app/graphql/v2", {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${railwayToken}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ query: mutation, variables })
+    });
+    const data = await response.json();
+    if (data.errors) { console.error("Failed to save refresh token to Railway:", JSON.stringify(data.errors)); }
+    else { console.log("✓ Refresh token auto-saved to Railway successfully"); }
+  } catch (err) {
+    console.error("Error saving refresh token to Railway:", err.message);
+  }
 }
 
 // Auto-refresh every 50 minutes
