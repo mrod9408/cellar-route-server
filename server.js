@@ -209,13 +209,42 @@ app.get('/api/invoices', async (req, res) => {
       if (!addr) return null;
       const line1 = addr.Line1 || '';
       const line2 = addr.Line2 || '';
-      const city = addr.City || '';
-      const state = addr.CountrySubDivisionCode || '';
-      const zip = addr.PostalCode || '';
+      const line3 = addr.Line3 || '';
+      const line4 = addr.Line4 || '';
+      const line5 = addr.Line5 || '';
+
+      // QB structured fields (ideal case)
+      let city  = addr.City || '';
+      let state = addr.CountrySubDivisionCode || '';
+      let zip   = addr.PostalCode || '';
+
+      // If structured fields are empty, QB packed everything into Line3/4/5
+      // Try to extract ZIP (5-digit or ZIP+4) from any of those lines
+      if (!zip) {
+        const allLines = [line3, line4, line5].join(' ');
+        const zipMatch = allLines.match(/\b(\d{5})(?:-\d{4})?\b/);
+        if (zipMatch) zip = zipMatch[1];
+      }
+
+      // Try to extract city and state from a line like "Darien, CT 06820 USA"
+      if (!city || !state) {
+        const candidates = [line3, line4, line5].filter(Boolean);
+        for (const line of candidates) {
+          // Match patterns like "Darien, CT 06820" or "Darien CT 06820 USA"
+          const match = line.match(/^([^,]+),?\s+([A-Z]{2})\s+\d{5}/);
+          if (match) {
+            if (!city)  city  = match[1].trim();
+            if (!state) state = match[2].trim();
+            break;
+          }
+        }
+      }
+
       const full = [line2, city, state, zip].filter(Boolean).join(', ')
         || [line1, line2].filter(Boolean).join(' ')
         || line1;
-      return { line1, line2, city, state, zip, full };
+
+      return { line1, line2, line3, city, state, zip, full };
     };
 
     const formatted = invoices.map(inv => ({
@@ -281,13 +310,37 @@ app.get('/api/customers', async (req, res) => {
       if (!addr) return null;
       const line1 = addr.Line1 || '';
       const line2 = addr.Line2 || '';
-      const city = addr.City || '';
-      const state = addr.CountrySubDivisionCode || '';
-      const zip = addr.PostalCode || '';
+      const line3 = addr.Line3 || '';
+      const line4 = addr.Line4 || '';
+      const line5 = addr.Line5 || '';
+
+      let city  = addr.City || '';
+      let state = addr.CountrySubDivisionCode || '';
+      let zip   = addr.PostalCode || '';
+
+      if (!zip) {
+        const allLines = [line3, line4, line5].join(' ');
+        const zipMatch = allLines.match(/\b(\d{5})(?:-\d{4})?\b/);
+        if (zipMatch) zip = zipMatch[1];
+      }
+
+      if (!city || !state) {
+        const candidates = [line3, line4, line5].filter(Boolean);
+        for (const line of candidates) {
+          const match = line.match(/^([^,]+),?\s+([A-Z]{2})\s+\d{5}/);
+          if (match) {
+            if (!city)  city  = match[1].trim();
+            if (!state) state = match[2].trim();
+            break;
+          }
+        }
+      }
+
       const full = [line2, city, state, zip].filter(Boolean).join(', ')
         || [line1, line2].filter(Boolean).join(' ')
         || line1;
-      return { line1, line2, city, state, zip, full };
+
+      return { line1, line2, line3, city, state, zip, full };
     };
 
     const formatted = (data.QueryResponse?.Customer || []).map(c => ({
