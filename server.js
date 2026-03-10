@@ -97,11 +97,15 @@ async function startup() {
   }
 }
 
-// ─── CLIENT CONFIG (safe to expose to frontend) ───────────────────────────────
-// Serves non-secret config values to the frontend so tokens are never hardcoded in source
+// ─── CLIENT CONFIG ────────────────────────────────────────────────────────────
+// Serves non-secret config values to the frontend so API keys are never
+// hardcoded in source. Both MAPBOX_TOKEN (legacy) and GOOGLE_MAPS_KEY are
+// returned so a gradual rollout is safe. Only GOOGLE_MAPS_KEY is used by
+// the current frontend.
 app.get('/api/config', (req, res) => {
   res.json({
-    mapboxToken: process.env.MAPBOX_TOKEN || ''
+    googleMapsKey: process.env.GOOGLE_MAPS_KEY || '',
+    mapboxToken: process.env.MAPBOX_TOKEN || ''   // kept for safety during transition
   });
 });
 
