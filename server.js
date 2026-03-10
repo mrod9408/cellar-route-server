@@ -57,7 +57,7 @@ async function doTokenRefresh() {
     tokenStore.expiresAt = Date.now() + (data.expires_in - 300) * 1000; // refresh 5 min early
     tokenStore.refreshTokenExpiresAt = Date.now() + (101 * 24 * 60 * 60 * 1000);
     console.log('✓ Access token refreshed successfully');
-    await saveRefreshTokenToRailway(data.refresh_token);
+    if (data.refresh_token !== process.env.QB_REFRESH_TOKEN) await saveRefreshTokenToRailway(data.refresh_token);
     return true;
   } catch (err) {
     console.error('Token refresh error:', err);
