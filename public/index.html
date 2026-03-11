@@ -497,6 +497,42 @@ const ZIP_MAP = {
   '065': { lat:41.16, lng:-73.20 }, '064': { lat:41.35, lng:-73.08 },
   '063': { lat:41.30, lng:-72.92 }, '060': { lat:41.76, lng:-72.68 },
   '061': { lat:41.82, lng:-72.52 }, '062': { lat:41.56, lng:-72.08 },
+  // Washington DC
+  '200': { lat:38.91, lng:-77.02 }, '201': { lat:38.88, lng:-77.10 },
+  '202': { lat:38.89, lng:-77.03 }, '203': { lat:38.85, lng:-76.99 },
+  '204': { lat:38.94, lng:-77.07 }, '205': { lat:38.96, lng:-77.09 },
+  // Pennsylvania — Philadelphia area
+  '190': { lat:39.95, lng:-75.16 }, '191': { lat:39.95, lng:-75.17 },
+  '192': { lat:39.95, lng:-75.15 }, '193': { lat:40.04, lng:-75.37 },
+  '194': { lat:40.09, lng:-75.31 }, '195': { lat:40.24, lng:-75.35 },
+  '196': { lat:40.19, lng:-75.18 },
+  // Pennsylvania — Pittsburgh area
+  '150': { lat:40.44, lng:-79.99 }, '151': { lat:40.44, lng:-80.00 },
+  '152': { lat:40.37, lng:-79.86 }, '153': { lat:40.30, lng:-79.54 },
+  '154': { lat:40.00, lng:-79.57 }, '155': { lat:40.25, lng:-79.18 },
+  '156': { lat:40.31, lng:-79.55 }, '157': { lat:40.40, lng:-78.92 },
+  '158': { lat:40.48, lng:-78.40 }, '159': { lat:40.50, lng:-78.70 },
+  // Pennsylvania — Central PA
+  '160': { lat:41.24, lng:-80.50 }, '161': { lat:41.41, lng:-79.83 },
+  '162': { lat:41.12, lng:-79.19 }, '163': { lat:41.23, lng:-79.90 },
+  '164': { lat:42.13, lng:-80.08 }, '165': { lat:41.85, lng:-80.13 },
+  '166': { lat:40.79, lng:-77.86 }, '167': { lat:40.93, lng:-78.02 },
+  '168': { lat:40.90, lng:-77.79 }, '169': { lat:40.60, lng:-77.57 },
+  // Pennsylvania — Lehigh Valley / Allentown / Easton
+  '180': { lat:40.61, lng:-75.47 }, '181': { lat:40.60, lng:-75.49 },
+  '182': { lat:40.76, lng:-75.22 }, '183': { lat:40.68, lng:-75.21 },
+  '184': { lat:41.41, lng:-75.66 }, '185': { lat:41.24, lng:-75.88 },
+  '186': { lat:41.07, lng:-76.07 }, '187': { lat:41.05, lng:-76.46 },
+  '188': { lat:41.00, lng:-75.97 }, '189': { lat:40.32, lng:-75.13 },
+  // Pennsylvania — Scranton / Wilkes-Barre / Poconos
+  '176': { lat:41.24, lng:-76.92 }, '177': { lat:41.24, lng:-76.92 },
+  '178': { lat:40.27, lng:-76.88 }, '179': { lat:40.07, lng:-76.31 },
+  '170': { lat:40.27, lng:-76.88 }, '171': { lat:40.26, lng:-76.87 },
+  '172': { lat:40.04, lng:-76.31 }, '173': { lat:40.04, lng:-76.30 },
+  '174': { lat:40.04, lng:-76.31 }, '175': { lat:40.42, lng:-76.93 },
+  // Delaware (close to Philly, often on PA routes)
+  '197': { lat:39.74, lng:-75.54 }, '198': { lat:39.74, lng:-75.55 },
+  '199': { lat:39.68, lng:-75.75 },
 };
 
 function getCoords(inv) {
@@ -540,6 +576,9 @@ function getStateLabel(inv) {
   if (st === 'NJ') return 'NJ — New Jersey';
   if (st === 'CT') return 'CT — Connecticut';
   if (st === 'NY') return 'NY — New York';
+  if (st === 'PA') return 'PA — Pennsylvania';
+  if (st === 'DC') return 'DC — Washington DC';
+  if (st === 'DE') return 'DE — Delaware';
   return addr.state || 'Unknown';
 }
 
@@ -601,6 +640,30 @@ const ZIP_ZONES = {
   // CT South / Central / East
   '060':'CTCentral','061':'CTCentral','062':'CTEast',
   '063':'CTSouth','064':'CTSouth','065':'CTSouth',
+  // Washington DC
+  '200':'DC','201':'DC','202':'DC','203':'DC','204':'DC','205':'DC',
+  // Pennsylvania — Philadelphia & suburbs
+  '190':'PhillyPA','191':'PhillyPA','192':'PhillyPA',
+  '193':'PhillyPA','194':'PhillyPA','195':'PhillyPA','196':'PhillyPA',
+  '189':'PhillyPA',
+  // Pennsylvania — Lehigh Valley / Poconos / Easton (close to NJ)
+  '180':'LehighPA','181':'LehighPA','182':'LehighPA','183':'LehighPA',
+  '184':'LehighPA','185':'LehighPA','186':'LehighPA','187':'LehighPA',
+  '188':'LehighPA',
+  // Pennsylvania — Scranton / Wilkes-Barre
+  '176':'NEPennsylvania','177':'NEPennsylvania','178':'NEPennsylvania',
+  '179':'NEPennsylvania','170':'CentralPA','171':'CentralPA',
+  '172':'CentralPA','173':'CentralPA','174':'CentralPA','175':'CentralPA',
+  // Pennsylvania — Pittsburgh & Western PA
+  '150':'PittsburghPA','151':'PittsburghPA','152':'PittsburghPA',
+  '153':'PittsburghPA','154':'PittsburghPA','155':'PittsburghPA',
+  '156':'PittsburghPA','157':'PittsburghPA','158':'PittsburghPA',
+  '159':'PittsburghPA',
+  '160':'WesternPA','161':'WesternPA','162':'WesternPA','163':'WesternPA',
+  '164':'WesternPA','165':'WesternPA','166':'CentralPA','167':'CentralPA',
+  '168':'CentralPA','169':'CentralPA',
+  // Delaware
+  '197':'Delaware','198':'Delaware','199':'Delaware',
 };
 
 function getZone(inv) {
@@ -635,6 +698,28 @@ const ZONE_PENALTY = {
   // Staten Island is somewhat isolated — penalise mixing with far zones
   'StatenIsland:LongIsland':3.5,'StatenIsland:CTNear':  3.5,
   'StatenIsland:Westchester':2.5,
+  // DC — far from NYC corridor, never mix with Long Island or CT
+  'DC:LongIsland':  6.0, 'DC:CTNear':    6.0, 'DC:CTWest':    6.0,
+  'DC:CTCentral':   6.0, 'DC:CTEast':    6.0, 'DC:CTSouth':   6.0,
+  'DC:Bronx':       4.0, 'DC:Queens':    4.0, 'DC:Brooklyn':  4.0,
+  'DC:Westchester': 4.0, 'DC:HudsonValley':5.0,
+  'DC:NJSouth':     2.0, 'DC:NJCentral': 2.5, 'DC:NJNorth':   3.0,
+  'DC:Manhattan':   3.5,
+  // Philly PA — natural corridor: NJ South, DC, Delaware
+  'PhillyPA:LongIsland':  4.0, 'PhillyPA:CTNear':  4.5, 'PhillyPA:CTWest':  4.5,
+  'PhillyPA:Bronx':       3.5, 'PhillyPA:Westchester':3.5, 'PhillyPA:HudsonValley':4.0,
+  'PhillyPA:Manhattan':   3.0, 'PhillyPA:Brooklyn': 3.0,
+  // Lehigh Valley / Poconos PA — between NYC and Philly corridor
+  'LehighPA:LongIsland':  3.0, 'LehighPA:CTNear':  3.0, 'LehighPA:CTWest':  3.0,
+  'LehighPA:DC':          3.5, 'LehighPA:PittsburghPA':4.0,
+  // Pittsburgh & Western PA — far from everything, own route
+  'PittsburghPA:LongIsland':7.0,'PittsburghPA:CTNear':  7.0,
+  'PittsburghPA:Manhattan': 6.0,'PittsburghPA:NJNorth': 5.0,
+  'PittsburghPA:NJSouth':   4.5,'PittsburghPA:DC':      4.0,
+  'PittsburghPA:PhillyPA':  3.0,
+  // NE Pennsylvania (Scranton) — moderate distance from NJ/NYC
+  'NEPennsylvania:LongIsland':3.5,'NEPennsylvania:CTNear':2.5,
+  'NEPennsylvania:Manhattan': 3.0,'NEPennsylvania:NJSouth':3.0,
 };
 
 function zonePenalty(zoneA, zoneB) {
@@ -688,6 +773,25 @@ const CROSSINGS = [
   ['CTNear','Manhattan',     { lat:40.851, lng:-73.880 }],
   ['CTWest','Manhattan',     { lat:40.851, lng:-73.880 }],
   ['CTSouth','Manhattan',    { lat:40.851, lng:-73.880 }],
+  // DC ↔ NJ/NYC — route through I-95 NJ Turnpike corridor
+  ['DC','Manhattan',         { lat:40.200, lng:-74.750 }],
+  ['DC','Brooklyn',          { lat:40.200, lng:-74.750 }],
+  ['DC','NJNorth',           { lat:39.550, lng:-75.400 }],
+  ['DC','NJCentral',         { lat:39.550, lng:-75.400 }],
+  ['DC','NJSouth',           { lat:39.400, lng:-75.100 }],
+  ['DC','PhillyPA',          { lat:39.880, lng:-75.250 }],
+  // Philadelphia ↔ NJ — via Ben Franklin / Walt Whitman bridges
+  ['PhillyPA','NJSouth',     { lat:39.952, lng:-75.134 }],
+  ['PhillyPA','NJCentral',   { lat:39.952, lng:-75.134 }],
+  ['PhillyPA','Manhattan',   { lat:40.200, lng:-74.750 }],
+  ['PhillyPA','DC',          { lat:39.600, lng:-75.700 }],
+  // Lehigh Valley ↔ NJ — via I-78 / Delaware Water Gap
+  ['LehighPA','NJNorth',     { lat:40.690, lng:-75.120 }],
+  ['LehighPA','NJCentral',   { lat:40.690, lng:-75.120 }],
+  ['LehighPA','Manhattan',   { lat:40.690, lng:-75.120 }],
+  // Pittsburgh — route everything through PA Turnpike
+  ['PittsburghPA','PhillyPA',{ lat:40.100, lng:-77.000 }],
+  ['PittsburghPA','DC',      { lat:39.800, lng:-77.500 }],
 ];
 
 // Build a quick lookup: "zoneA|zoneB" → waypoint
@@ -798,7 +902,16 @@ const ZONE_MERGE_AFFINITY = {
   'StatenIsland':['Brooklyn','NJNorth','NJCentral'],
   'NJNorth':     ['Manhattan','Bronx','StatenIsland','NJCentral'],
   'NJCentral':   ['NJNorth','StatenIsland'],
-  'NJSouth':     ['NJCentral'],
+  'NJSouth':     ['NJCentral','PhillyPA','Delaware'],
+  // DC / PA / DE corridor — these naturally travel together
+  'DC':          ['PhillyPA','Delaware','NJSouth'],
+  'PhillyPA':    ['Delaware','NJSouth','DC','LehighPA','NJCentral'],
+  'Delaware':    ['PhillyPA','NJSouth','DC'],
+  'LehighPA':    ['PhillyPA','NEPennsylvania','NJCentral','NJNorth'],
+  'NEPennsylvania':['LehighPA','CentralPA','NJNorth'],
+  'CentralPA':   ['LehighPA','NEPennsylvania','PittsburghPA','PhillyPA'],
+  'PittsburghPA':['WesternPA','CentralPA'],
+  'WesternPA':   ['PittsburghPA','CentralPA'],
   'Unknown':     [],
 };
 
