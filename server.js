@@ -26,7 +26,7 @@ let tokenStore = {
   companyId: process.env.QB_COMPANY_ID || null,
   environment: process.env.QB_ENVIRONMENT || 'sandbox',
   expiresAt: null,
-  refreshTokenExpiresAt: Date.now() + (101 * 24 * 60 * 60 * 1000) // ~101 days from first run
+  refreshTokenExpiresAt: Date.now() + (101 * 24 * 60 * 60 * 1000)
 };
 
 // ─── TOKEN REFRESH ────────────────────────────────────────────────────────────
@@ -53,8 +53,8 @@ async function doTokenRefresh() {
       return false;
     }
     tokenStore.accessToken = data.access_token;
-    tokenStore.refreshToken = data.refresh_token; // Intuit rotates refresh tokens
-    tokenStore.expiresAt = Date.now() + (data.expires_in - 300) * 1000; // refresh 5 min early
+    tokenStore.refreshToken = data.refresh_token;
+    tokenStore.expiresAt = Date.now() + (data.expires_in - 300) * 1000;
     tokenStore.refreshTokenExpiresAt = Date.now() + (101 * 24 * 60 * 60 * 1000);
     console.log('✓ Access token refreshed successfully');
     if (data.refresh_token !== process.env.QB_REFRESH_TOKEN) await saveRefreshTokenToRailway(data.refresh_token);
@@ -65,7 +65,6 @@ async function doTokenRefresh() {
   }
 }
 
-// Get a valid access token — auto-refreshes if expired
 async function getValidAccessToken() {
   if (!tokenStore.accessToken || (tokenStore.expiresAt && Date.now() >= tokenStore.expiresAt)) {
     const success = await doTokenRefresh();
@@ -73,7 +72,6 @@ async function getValidAccessToken() {
   }
   return tokenStore.accessToken;
 }
-
 
 // ─── SAVE REFRESH TOKEN BACK TO RAILWAY ──────────────────────────────────────
 async function saveRefreshTokenToRailway(newRefreshToken) {
@@ -102,47 +100,35 @@ async function saveRefreshTokenToRailway(newRefreshToken) {
 }
 
 // Auto-refresh every 50 minutes
-setInterval(async () => {
-  await doTokenRefresh();
-}, 50 * 60 * 1000);
+setInterval(async () => { await doTokenRefresh(); }, 50 * 60 * 1000);
 
-// ─── STARTUP: GET INITIAL TOKEN ───────────────────────────────────────────────
+// ─── STARTUP ─────────────────────────────────────────────────────────────────
 async function startup() {
   console.log('Cellar Route Server starting...');
   console.log(`Environment: ${tokenStore.environment}`);
   console.log(`Company ID: ${tokenStore.companyId}`);
-
   if (tokenStore.refreshToken && tokenStore.clientId && tokenStore.clientSecret) {
-    console.log('Credentials found in environment variables — fetching initial access token...');
+    console.log('Credentials found — fetching initial access token...');
     const success = await doTokenRefresh();
-    if (success) {
-      console.log('✓ Ready! Auto-refresh is active.');
-    } else {
-      console.log('⚠️ Could not get initial token — check your Railway environment variables.');
-    }
+    if (success) { console.log('✓ Ready! Auto-refresh is active.'); }
+    else { console.log('⚠️ Could not get initial token — check Railway environment variables.'); }
   } else {
     console.log('⚠️ No credentials in environment variables. Manual connection required.');
   }
 }
 
 // ─── CLIENT CONFIG ────────────────────────────────────────────────────────────
-// Serves non-secret config values to the frontend so API keys are never
-// hardcoded in source. Both MAPBOX_TOKEN (legacy) and GOOGLE_MAPS_KEY are
-// returned so a gradual rollout is safe. Only GOOGLE_MAPS_KEY is used by
-// the current frontend.
 app.get('/api/config', (req, res) => {
   res.json({
     googleMapsKey: process.env.GOOGLE_MAPS_KEY || '',
-    mapboxToken: process.env.MAPBOX_TOKEN || ''   // kept for safety during transition
+    mapboxToken: process.env.MAPBOX_TOKEN || ''
   });
 });
 
-// ─── SAVE CREDENTIALS (manual override from app) ─────────────────────────────
+// ─── SAVE CREDENTIALS ────────────────────────────────────────────────────────
 app.post('/api/connect', async (req, res) => {
   const { accessToken, refreshToken, clientId, clientSecret, companyId, environment, expiresIn } = req.body;
-  if (!accessToken || !companyId) {
-    return res.status(400).json({ error: 'Missing required fields' });
-  }
+  if (!accessToken || !companyId) return res.status(400).json({ error: 'Missing required fields' });
   if (refreshToken) tokenStore.refreshToken = refreshToken;
   if (clientId) tokenStore.clientId = clientId;
   if (clientSecret) tokenStore.clientSecret = clientSecret;
@@ -157,9 +143,7 @@ app.post('/api/connect', async (req, res) => {
 // ─── REFRESH TOKEN (manual) ───────────────────────────────────────────────────
 app.post('/api/refresh-token', async (req, res) => {
   const { refreshToken, clientId, clientSecret } = req.body;
-  if (!refreshToken || !clientId || !clientSecret) {
-    return res.status(400).json({ error: 'Missing required fields' });
-  }
+  if (!refreshToken || !clientId || !clientSecret) return res.status(400).json({ error: 'Missing required fields' });
   try {
     const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
     const response = await fetch('https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer', {
@@ -172,17 +156,11 @@ app.post('/api/refresh-token', async (req, res) => {
       body: `grant_type=refresh_token&refresh_token=${encodeURIComponent(refreshToken)}`
     });
     const data = await response.json();
-    if (!response.ok) {
-      return res.status(response.status).json({ error: data.error || 'Token refresh failed', details: data });
-    }
+    if (!response.ok) return res.status(response.status).json({ error: data.error || 'Token refresh failed', details: data });
     tokenStore.accessToken = data.access_token;
     tokenStore.refreshToken = data.refresh_token;
     tokenStore.expiresAt = Date.now() + (data.expires_in - 300) * 1000;
-    res.json({
-      accessToken: data.access_token,
-      refreshToken: data.refresh_token,
-      expiresIn: data.expires_in
-    });
+    res.json({ accessToken: data.access_token, refreshToken: data.refresh_token, expiresIn: data.expires_in });
   } catch (err) {
     console.error('Token refresh error:', err);
     res.status(500).json({ error: 'Server error during token refresh' });
@@ -194,10 +172,7 @@ app.get('/api/invoices', async (req, res) => {
   let accessToken = await getValidAccessToken();
   const companyId = tokenStore.companyId;
   const environment = tokenStore.environment;
-
-  if (!accessToken || !companyId) {
-    return res.status(400).json({ error: 'Not connected to QuickBooks. Check Railway environment variables.' });
-  }
+  if (!accessToken || !companyId) return res.status(400).json({ error: 'Not connected to QuickBooks. Check Railway environment variables.' });
 
   const baseUrls = environment === 'production'
     ? ['https://quickbooks.api.intuit.com', 'https://qbo.api.intuit.com', 'https://c1.qbo.intuit.com', 'https://c3.qbo.intuit.com', 'https://c5.qbo.intuit.com']
@@ -205,7 +180,6 @@ app.get('/api/invoices', async (req, res) => {
 
   const today = new Date();
   const todayStr = today.toISOString().split('T')[0];
-
   const query = environment === 'production'
     ? `SELECT * FROM Invoice WHERE TxnDate = '${todayStr}' ORDERBY TxnDate ASC MAXRESULTS 100`
     : `SELECT * FROM Invoice ORDERBY TxnDate DESC MAXRESULTS 100`;
@@ -213,7 +187,6 @@ app.get('/api/invoices', async (req, res) => {
   try {
     const qbHeaders = { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' };
     let response = null, data = null;
-
     for (const tryUrl of baseUrls) {
       try {
         const qbUrl = `${tryUrl}/v3/company/${companyId}/query?query=${encodeURIComponent(query)}&minorversion=65`;
@@ -227,51 +200,27 @@ app.get('/api/invoices', async (req, res) => {
         console.log(`Failed to connect to ${tryUrl}: ${urlErr.message}`);
       }
     }
-
-    if (!response || !response.ok) {
-      return res.status(500).json({ error: 'QuickBooks API error', details: data });
-    }
+    if (!response || !response.ok) return res.status(500).json({ error: 'QuickBooks API error', details: data });
 
     const invoices = data.QueryResponse?.Invoice || [];
     const formatAddress = (addr) => {
       if (!addr) return null;
-      const line1 = addr.Line1 || '';
-      const line2 = addr.Line2 || '';
-      const line3 = addr.Line3 || '';
-      const line4 = addr.Line4 || '';
-      const line5 = addr.Line5 || '';
-
-      // QB structured fields (ideal case)
-      let city  = addr.City || '';
-      let state = addr.CountrySubDivisionCode || '';
-      let zip   = addr.PostalCode || '';
-
-      // If structured fields are empty, QB packed everything into Line3/4/5
-      // Try to extract ZIP (5-digit or ZIP+4) from any of those lines
+      const line1 = addr.Line1 || '', line2 = addr.Line2 || '', line3 = addr.Line3 || '',
+            line4 = addr.Line4 || '', line5 = addr.Line5 || '';
+      let city = addr.City || '', state = addr.CountrySubDivisionCode || '', zip = addr.PostalCode || '';
       if (!zip) {
         const allLines = [line3, line4, line5].join(' ');
         const zipMatch = allLines.match(/\b(\d{5})(?:-\d{4})?\b/);
         if (zipMatch) zip = zipMatch[1];
       }
-
-      // Try to extract city and state from a line like "Darien, CT 06820 USA"
       if (!city || !state) {
         const candidates = [line3, line4, line5].filter(Boolean);
         for (const line of candidates) {
-          // Match patterns like "Darien, CT 06820" or "Darien CT 06820 USA"
           const match = line.match(/^([^,]+),?\s+([A-Z]{2})\s+\d{5}/);
-          if (match) {
-            if (!city)  city  = match[1].trim();
-            if (!state) state = match[2].trim();
-            break;
-          }
+          if (match) { if (!city) city = match[1].trim(); if (!state) state = match[2].trim(); break; }
         }
       }
-
-      const full = [line2, city, state, zip].filter(Boolean).join(', ')
-        || [line1, line2].filter(Boolean).join(' ')
-        || line1;
-
+      const full = [line2, city, state, zip].filter(Boolean).join(', ') || [line1, line2].filter(Boolean).join(' ') || line1;
       return { line1, line2, line3, city, state, zip, full };
     };
 
@@ -290,17 +239,81 @@ app.get('/api/invoices', async (req, res) => {
       billAddress: formatAddress(inv.BillAddr)
     }));
 
-    res.json({
-      count: formatted.length,
-      invoices: formatted,
-      environment,
-      autoRefresh: true,
-      queriedAt: new Date().toISOString()
-    });
+    res.json({ count: formatted.length, invoices: formatted, environment, autoRefresh: true, queriedAt: new Date().toISOString() });
   } catch (err) {
     console.error('Invoice fetch error:', err);
     res.status(500).json({ error: 'Server error fetching invoices' });
   }
+});
+
+// ─── INVOICE PDF PROXY ────────────────────────────────────────────────────────
+// Fetches a single invoice PDF from QuickBooks and streams it to the client.
+// The frontend (pdf-lib) then merges multiple PDFs in route order.
+app.get('/api/invoice-pdf/:invoiceId', async (req, res) => {
+  const accessToken = await getValidAccessToken();
+  const companyId   = tokenStore.companyId;
+  const environment = tokenStore.environment;
+  const { invoiceId } = req.params;
+
+  console.log(`PDF request received for invoice ${invoiceId}, env=${environment}, company=${companyId}`);
+
+  if (!accessToken || !companyId) {
+    console.error('PDF endpoint: missing accessToken or companyId');
+    return res.status(400).json({ error: 'Not connected to QuickBooks.' });
+  }
+
+  // Try all known QB base URLs in order — same approach as /api/invoices
+  const baseUrls = environment === 'production'
+    ? [
+        'https://quickbooks.api.intuit.com',
+        'https://qbo.api.intuit.com',
+        'https://c1.qbo.intuit.com',
+        'https://c3.qbo.intuit.com',
+        'https://c5.qbo.intuit.com'
+      ]
+    : ['https://sandbox-quickbooks.api.intuit.com'];
+
+  const headers = {
+    'Authorization': `Bearer ${accessToken}`,
+    'Accept': 'application/pdf'
+  };
+
+  for (const baseUrl of baseUrls) {
+    const pdfUrl = `${baseUrl}/v3/company/${companyId}/invoice/${invoiceId}/pdf?minorversion=65`;
+    try {
+      console.log(`Trying PDF URL: ${pdfUrl}`);
+      const qbRes = await fetch(pdfUrl, { method: 'GET', headers });
+
+      if (qbRes.ok) {
+        const contentType = qbRes.headers.get('content-type') || '';
+        console.log(`✓ PDF success for invoice ${invoiceId} via ${baseUrl}, content-type: ${contentType}`);
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Cache-Control', 'no-store');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        qbRes.body.pipe(res);
+        return;
+      }
+
+      const errText = await qbRes.text();
+      console.error(`QB PDF ${qbRes.status} from ${baseUrl} for invoice ${invoiceId}:`, errText.slice(0, 300));
+
+      // 404 = invoice not found on this cluster, try next
+      // 401/403 = auth issue, no point trying other clusters
+      if (qbRes.status === 401 || qbRes.status === 403) {
+        return res.status(qbRes.status).json({ error: `QB auth error ${qbRes.status} — token may need refresh` });
+      }
+      // For non-404 errors, stop trying
+      if (qbRes.status !== 404) {
+        return res.status(qbRes.status).json({ error: `QB returned ${qbRes.status} for invoice ${invoiceId}` });
+      }
+
+    } catch (err) {
+      console.error(`Network error fetching PDF from ${baseUrl}:`, err.message);
+    }
+  }
+
+  console.error(`All QB URLs returned 404 for invoice ${invoiceId}`);
+  res.status(404).json({ error: `Invoice ${invoiceId} PDF not found in QuickBooks` });
 });
 
 // ─── FETCH CUSTOMERS ──────────────────────────────────────────────────────────
@@ -308,10 +321,7 @@ app.get('/api/customers', async (req, res) => {
   let accessToken = await getValidAccessToken();
   const companyId = tokenStore.companyId;
   const environment = tokenStore.environment;
-
-  if (!accessToken || !companyId) {
-    return res.status(400).json({ error: 'Not connected to QuickBooks.' });
-  }
+  if (!accessToken || !companyId) return res.status(400).json({ error: 'Not connected to QuickBooks.' });
 
   const baseUrl = environment === 'production'
     ? 'https://quickbooks.api.intuit.com'
@@ -320,60 +330,29 @@ app.get('/api/customers', async (req, res) => {
   try {
     const custHeaders = { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' };
     const custUrl = `${baseUrl}/v3/company/${companyId}/query?query=${encodeURIComponent('SELECT * FROM Customer WHERE Active = true ORDERBY DisplayName ASC MAXRESULTS 200')}&minorversion=65`;
-
     let response = await fetch(custUrl, { method: 'GET', headers: custHeaders, redirect: 'manual' });
-
     if ([301, 302, 307, 308].includes(response.status)) {
       const redirectUrl = response.headers.get('location');
       console.log(`Following QB redirect to: ${redirectUrl}`);
       response = await fetch(redirectUrl, { method: 'GET', headers: custHeaders });
     }
-
     const data = await response.json();
-    if (!response.ok) {
-      return res.status(response.status).json({ error: 'QuickBooks API error', details: data });
-    }
+    if (!response.ok) return res.status(response.status).json({ error: 'QuickBooks API error', details: data });
 
     const formatAddress = (addr) => {
       if (!addr) return null;
-      const line1 = addr.Line1 || '';
-      const line2 = addr.Line2 || '';
-      const line3 = addr.Line3 || '';
-      const line4 = addr.Line4 || '';
-      const line5 = addr.Line5 || '';
-
-      let city  = addr.City || '';
-      let state = addr.CountrySubDivisionCode || '';
-      let zip   = addr.PostalCode || '';
-
-      if (!zip) {
-        const allLines = [line3, line4, line5].join(' ');
-        const zipMatch = allLines.match(/\b(\d{5})(?:-\d{4})?\b/);
-        if (zipMatch) zip = zipMatch[1];
-      }
-
-      if (!city || !state) {
-        const candidates = [line3, line4, line5].filter(Boolean);
-        for (const line of candidates) {
-          const match = line.match(/^([^,]+),?\s+([A-Z]{2})\s+\d{5}/);
-          if (match) {
-            if (!city)  city  = match[1].trim();
-            if (!state) state = match[2].trim();
-            break;
-          }
-        }
-      }
-
-      const full = [line2, city, state, zip].filter(Boolean).join(', ')
-        || [line1, line2].filter(Boolean).join(' ')
-        || line1;
-
+      const line1 = addr.Line1||'', line2 = addr.Line2||'', line3 = addr.Line3||'',
+            line4 = addr.Line4||'', line5 = addr.Line5||'';
+      let city = addr.City||'', state = addr.CountrySubDivisionCode||'', zip = addr.PostalCode||'';
+      if (!zip) { const m = [line3,line4,line5].join(' ').match(/\b(\d{5})(?:-\d{4})?\b/); if(m) zip=m[1]; }
+      if (!city||!state) { for(const l of [line3,line4,line5].filter(Boolean)) { const m=l.match(/^([^,]+),?\s+([A-Z]{2})\s+\d{5}/); if(m){if(!city)city=m[1].trim();if(!state)state=m[2].trim();break;} } }
+      const full = [line2,city,state,zip].filter(Boolean).join(', ') || [line1,line2].filter(Boolean).join(' ') || line1;
       return { line1, line2, line3, city, state, zip, full };
     };
 
     const formatted = (data.QueryResponse?.Customer || []).map(c => ({
-      id: c.Id, displayName: c.DisplayName, companyName: c.CompanyName || null,
-      email: c.PrimaryEmailAddr?.Address || null, phone: c.PrimaryPhone?.FreeFormNumber || null,
+      id: c.Id, displayName: c.DisplayName, companyName: c.CompanyName||null,
+      email: c.PrimaryEmailAddr?.Address||null, phone: c.PrimaryPhone?.FreeFormNumber||null,
       balance: c.Balance, shipAddress: formatAddress(c.ShipAddr), billAddress: formatAddress(c.BillAddr)
     }));
 
@@ -413,75 +392,27 @@ app.get('/authorize', (req, res) => {
 // ─── OAUTH CALLBACK ───────────────────────────────────────────────────────────
 app.get('/callback', async (req, res) => {
   const { code, realmId, error } = req.query;
-
-  if (error) {
-    return res.send(`<h2>Authorization failed: ${error}</h2><p>Go back and try again.</p>`);
-  }
-  if (!code || !realmId) {
-    return res.send('<h2>Missing code or realmId</h2><p>Something went wrong. Try visiting /authorize again.</p>');
-  }
-
+  if (error) return res.send(`<h2>Authorization failed: ${error}</h2>`);
+  if (!code || !realmId) return res.send('<h2>Missing code or realmId</h2>');
   try {
     const clientId = tokenStore.clientId || process.env.QB_CLIENT_ID;
     const clientSecret = tokenStore.clientSecret || process.env.QB_CLIENT_SECRET;
     const redirectUri = 'https://cellar-route-server-production.up.railway.app/callback';
     const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
-
     const response = await fetch('https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer', {
       method: 'POST',
-      headers: {
-        'Authorization': `Basic ${credentials}`,
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Accept': 'application/json'
-      },
+      headers: { 'Authorization': `Basic ${credentials}`, 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json' },
       body: `grant_type=authorization_code&code=${encodeURIComponent(code)}&redirect_uri=${encodeURIComponent(redirectUri)}`
     });
-
     const data = await response.json();
-
-    if (!response.ok) {
-      return res.send(`<h2>Token exchange failed</h2><pre>${JSON.stringify(data, null, 2)}</pre>`);
-    }
-
+    if (!response.ok) return res.send(`<h2>Token exchange failed</h2><pre>${JSON.stringify(data, null, 2)}</pre>`);
     tokenStore.accessToken = data.access_token;
     tokenStore.refreshToken = data.refresh_token;
     tokenStore.companyId = realmId;
     tokenStore.expiresAt = Date.now() + (data.expires_in - 300) * 1000;
     tokenStore.refreshTokenExpiresAt = Date.now() + (101 * 24 * 60 * 60 * 1000);
-
     console.log(`✓ OAuth complete! Company ID: ${realmId}`);
-    console.log(`✓ Refresh Token: ${data.refresh_token}`);
-    console.log(`✓ Copy this refresh token to your QB_REFRESH_TOKEN Railway variable!`);
-
-    res.send(`
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1">
-        <style>
-          body { font-family: sans-serif; background: #4A1320; color: #F7F2EA; display: flex; align-items: center; justify-content: center; min-height: 100vh; margin: 0; padding: 20px; box-sizing: border-box; }
-          .card { background: #6B1E2E; border-radius: 16px; padding: 32px; max-width: 500px; width: 100%; }
-          h2 { color: #E8C97A; font-size: 22px; margin-bottom: 16px; }
-          p { font-size: 14px; line-height: 1.6; margin-bottom: 12px; }
-          .token { background: rgba(0,0,0,0.3); border-radius: 8px; padding: 12px; font-size: 12px; word-break: break-all; margin: 12px 0; }
-          .label { font-size: 11px; color: #C9A84C; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 4px; }
-          .btn { display: block; background: #C9A84C; color: #4A1320; padding: 14px; border-radius: 10px; text-align: center; font-weight: bold; text-decoration: none; margin-top: 20px; font-size: 15px; }
-        </style>
-      </head>
-      <body>
-        <div class="card">
-          <h2>✓ QuickBooks Connected!</h2>
-          <p>Your app is now connected to your real QuickBooks company.</p>
-          <div class="label">Company (Realm) ID</div>
-          <div class="token">${realmId}</div>
-          <div class="label">Refresh Token — Save this in Railway as QB_REFRESH_TOKEN</div>
-          <div class="token">${data.refresh_token}</div>
-          <p style="color:#E8C97A;font-size:13px">⚠️ Copy the Refresh Token above and update QB_REFRESH_TOKEN in your Railway variables to make this permanent.</p>
-          <a class="btn" href="/">Go to Cellar Route App →</a>
-        </div>
-      </body>
-      </html>
-    `);
+    res.send(`<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><style>body{font-family:sans-serif;background:#4A1320;color:#F7F2EA;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:20px;box-sizing:border-box}.card{background:#6B1E2E;border-radius:16px;padding:32px;max-width:500px;width:100%}h2{color:#E8C97A;font-size:22px;margin-bottom:16px}.token{background:rgba(0,0,0,0.3);border-radius:8px;padding:12px;font-size:12px;word-break:break-all;margin:12px 0}.label{font-size:11px;color:#C9A84C;font-weight:bold;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px}.btn{display:block;background:#C9A84C;color:#4A1320;padding:14px;border-radius:10px;text-align:center;font-weight:bold;text-decoration:none;margin-top:20px;font-size:15px}</style></head><body><div class="card"><h2>✓ QuickBooks Connected!</h2><p>Your app is now connected to your real QuickBooks company.</p><div class="label">Company (Realm) ID</div><div class="token">${realmId}</div><div class="label">Refresh Token — Save this in Railway as QB_REFRESH_TOKEN</div><div class="token">${data.refresh_token}</div><p style="color:#E8C97A;font-size:13px">⚠️ Copy the Refresh Token above and update QB_REFRESH_TOKEN in your Railway variables.</p><a class="btn" href="/">Go to Cellar Route App →</a></div></body></html>`);
   } catch (err) {
     console.error('Callback error:', err);
     res.send(`<h2>Server error</h2><pre>${err.message}</pre>`);
