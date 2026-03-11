@@ -174,6 +174,13 @@
     .map-loading-overlay .spinner { width: 36px; height: 36px; border: 3px solid var(--cream-dark); border-top-color: var(--burgundy); border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 12px; }
     .map-loading-overlay p { font-size: 13px; color: var(--burgundy); font-weight: 500; }
     #routeMapWrapper { position: relative; }
+    .map-route-toggles { display:flex; flex-wrap:wrap; gap:8px; padding:10px 16px 4px; }
+    .route-toggle-btn { display:flex; align-items:center; gap:7px; padding:7px 14px; border-radius:20px; border:2px solid transparent; font-family:'DM Sans',sans-serif; font-size:12px; font-weight:600; cursor:pointer; transition:all 0.18s; background:var(--cream); color:var(--charcoal); }
+    .route-toggle-btn .toggle-dot { width:11px; height:11px; border-radius:50%; flex-shrink:0; }
+    .route-toggle-btn.active { color:white; }
+    .route-toggle-btn.inactive { opacity:0.45; background:var(--cream-dark); }
+    .route-toggle-all { background:var(--burgundy); color:var(--cream); border-color:var(--burgundy); }
+    .route-toggle-all.inactive { background:var(--cream-dark); color:var(--gray); border-color:transparent; opacity:0.7; }
 
     /* ── WARN BANNER ──────────────────────────────────────────────────────── */
     .warn-banner { background: var(--orange-light); border: 1.5px solid var(--orange); border-radius: 12px; padding: 12px 16px; margin-bottom: 14px; font-size: 13px; color: var(--orange); font-weight: 500; display: flex; gap: 8px; }
@@ -406,6 +413,7 @@
           <div class="map-toolbar-title">🗺 Route Map</div>
           <div class="route-legend" id="routeLegend"></div>
         </div>
+        <div class="map-route-toggles" id="mapRouteToggles"></div>
         <div id="routeMapWrapper">
           <div id="routeMap"></div>
         </div>
@@ -1069,6 +1077,7 @@ let appPin='2024';
 
 // Google Maps state
 let gMap=null, gMapMarkers=[], gMapPolylines=[], gInfoWindow=null, selectedStopForReassign=null;
+let visibleRoutes=new Set(); // which route indices are currently shown on map
 
 // ═══════════════════ LOAD GOOGLE MAPS ════════════════════════════════════════
 function loadGoogleMaps(key) {
@@ -1402,7 +1411,9 @@ async function initOrRefreshMap() {
   let loadingOverlay=document.getElementById('mapLoadingOverlay');
   if(!loadingOverlay){ loadingOverlay=document.createElement('div'); loadingOverlay.id='mapLoadingOverlay'; loadingOverlay.className='map-loading-overlay'; loadingOverlay.innerHTML='<div class="spinner"></div><p>Loading map…</p>'; wrapper.appendChild(loadingOverlay); }
   loadingOverlay.style.display='flex';
+  // Build legend
   document.getElementById('routeLegend').innerHTML=clusters.map((c,i)=>`<div class="legend-item"><div class="legend-dot" style="background:${c.color}"></div>Route ${i+1}${c.driver?' · '+c.driver:''}${c.distance?' · ~'+c.distance+' mi':''}</div>`).join('');
+
   try{ await loadGoogleMaps(GOOGLE_MAPS_KEY); }catch(e){ loadingOverlay.style.display='none'; showToast('❌ Could not load Google Maps'); return; }
 
   const allStops=[];
@@ -1413,6 +1424,11 @@ async function initOrRefreshMap() {
   if(!allStops.length){ loadingOverlay.style.display='none'; document.getElementById('mapEmptyState').style.display='block'; document.getElementById('mapEmptyState').innerHTML=`<div class="empty-icon">📍</div><div class="empty-title">No mappable stops</div><div class="empty-text">Check that your QuickBooks addresses include ZIP codes.</div>`; document.getElementById('mapContent').style.display='none'; return; }
 
   clearMapObjects();
+
+  // Initialise visibleRoutes to show all
+  visibleRoutes=new Set(clusters.map((_,i)=>i));
+  renderMapRouteToggles();
+
   const mapEl=document.getElementById('routeMap');
   mapEl.style.height='520px';
   if(!gMap){ gMap=new google.maps.Map(mapEl,{zoom:10,center:{lat:41.0534,lng:-73.5387},mapTypeId:'roadmap',mapTypeControl:true,mapTypeControlOptions:{style:google.maps.MapTypeControlStyle.HORIZONTAL_BAR,position:google.maps.ControlPosition.TOP_LEFT},fullscreenControl:true,streetViewControl:false,styles:[{featureType:'poi',elementType:'labels',stylers:[{visibility:'off'}]},{featureType:'transit',elementType:'labels',stylers:[{visibility:'off'}]}]}); gInfoWindow=new google.maps.InfoWindow(); }
@@ -1424,12 +1440,17 @@ async function initOrRefreshMap() {
   warehouseMarker.addListener('click',()=>{ gInfoWindow.setContent(`<div class="gm-popup"><div class="popup-inv">WAREHOUSE</div><div class="popup-customer">52 Poplar St</div><div class="popup-address">Stamford, CT 06902</div></div>`); gInfoWindow.open(gMap,warehouseMarker); });
   gMapMarkers.push(warehouseMarker);
 
+  // Track markers/polylines per route index for toggling
+  const routeMapObjects={}; // ci -> {markers:[], polyline}
+
   clusters.forEach((cluster,ci)=>{
     const clusterStops=allStops.filter(s=>s.ci===ci);
     if(!clusterStops.length)return;
+    routeMapObjects[ci]={markers:[],polyline:null};
     const pathCoords=[{lat:WAREHOUSE.lat,lng:WAREHOUSE.lng},...clusterStops.map(s=>({lat:s.coords.lat,lng:s.coords.lng})),{lat:WAREHOUSE.lat,lng:WAREHOUSE.lng}];
     const polyline=new google.maps.Polyline({path:pathCoords,geodesic:true,strokeColor:cluster.color,strokeOpacity:0.75,strokeWeight:3,map:gMap});
     gMapPolylines.push(polyline);
+    routeMapObjects[ci].polyline=polyline;
     clusterStops.forEach(({inv,si,coords,color})=>{
       bounds.extend({lat:coords.lat,lng:coords.lng});
       const svgIcon={url:`data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="32" height="38" viewBox="0 0 32 38"><path d="M16 0C7.163 0 0 7.163 0 16c0 10.627 14 22 16 22s16-11.373 16-22C32 7.163 24.837 0 16 0z" fill="${color}"/><circle cx="16" cy="15" r="10" fill="white" opacity="0.2"/><text x="16" y="20" text-anchor="middle" font-family="DM Sans,sans-serif" font-size="11" font-weight="700" fill="white">${si+1}</text></svg>`)}`,scaledSize:new google.maps.Size(32,38),anchor:new google.maps.Point(16,38)};
@@ -1438,13 +1459,71 @@ async function initOrRefreshMap() {
       const addrText=addr?(addr.full||addr.line1||'No address'):'No address';
       marker.addListener('click',()=>{ gInfoWindow.setContent(`<div class="gm-popup"><div class="popup-inv">INV #${inv.invoiceNumber} · Route ${ci+1}</div><div class="popup-customer">${inv.customerName}</div><div class="popup-address">📍 ${addrText}</div><div class="popup-meta"><span class="popup-cases">📦 ${inv.cases} cases</span><span class="popup-route" style="background:${color}">Route ${ci+1}${cluster.driver?' · '+cluster.driver:''}</span></div><button class="popup-reassign-btn" onclick="openReassignPanel('${inv.id}',${ci})">↔ Move to Different Route</button></div>`); gInfoWindow.open(gMap,marker); });
       gMapMarkers.push(marker);
+      routeMapObjects[ci].markers.push(marker);
     });
   });
+
+  // Expose routeMapObjects globally so toggle function can access it
+  window._routeMapObjects=routeMapObjects;
+
   gMap.fitBounds(bounds,{top:60,right:40,bottom:40,left:40});
   loadingOverlay.style.display='none';
 }
 
-// ═══════════════════ REASSIGN STOP ════════════════════════════════════════════
+// ═══════════════════ MAP ROUTE TOGGLES ═══════════════════════════════════════
+function renderMapRouteToggles() {
+  const container = document.getElementById('mapRouteToggles');
+  if (!container || !clusters.length) return;
+  const allVisible = visibleRoutes.size === clusters.length;
+  container.innerHTML = `
+    <button class="route-toggle-btn route-toggle-all ${allVisible?'active':'inactive'}" onclick="toggleAllRoutes()">
+      ${allVisible ? '👁 All Routes' : '👁 Show All'}
+    </button>
+    ${clusters.map((c,i) => `
+      <button class="route-toggle-btn ${visibleRoutes.has(i)?'active':'inactive'}"
+        style="${visibleRoutes.has(i)?`background:${c.color};border-color:${c.color}`:'border-color:'+c.color}"
+        onclick="toggleMapRoute(${i})">
+        <span class="toggle-dot" style="background:${visibleRoutes.has(i)?'white':c.color}"></span>
+        Route ${i+1}${c.driver?' · '+c.driver:''}
+      </button>`).join('')}`;
+}
+
+function toggleMapRoute(ci) {
+  if (visibleRoutes.has(ci)) {
+    // Don't allow hiding the last visible route
+    if (visibleRoutes.size === 1) return;
+    visibleRoutes.delete(ci);
+  } else {
+    visibleRoutes.add(ci);
+  }
+  applyRouteVisibility();
+  renderMapRouteToggles();
+}
+
+function toggleAllRoutes() {
+  if (visibleRoutes.size === clusters.length) {
+    // All visible — show only first route
+    visibleRoutes = new Set([0]);
+  } else {
+    // Show all
+    visibleRoutes = new Set(clusters.map((_,i) => i));
+  }
+  applyRouteVisibility();
+  renderMapRouteToggles();
+}
+
+function applyRouteVisibility() {
+  const objs = window._routeMapObjects || {};
+  clusters.forEach((_, ci) => {
+    const show = visibleRoutes.has(ci);
+    const routeObj = objs[ci];
+    if (!routeObj) return;
+    routeObj.markers.forEach(m => m.setVisible(show));
+    if (routeObj.polyline) routeObj.polyline.setVisible(show);
+  });
+}
+
+// ═══════════════════ REASSIGN STOP ═══════════════════════════════════════════
 function openReassignPanel(invId,currentClusterIdx){
   selectedStopForReassign={invId,currentClusterIdx};
   const inv=invoices.find(i=>i.id==invId);
@@ -1574,25 +1653,76 @@ async function fetchInvoicePdf(invoiceId) {
   return res.arrayBuffer();
 }
 
-// Build a simple divider page using pdf-lib
-async function makeDividerPage(pdfDoc, routeNum, driverName, stopCount, cases, dist, date) {
-  const page = pdfDoc.addPage([612, 792]); // US Letter
-  const { rgb } = PDFLib;
+// Build a divider page using pdf-lib, listing all stops in order
+async function makeDividerPage(pdfDoc, routeNum, driverName, stops, cases, dist, date) {
+  const { rgb, StandardFonts } = PDFLib;
+  const page    = pdfDoc.addPage([612, 792]); // US Letter
+  const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  const regFont  = await pdfDoc.embedFont(StandardFonts.Helvetica);
+
   // Dark burgundy header bar
-  page.drawRectangle({ x:0, y:692, width:612, height:100, color: rgb(0.29,0.075,0.176) });
+  page.drawRectangle({ x:0, y:692, width:612, height:100, color: rgb(0.29, 0.075, 0.176) });
+
   // Route title
-  page.drawText(`ROUTE ${routeNum}`, { x:40, y:755, size:32, color: rgb(0.788,0.659,0.298) });
-  if (driverName) page.drawText(driverName, { x:40, y:724, size:16, color: rgb(0.969,0.949,0.918) });
+  page.drawText(`ROUTE ${routeNum}`, {
+    x:40, y:755, size:30, font:boldFont, color: rgb(0.788, 0.659, 0.298)
+  });
+
+  // Driver name
+  if (driverName) {
+    page.drawText(driverName, { x:40, y:722, size:15, font:boldFont, color: rgb(0.969, 0.949, 0.918) });
+  }
+
   // Meta line
-  const meta = `${stopCount} stops  ·  ${cases} cases  ·  ~${dist||'?'} mi  ·  ${date}`;
-  page.drawText(meta, { x:40, y:670, size:12, color: rgb(0.42,0.42,0.42) });
-  // Divider line
-  page.drawLine({ start:{x:40,y:655}, end:{x:572,y:655}, thickness:1.5, color:rgb(0.83,0.71,0.74) });
-  // Stop list
-  let y = 630;
-  page.drawText('STOP ORDER', { x:40, y, size:9, color:rgb(0.42,0.42,0.42) });
-  y -= 18;
-  return page;
+  const meta = `${stops.length} stops  ·  ${cases} cases  ·  ~${dist||'?'} mi  ·  ${date}`;
+  page.drawText(meta, { x:40, y:670, size:11, font:regFont, color: rgb(0.42, 0.42, 0.42) });
+
+  // Section header
+  page.drawLine({ start:{x:40,y:655}, end:{x:572,y:655}, thickness:1.5, color: rgb(0.83,0.71,0.74) });
+  page.drawText('STOP ORDER', { x:40, y:638, size:8, font:boldFont, color: rgb(0.55,0.55,0.55) });
+
+  // Stop list — two columns if more than 14 stops
+  const col1X=40, col2X=326, rowH=19, startY=618;
+  const useTwo = stops.length > 14;
+  const col1Stops = useTwo ? stops.slice(0, Math.ceil(stops.length/2)) : stops;
+  const col2Stops = useTwo ? stops.slice(Math.ceil(stops.length/2)) : [];
+
+  const drawStopRow = (stop, idx, x, y) => {
+    // Stop number bubble background
+    page.drawRectangle({ x:x, y:y-3, width:20, height:16, borderRadius:4, color: rgb(0.29,0.075,0.176) });
+    page.drawText(String(idx+1), {
+      x: x + (idx+1 < 10 ? 7 : 3), y: y+1, size:9, font:boldFont, color: rgb(1,1,1)
+    });
+    // Customer name
+    const name = stop.customerName || 'Unknown';
+    const truncated = name.length > 28 ? name.slice(0,26)+'…' : name;
+    page.drawText(truncated, { x:x+26, y:y+1, size:10, font:boldFont, color: rgb(0.15,0.15,0.15) });
+    // Address city/state
+    const addr = (stop.shipAddress?.zip ? stop.shipAddress : null) || (stop.billAddress?.zip ? stop.billAddress : null) || stop.shipAddress || stop.billAddress;
+    const cityState = addr ? [addr.city, addr.state].filter(Boolean).join(', ') : '';
+    if (cityState) page.drawText(cityState, { x:x+26, y:y-9, size:8, font:regFont, color: rgb(0.5,0.5,0.5) });
+    // Cases
+    const casesLabel = `${stop.cases||0} cs`;
+    page.drawText(casesLabel, { x:x+230, y:y+1, size:9, font:regFont, color: rgb(0.18,0.49,0.36) });
+  };
+
+  col1Stops.forEach((stop, i) => {
+    const y = startY - (i * rowH);
+    if (y < 40) return;
+    drawStopRow(stop, i, col1X, y);
+  });
+
+  col2Stops.forEach((stop, i) => {
+    const actualIdx = Math.ceil(stops.length/2) + i;
+    const y = startY - (i * rowH);
+    if (y < 40) return;
+    drawStopRow(stop, actualIdx, col2X, y);
+  });
+
+  // Vertical separator between columns
+  if (useTwo) {
+    page.drawLine({ start:{x:312,y:startY+10}, end:{x:312,y:Math.max(40, startY-(col1Stops.length*rowH))}, thickness:0.5, color:rgb(0.85,0.85,0.85) });
+  }
 }
 
 // Merge multiple ArrayBuffers (individual invoice PDFs) into one pdf-lib doc
@@ -1631,7 +1761,7 @@ async function downloadAllRoutesPdf() {
       setPdfStatus(`Route ${ci+1} of ${clusters.length}: fetching ${cluster.stops.length} invoices…`);
 
       // Divider page
-      await makeDividerPage(merged, ci+1, cluster.driver, cluster.stops.length, cluster.cases, cluster.distance, date);
+      await makeDividerPage(merged, ci+1, cluster.driver, cluster.stops, cluster.cases, cluster.distance, date);
 
       // Invoices in stop order
       for (let i = 0; i < cluster.stops.length; i++) {
