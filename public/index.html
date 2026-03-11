@@ -43,12 +43,7 @@
     .pin-btn.del { font-family: 'DM Sans', sans-serif; font-size: 20px; }
     .pin-btn.empty { background: transparent !important; cursor: default; }
     .pin-error { color: #F28B82; font-size: 13px; margin-top: 16px; min-height: 18px; font-weight: 500; }
-    .name-label { color: rgba(247,242,234,0.7); font-size: 12px; font-weight: 600; margin-bottom: 20px; text-transform: uppercase; letter-spacing: 1px; }
-    .driver-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; width: 100%; max-width: 340px; }
-    .driver-btn { background: rgba(255,255,255,0.08); border: 1.5px solid rgba(255,255,255,0.15); border-radius: 14px; color: var(--cream); font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 500; padding: 18px 12px; cursor: pointer; transition: all 0.2s; text-align: center; }
-    .driver-btn:hover { background: var(--gold); border-color: var(--gold); color: var(--burgundy-dark); font-weight: 700; }
-    .driver-btn:active { transform: scale(0.96); }
-    .btn-back { background: none; border: none; color: rgba(247,242,234,0.4); font-size: 13px; font-family: 'DM Sans', sans-serif; cursor: pointer; margin-top: 20px; padding: 8px; }
+
     .btn-back:hover { color: var(--cream); }
 
     /* ── APP CHROME ───────────────────────────────────────────────────────── */
@@ -135,7 +130,6 @@
     .meta-stops { background: var(--cream-dark); color: var(--burgundy); }
     .meta-cases { background: var(--green-light); color: var(--green); }
     .meta-cases.over { background: var(--orange-light); color: var(--orange); }
-    .meta-dist { background: #EEF2FF; color: #4338CA; }
     .cluster-color-dot { width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; display: inline-block; margin-right: 6px; vertical-align: middle; }
     .cluster-driver-row { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
     .cluster-driver-select { flex: 1; padding: 9px 12px; border: 1.5px solid var(--cream-dark); border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 13px; color: var(--charcoal); background: var(--cream); outline: none; cursor: pointer; }
@@ -296,11 +290,7 @@
     </div>
     <div class="pin-error" id="pinError"></div>
   </div>
-  <div class="login-step hidden" id="nameStep">
-    <div class="name-label">Who are you?</div>
-    <div class="driver-grid" id="driverGrid"></div>
-    <button class="btn-back" onclick="backToPin()">← Back</button>
-  </div>
+
 </div>
 
 <!-- ═══════════════════════ MAIN APP ═══════════════════════════════════════ -->
@@ -314,7 +304,6 @@
       </div>
     </div>
     <div class="header-right">
-      <span class="user-badge" id="userBadge"></span>
       <button class="btn-icon" onclick="refreshInvoices()">↻</button>
       <button class="btn-icon" onclick="showTab('settings')">⚙</button>
       <button class="btn-icon" onclick="logout()" title="Log out">⏻</button>
@@ -324,8 +313,6 @@
   <div class="tabs">
     <div class="tab active" onclick="showTab('route')">Route Planner</div>
     <div class="tab" onclick="showTab('map')">Route Map</div>
-    <div class="tab" onclick="showTab('deliveries')">All Deliveries</div>
-    <div class="tab" onclick="showTab('bydriver')">By Driver</div>
     <div class="tab" onclick="showTab('settings')">Settings</div>
   </div>
 
@@ -426,22 +413,6 @@
           </div>
         </div>
       </div>
-    </div>
-
-    <!-- ══ ALL DELIVERIES ══ -->
-    <div class="view" id="view-deliveries">
-      <div class="stats-bar" style="grid-template-columns:repeat(3,1fr)">
-        <div class="stat-card"><div class="stat-number" id="d-stat-total">0</div><div class="stat-label">Total</div></div>
-        <div class="stat-card"><div class="stat-number" id="d-stat-assigned">0</div><div class="stat-label">Assigned</div></div>
-        <div class="stat-card"><div class="stat-number" id="d-stat-done">0</div><div class="stat-label">Done</div></div>
-      </div>
-      <div id="deliveriesList"></div>
-    </div>
-
-    <!-- ══ BY DRIVER ══ -->
-    <div class="view" id="view-bydriver">
-      <div class="driver-filter" id="driverFilter"></div>
-      <div id="driverDeliveries"></div>
     </div>
 
     <!-- ══ SETTINGS ══ -->
@@ -1098,13 +1069,10 @@ function pinPress(digit) { if(pinEntry.length>=4)return; pinEntry+=digit; update
 function pinDelete() { pinEntry=pinEntry.slice(0,-1); updateDots(); document.getElementById('pinError').textContent=''; document.querySelectorAll('.pin-dot').forEach(d=>d.classList.remove('error')); }
 function updateDots() { for(let i=0;i<4;i++) document.getElementById('dot'+i).classList.toggle('filled',i<pinEntry.length); }
 function checkPin() {
-  if(pinEntry===appPin) { document.getElementById('pinStep').classList.add('hidden'); document.getElementById('nameStep').classList.remove('hidden'); renderNameGrid(); }
+  if(pinEntry===appPin) { document.getElementById('loginScreen').classList.add('hidden'); document.getElementById('appShell').style.display='block'; document.getElementById('userBadge').textContent=''; initApp(); setTimeout(()=>document.getElementById('loginScreen').style.display='none',400); }
   else { document.querySelectorAll('.pin-dot').forEach(d=>{d.classList.remove('filled');d.classList.add('error');}); document.getElementById('pinError').textContent='Incorrect PIN. Try again.'; pinEntry=''; setTimeout(()=>document.querySelectorAll('.pin-dot').forEach(d=>d.classList.remove('error')),800); }
 }
-function renderNameGrid() { document.getElementById('driverGrid').innerHTML=drivers.map(d=>`<button class="driver-btn" onclick="selectDriver('${d}')">👤 ${d}</button>`).join(''); }
-function selectDriver(name) { currentUser=name; document.getElementById('loginScreen').classList.add('hidden'); document.getElementById('appShell').style.display='block'; document.getElementById('userBadge').textContent='👤 '+name; initApp(); setTimeout(()=>document.getElementById('loginScreen').style.display='none',400); }
-function backToPin() { pinEntry=''; updateDots(); document.getElementById('pinError').textContent=''; document.getElementById('nameStep').classList.add('hidden'); document.getElementById('pinStep').classList.remove('hidden'); }
-function logout() { currentUser=null; pinEntry=''; updateDots(); document.getElementById('pinError').textContent=''; document.getElementById('nameStep').classList.add('hidden'); document.getElementById('pinStep').classList.remove('hidden'); document.getElementById('loginScreen').style.display='flex'; document.getElementById('loginScreen').classList.remove('hidden'); document.getElementById('appShell').style.display='none'; }
+function logout() { currentUser=null; pinEntry=''; updateDots(); document.getElementById('pinError').textContent=''; document.getElementById('pinStep').classList.remove('hidden'); document.getElementById('loginScreen').style.display='flex'; document.getElementById('loginScreen').classList.remove('hidden'); document.getElementById('appShell').style.display='none'; }
 function changePin() { const val=document.getElementById('newPin').value.trim(); if(!/^\d{4}$/.test(val)){showToast('PIN must be exactly 4 digits');return;} appPin=val; document.getElementById('newPin').value=''; saveState(); showToast('✓ PIN updated'); }
 
 // ═══════════════════ APP INIT ═════════════════════════════════════════════════
@@ -1314,11 +1282,6 @@ function runAutoRoute() {
   const warns=[];
   clusters.filter(c=>c.overLimit).forEach(c=>warns.push(`⚠️ Route ${clusters.indexOf(c)+1} has ${c.cases} cases — over ${caseLimit} limit.`));
 
-  // Check for large distance imbalances
-  const dists=clusters.map(c=>c.distance);
-  const maxD=Math.max(...dists), minD=Math.min(...dists);
-  if(clusters.length>1&&maxD-minD>40) warns.push(`ℹ️ Route distances range from ${minD} to ${maxD} mi — some imbalance due to geographic clustering.`);
-
   saveState(); updateStats();
   document.getElementById('warningBanners').innerHTML=warns.map(w=>`<div class="warn-banner"><span>${w.startsWith('⚠️')?'🟠':'ℹ️'}</span><span>${w}</span></div>`).join('');
   renderClusters();
@@ -1343,14 +1306,12 @@ function renderClusters() {
     const card=document.createElement('div');card.className='cluster-card';card.id=`cluster-${ci}`;
     const mapsUrl=buildGoogleMapsUrl(cluster.stops);
     const colorDot=`<span class="cluster-color-dot" style="background:${cluster.color}"></span>`;
-    const distPill=cluster.distance?`<span class="meta-pill meta-dist">~${cluster.distance} mi</span>`:'';
     card.innerHTML=`
       <div class="cluster-header">
         <div class="cluster-title">${colorDot}Route ${ci+1}</div>
         <div class="cluster-meta">
           <span class="meta-pill meta-stops">${cluster.stops.length} stops</span>
           <span class="meta-pill meta-cases ${cluster.overLimit?'over':''}">${cluster.cases} cases</span>
-          ${distPill}
         </div>
       </div>
       <div class="cluster-driver-row">
@@ -1412,7 +1373,7 @@ async function initOrRefreshMap() {
   if(!loadingOverlay){ loadingOverlay=document.createElement('div'); loadingOverlay.id='mapLoadingOverlay'; loadingOverlay.className='map-loading-overlay'; loadingOverlay.innerHTML='<div class="spinner"></div><p>Loading map…</p>'; wrapper.appendChild(loadingOverlay); }
   loadingOverlay.style.display='flex';
   // Build legend
-  document.getElementById('routeLegend').innerHTML=clusters.map((c,i)=>`<div class="legend-item"><div class="legend-dot" style="background:${c.color}"></div>Route ${i+1}${c.driver?' · '+c.driver:''}${c.distance?' · ~'+c.distance+' mi':''}</div>`).join('');
+  document.getElementById('routeLegend').innerHTML=clusters.map((c,i)=>`<div class="legend-item"><div class="legend-dot" style="background:${c.color}"></div>Route ${i+1}${c.driver?' · '+c.driver:''}</div>`).join('');
 
   try{ await loadGoogleMaps(GOOGLE_MAPS_KEY); }catch(e){ loadingOverlay.style.display='none'; showToast('❌ Could not load Google Maps'); return; }
 
@@ -1531,7 +1492,7 @@ function openReassignPanel(invId,currentClusterIdx){
   const panel=document.getElementById('reassignPanel');
   document.getElementById('reassignTitle').textContent=`Move "${inv?inv.customerName:invId}" to a different route`;
   const sel=document.getElementById('reassignSelect');
-  sel.innerHTML=clusters.filter((_,i)=>i!==currentClusterIdx).map(c=>{const ri=clusters.indexOf(c);return `<option value="${ri}">Route ${ri+1}${c.driver?' ('+c.driver+')':''} · ${c.stops.length} stops · ~${c.distance||'?'} mi</option>`;}).join('');
+  sel.innerHTML=clusters.filter((_,i)=>i!==currentClusterIdx).map(c=>{const ri=clusters.indexOf(c);return `<option value="${ri}">Route ${ri+1}${c.driver?' ('+c.driver+')':''} · ${c.stops.length} stops</option>`;}).join('');
   panel.classList.add('visible');
 }
 function confirmReassign(){
@@ -1674,7 +1635,7 @@ async function makeDividerPage(pdfDoc, routeNum, driverName, stops, cases, dist,
   }
 
   // Meta line
-  const meta = `${stops.length} stops  ·  ${cases} cases  ·  ~${dist||'?'} mi  ·  ${date}`;
+  const meta = `${stops.length} stops  ·  ${cases} cases  ·  ${date}`;
   page.drawText(meta, { x:40, y:670, size:11, font:regFont, color: rgb(0.42, 0.42, 0.42) });
 
   // Section header
