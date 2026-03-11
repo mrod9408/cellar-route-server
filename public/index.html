@@ -131,9 +131,7 @@
     .meta-cases { background: var(--green-light); color: var(--green); }
     .meta-cases.over { background: var(--orange-light); color: var(--orange); }
     .cluster-color-dot { width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; display: inline-block; margin-right: 6px; vertical-align: middle; }
-    .cluster-driver-row { display: flex; gap: 8px; align-items: center; margin-bottom: 12px; }
-    .cluster-driver-select { flex: 1; padding: 9px 12px; border: 1.5px solid var(--cream-dark); border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 13px; color: var(--charcoal); background: var(--cream); outline: none; cursor: pointer; }
-    .cluster-driver-select.assigned { border-color: var(--gold); background: #FDF8EC; color: var(--burgundy-dark); font-weight: 500; }
+
     .stop-list { border-top: 1px solid var(--cream-dark); padding-top: 10px; }
     .stop-row { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--cream-dark); }
     .stop-row:last-child { border-bottom: none; }
@@ -196,8 +194,6 @@
     .address-text { font-size: 13px; color: var(--gray); line-height: 1.4; }
     .no-address { font-size: 12px; color: var(--gray-light); font-style: italic; }
     .card-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-    .driver-select { flex: 1; min-width: 120px; padding: 8px 12px; border: 1.5px solid var(--cream-dark); border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 13px; color: var(--charcoal); background: var(--cream); outline: none; cursor: pointer; }
-    .driver-select.has-driver { border-color: var(--gold); background: #FDF8EC; color: var(--burgundy-dark); font-weight: 500; }
     .btn-complete { padding: 8px 14px; background: var(--green); color: white; border: none; border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
     .btn-map { padding: 8px 12px; background: var(--cream-dark); color: var(--burgundy); border: none; border-radius: 10px; font-size: 16px; cursor: pointer; }
     .completed-banner { display: flex; align-items: center; gap: 6px; background: var(--green-light); color: var(--green); border-radius: 8px; padding: 7px 12px; font-size: 13px; font-weight: 600; width: 100%; }
@@ -219,10 +215,7 @@
     .settings-card { background: var(--white); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); margin-bottom: 16px; }
     .settings-card h3 { font-family: 'Playfair Display', serif; font-size: 16px; color: var(--burgundy-dark); margin-bottom: 14px; }
     .driver-list { display: flex; flex-direction: column; gap: 8px; }
-    .driver-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 14px; background: var(--cream); border-radius: 10px; }
-    .driver-row-name { font-size: 14px; font-weight: 500; }
     .btn-remove { background: none; border: none; color: var(--burgundy); font-size: 16px; cursor: pointer; padding: 4px; }
-    .add-driver-row { display: flex; gap: 8px; margin-top: 10px; }
     .pin-change-row { display: flex; gap: 8px; margin-top: 10px; }
 
     /* ── LOADING / EMPTY ──────────────────────────────────────────────────── */
@@ -417,14 +410,7 @@
 
     <!-- ══ SETTINGS ══ -->
     <div class="view" id="view-settings">
-      <div class="settings-card">
-        <h3>👥 Manage Drivers</h3>
-        <div class="driver-list" id="driverList"></div>
-        <div class="add-driver-row">
-          <input class="form-input" type="text" id="newDriverName" placeholder="Driver name" />
-          <button class="btn-secondary" onclick="addDriver()">Add</button>
-        </div>
-      </div>
+
       <div class="settings-card">
         <h3>🔐 Change PIN</h3>
         <p style="font-size:13px;color:var(--gray);margin-bottom:10px">Current PIN is shared with your whole team.</p>
@@ -1096,7 +1082,6 @@ async function initApp() {
     else selectedInvoiceIds=new Set(invoices.map(i=>i.id));
   }
   document.getElementById('serverUrl').value=serverUrl;
-  renderDriverSettings();
   checkTokenStatus();
   if(invoices.length>0){
     document.getElementById('connectCard').style.display='none';
@@ -1112,12 +1097,10 @@ function saveState() {
 // ═══════════════════ TABS ════════════════════════════════════════════════════
 function showTab(tab) {
   activeTab=tab;
-  document.querySelectorAll('.tab').forEach((t,i)=>{t.classList.toggle('active',['route','map','deliveries','bydriver','settings'][i]===tab);});
+  document.querySelectorAll('.tab').forEach((t,i)=>{t.classList.toggle('active',['route','map','settings'][i]===tab);});
   document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
   document.getElementById('view-'+tab).classList.add('active');
   if(tab==='deliveries') renderDeliveries();
-  if(tab==='bydriver') renderByDriver();
-  if(tab==='settings') renderDriverSettings();
   if(tab==='map') setTimeout(()=>initOrRefreshMap(),80);
 }
 
@@ -1271,13 +1254,10 @@ function runAutoRoute() {
     return {
       id:i, stops:van.stops, cases:van.cases, distance:van.distance,
       zone:zoneLabel, territory:zoneLabel,
-      driver:drivers[i]||null, overLimit:van.overLimit,
+      overLimit:van.overLimit,
       color:ROUTE_COLORS[i%ROUTE_COLORS.length]
     };
   });
-
-  // Auto-assign drivers
-  clusters.forEach((c,i)=>{ if(drivers[i]){c.driver=drivers[i];c.stops.forEach(inv=>{assignments[inv.id]=drivers[i];});} });
 
   const warns=[];
   clusters.filter(c=>c.overLimit).forEach(c=>warns.push(`⚠️ Route ${clusters.indexOf(c)+1} has ${c.cases} cases — over ${caseLimit} limit.`));
@@ -1314,13 +1294,7 @@ function renderClusters() {
           <span class="meta-pill meta-cases ${cluster.overLimit?'over':''}">${cluster.cases} cases</span>
         </div>
       </div>
-      <div class="cluster-driver-row">
-        <select class="cluster-driver-select ${cluster.driver?'assigned':''}" onchange="setClusterDriver(${ci},this.value)">
-          <option value="">Assign driver...</option>
-          ${drivers.map(d=>`<option value="${d}" ${cluster.driver===d?'selected':''}>${d}</option>`).join('')}
-        </select>
-        <button class="btn-secondary" onclick="markClusterComplete(${ci})">✓ All Done</button>
-      </div>
+
       <div class="stop-list">
         ${cluster.stops.map((inv,si)=>{
           const addr=inv.shipAddress||inv.billAddress; const isDone=completed[inv.id];
@@ -1350,7 +1324,7 @@ function buildGoogleMapsUrl(stops) {
   const wp=addrs.slice(0,-1).map(a=>encodeURIComponent(a)).join('|');
   return `https://www.google.com/maps/dir/?api=1&origin=${warehouseAddr}&destination=${dest}&waypoints=${wp}&travelmode=driving`;
 }
-function setClusterDriver(ci,name){if(!clusters[ci])return;const old=clusters[ci].driver;clusters[ci].driver=name||null;clusters[ci].stops.forEach(inv=>{if(assignments[inv.id]===old)delete assignments[inv.id];if(name)assignments[inv.id]=name;});saveState();renderClusters();if(name)showToast(`Route ${ci+1} → ${name}`);}
+
 function markClusterComplete(ci){if(!clusters[ci])return;clusters[ci].stops.forEach(inv=>{completed[inv.id]=true;});saveState();updateStats();renderClusters();showToast(`✓ Route ${ci+1} complete`);}
 
 // ═══════════════════ GOOGLE MAPS ══════════════════════════════════════════════
@@ -1373,7 +1347,7 @@ async function initOrRefreshMap() {
   if(!loadingOverlay){ loadingOverlay=document.createElement('div'); loadingOverlay.id='mapLoadingOverlay'; loadingOverlay.className='map-loading-overlay'; loadingOverlay.innerHTML='<div class="spinner"></div><p>Loading map…</p>'; wrapper.appendChild(loadingOverlay); }
   loadingOverlay.style.display='flex';
   // Build legend
-  document.getElementById('routeLegend').innerHTML=clusters.map((c,i)=>`<div class="legend-item"><div class="legend-dot" style="background:${c.color}"></div>Route ${i+1}${c.driver?' · '+c.driver:''}</div>`).join('');
+  document.getElementById('routeLegend').innerHTML=clusters.map((c,i)=>`<div class="legend-item"><div class="legend-dot" style="background:${c.color}"></div>Route ${i+1}</div>`).join('');
 
   try{ await loadGoogleMaps(GOOGLE_MAPS_KEY); }catch(e){ loadingOverlay.style.display='none'; showToast('❌ Could not load Google Maps'); return; }
 
@@ -1418,7 +1392,7 @@ async function initOrRefreshMap() {
       const marker=new google.maps.Marker({position:{lat:coords.lat,lng:coords.lng},map:gMap,icon:svgIcon,title:inv.customerName,zIndex:100+si});
       const addr=(inv.shipAddress?.zip?inv.shipAddress:null)||(inv.billAddress?.zip?inv.billAddress:null)||inv.shipAddress||inv.billAddress;
       const addrText=addr?(addr.full||addr.line1||'No address'):'No address';
-      marker.addListener('click',()=>{ gInfoWindow.setContent(`<div class="gm-popup"><div class="popup-inv">INV #${inv.invoiceNumber} · Route ${ci+1}</div><div class="popup-customer">${inv.customerName}</div><div class="popup-address">📍 ${addrText}</div><div class="popup-meta"><span class="popup-cases">📦 ${inv.cases} cases</span><span class="popup-route" style="background:${color}">Route ${ci+1}${cluster.driver?' · '+cluster.driver:''}</span></div><button class="popup-reassign-btn" onclick="openReassignPanel('${inv.id}',${ci})">↔ Move to Different Route</button></div>`); gInfoWindow.open(gMap,marker); });
+      marker.addListener('click',()=>{ gInfoWindow.setContent(`<div class="gm-popup"><div class="popup-inv">INV #${inv.invoiceNumber} · Route ${ci+1}</div><div class="popup-customer">${inv.customerName}</div><div class="popup-address">📍 ${addrText}</div><div class="popup-meta"><span class="popup-cases">📦 ${inv.cases} cases</span><span class="popup-route" style="background:${color}">Route ${ci+1}</span></div><button class="popup-reassign-btn" onclick="openReassignPanel('${inv.id}',${ci})">↔ Move to Different Route</button></div>`); gInfoWindow.open(gMap,marker); });
       gMapMarkers.push(marker);
       routeMapObjects[ci].markers.push(marker);
     });
@@ -1445,7 +1419,7 @@ function renderMapRouteToggles() {
         style="${visibleRoutes.has(i)?`background:${c.color};border-color:${c.color}`:'border-color:'+c.color}"
         onclick="toggleMapRoute(${i})">
         <span class="toggle-dot" style="background:${visibleRoutes.has(i)?'white':c.color}"></span>
-        Route ${i+1}${c.driver?' · '+c.driver:''}
+        Route ${i+1}
       </button>`).join('')}`;
 }
 
@@ -1492,7 +1466,7 @@ function openReassignPanel(invId,currentClusterIdx){
   const panel=document.getElementById('reassignPanel');
   document.getElementById('reassignTitle').textContent=`Move "${inv?inv.customerName:invId}" to a different route`;
   const sel=document.getElementById('reassignSelect');
-  sel.innerHTML=clusters.filter((_,i)=>i!==currentClusterIdx).map(c=>{const ri=clusters.indexOf(c);return `<option value="${ri}">Route ${ri+1}${c.driver?' ('+c.driver+')':''} · ${c.stops.length} stops</option>`;}).join('');
+  sel.innerHTML=clusters.filter((_,i)=>i!==currentClusterIdx).map(c=>{const ri=clusters.indexOf(c);return `<option value="${ri}">Route ${ri+1} · ${c.stops.length} stops</option>`;}).join('');
   panel.classList.add('visible');
 }
 function confirmReassign(){
@@ -1518,39 +1492,6 @@ function confirmReassign(){
 }
 function cancelReassign(){selectedStopForReassign=null;document.getElementById('reassignPanel').classList.remove('visible');}
 
-// ═══════════════════ DELIVERIES VIEW ══════════════════════════════════════════
-function renderDeliveries(){
-  updateDeliveryStats();
-  const list=document.getElementById('deliveriesList');
-  if(!invoices.length){list.innerHTML=`<div class="empty-state"><div class="empty-icon">📋</div><div class="empty-title">No deliveries yet</div><div class="empty-text">Go to Route Planner to pull today's invoices.</div></div>`;return;}
-  list.innerHTML='';
-  const hdr=document.createElement('div');hdr.className='section-header';
-  hdr.innerHTML=`<div class="section-title">Today's Deliveries</div><span class="badge">${invoices.length}</span>`;
-  list.appendChild(hdr);
-  invoices.forEach(inv=>list.appendChild(buildDeliveryCard(inv)));
-}
-function buildDeliveryCard(inv){
-  const isDone=completed[inv.id],drv=assignments[inv.id],addr=inv.shipAddress||inv.billAddress;
-  const card=document.createElement('div');
-  card.className=`delivery-card ${isDone?'completed':drv?'assigned':''}`;card.id=`dcard-${inv.id}`;
-  const sc=isDone?'completed':drv?'assigned':'unassigned',st=isDone?'Completed':drv||'Unassigned';
-  const addrHtml=addr?`<div class="address-row"><span>📍</span><span class="address-text">${addr.full||addr.line1}</span></div>`:`<div class="address-row"><span class="no-address">No address on file</span></div>`;
-  const actHtml=isDone?`<div class="completed-banner">✓ Delivered${drv?' by '+drv:''}</div>`:`<select class="driver-select ${drv?'has-driver':''}" onchange="assignDriver('${inv.id}',this.value)"><option value="">Assign driver...</option>${drivers.map(d=>`<option value="${d}" ${drv===d?'selected':''}>${d}</option>`).join('')}</select><button class="btn-complete" onclick="markComplete('${inv.id}')">✓ Done</button>${addr?`<button class="btn-map" onclick="openMap('${encodeURIComponent(addr.full||addr.line1||'')}')">🗺</button>`:''}`;
-  card.innerHTML=`<div class="card-top"><div class="card-top-left"><div class="invoice-num">INV #${inv.invoiceNumber}</div><div class="customer-name">${inv.customerName}</div><span class="status-pill ${sc}">${st}</span></div><div class="card-badges"><div class="amount-badge">$${Number(inv.totalAmount||0).toFixed(2)}</div><div class="cases-badge ${inv.cases?'':'unknown'}">📦 ${inv.cases||'?'} cases</div></div></div>${addrHtml}<div class="card-actions">${actHtml}</div>`;
-  return card;
-}
-function assignDriver(id,name){assignments[id]=name||undefined;if(!name)delete assignments[id];saveState();updateDeliveryStats();const o=document.getElementById(`dcard-${id}`);const inv=invoices.find(i=>i.id===id);if(o&&inv)o.replaceWith(buildDeliveryCard(inv));if(name)showToast(`Assigned to ${name}`);}
-function markComplete(id){completed[id]=true;saveState();updateDeliveryStats();updateStats();const o=document.getElementById(`dcard-${id}`);const inv=invoices.find(i=>i.id===id);if(o&&inv)o.replaceWith(buildDeliveryCard(inv));showToast('✓ Marked delivered!');}
-
-// ═══════════════════ BY DRIVER ════════════════════════════════════════════════
-function renderByDriver(){
-  document.getElementById('driverFilter').innerHTML=['all',...drivers].map(d=>`<div class="driver-chip ${activeDriverFilter===d?'active':''}" onclick="filterByDriver('${d}')">${d==='all'?'All Drivers':d}</div>`).join('');
-  const container=document.getElementById('driverDeliveries');
-  const filtered=activeDriverFilter==='all'?invoices:invoices.filter(i=>assignments[i.id]===activeDriverFilter);
-  if(!filtered.length){container.innerHTML=`<div class="empty-state"><div class="empty-icon">👤</div><div class="empty-title">No deliveries</div><div class="empty-text">${activeDriverFilter==='all'?'No invoices loaded.':activeDriverFilter+' has no deliveries.'}</div></div>`;return;}
-  container.innerHTML='';filtered.forEach(inv=>container.appendChild(buildDeliveryCard(inv)));
-}
-function filterByDriver(d){activeDriverFilter=d;renderByDriver();}
 
 // ═══════════════════ STATS ════════════════════════════════════════════════════
 function updateStats(){
@@ -1564,16 +1505,11 @@ function updateStats(){
   document.getElementById('stat-done').textContent=Object.keys(completed).length;
   document.getElementById('stat-vans').classList.toggle('warn',mv>(parseInt(document.getElementById('driverCount')?.value)||0));
 }
-function updateDeliveryStats(){
-  document.getElementById('d-stat-total').textContent=invoices.length;
-  document.getElementById('d-stat-assigned').textContent=invoices.filter(i=>assignments[i.id]).length;
-  document.getElementById('d-stat-done').textContent=Object.keys(completed).length;
-}
 
 // ═══════════════════ SETTINGS ═════════════════════════════════════════════════
-function renderDriverSettings(){const list=document.getElementById('driverList');if(!list)return;list.innerHTML=drivers.map(d=>`<div class="driver-row"><span class="driver-row-name">👤 ${d}</span><button class="btn-remove" onclick="removeDriver('${d}')">✕</button></div>`).join('');}
-function addDriver(){const i=document.getElementById('newDriverName');const n=i.value.trim();if(!n)return;if(drivers.includes(n)){showToast('Already exists');return;}drivers.push(n);i.value='';saveState();renderDriverSettings();showToast(`${n} added`);}
-function removeDriver(n){drivers=drivers.filter(d=>d!==n);saveState();renderDriverSettings();showToast(`${n} removed`);}
+
+
+
 function saveSettings(){serverUrl=document.getElementById('serverUrl').value.trim()||serverUrl;saveState();showToast('Settings saved');}
 function clearAll(){if(!confirm('Clear all delivery data?'))return;invoices=[];assignments={};completed={};clusters=[];selectedInvoiceIds=new Set();clearMapObjects();gMap=null;saveState();document.getElementById('connectCard').style.display='block';document.getElementById('plannerSection').style.display='none';document.getElementById('clusterList').innerHTML='';document.getElementById('warningBanners').innerHTML='';document.getElementById('invoiceStateGroups').innerHTML='';document.getElementById('fetchBtn').disabled=false;document.getElementById('fetchBtn').textContent="Pull Today's Deliveries";showToast('Data cleared');showTab('route');}
 function openMap(a){if(!a||a.trim()===''){showToast('No address available');return;}window.open('https://maps.google.com/?q='+a,'_blank');}
@@ -1615,7 +1551,7 @@ async function fetchInvoicePdf(invoiceId) {
 }
 
 // Build a divider page using pdf-lib, listing all stops in order
-async function makeDividerPage(pdfDoc, routeNum, driverName, stops, cases, dist, date) {
+async function makeDividerPage(pdfDoc, routeNum, stops, cases, dist, date) {
   const { rgb, StandardFonts } = PDFLib;
   const page    = pdfDoc.addPage([612, 792]); // US Letter
   const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
@@ -1630,9 +1566,7 @@ async function makeDividerPage(pdfDoc, routeNum, driverName, stops, cases, dist,
   });
 
   // Driver name
-  if (driverName) {
-    page.drawText(driverName, { x:40, y:722, size:15, font:boldFont, color: rgb(0.969, 0.949, 0.918) });
-  }
+
 
   // Meta line
   const meta = `${stops.length} stops  ·  ${cases} cases  ·  ${date}`;
@@ -1722,7 +1656,7 @@ async function downloadAllRoutesPdf() {
       setPdfStatus(`Route ${ci+1} of ${clusters.length}: fetching ${cluster.stops.length} invoices…`);
 
       // Divider page
-      await makeDividerPage(merged, ci+1, cluster.driver, cluster.stops, cluster.cases, cluster.distance, date);
+      await makeDividerPage(merged, ci+1, cluster.stops, cluster.cases, cluster.distance, date);
 
       // Invoices in stop order
       for (let i = 0; i < cluster.stops.length; i++) {
