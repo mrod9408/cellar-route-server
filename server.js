@@ -304,7 +304,7 @@ app.get('/api/overdue', async (req, res) => {
     // (in sandbox we can't filter by DueDate in the query itself, so we do it here)
     const pastDueByCustomer = {}; // custId → { customerName, overdueInvoiceBalance, invoiceCount, oldestDueDate }
     rawInvoices.forEach(inv => {
-      const custId   = inv.CustomerRef?.value;
+      const custId   = inv.CustomerRef?.value ? String(inv.CustomerRef.value) : null;
       const custName = inv.CustomerRef?.name || 'Unknown';
       if (!custId) return;
 
@@ -328,7 +328,9 @@ app.get('/api/overdue', async (req, res) => {
       }
     });
 
-    const pastDueCustomerIds = Object.keys(pastDueByCustomer);
+    // Ensure all customer IDs are strings — QB returns them as strings
+    // and we need consistent types for the cross-reference lookup
+    const pastDueCustomerIds = Object.keys(pastDueByCustomer).map(String);
     console.log(`SOURCE 1 — ${pastDueCustomerIds.length} customers with past-due invoices`);
 
     if (!pastDueCustomerIds.length) {
@@ -457,21 +459,24 @@ app.get('/api/invoice-pdf/:invoiceId', async (req, res) => {
 });
 
 // ─── CUSTOMER STATEMENT PDF PROXY ─────────────────────────────────────────────
-// Fetches the QB statement PDF for a customer (year-to-date) and streams it.
-// Called by the frontend during PDF build for any stop with overdue balance.
+// QuickBooks Online does NOT have a /customer/:id/statement REST endpoint.
+// Statements are generated via the Reports API.  We try two report types:
+//   1. CustomerBalanceDetail  — closest to the QB "statement" you print
+//   2. AgedReceivableDetail   — fallback showing all open/overdue items
+// Both support Accept: application/pdf and filter by customer ID.
 app.get('/api/customer-statement/:customerId', async (req, res) => {
   const accessToken = await getValidAccessToken();
   const companyId   = tokenStore.companyId;
   const environment = tokenStore.environment;
   const { customerId } = req.params;
 
-  console.log(`Statement request for customer ${customerId}, env=${environment}`);
+  console.log(`[STATEMENT] Request for customer ${customerId}, env=${environment}, company=${companyId}`);
 
   if (!accessToken || !companyId) {
+    console.error('[STATEMENT] Missing accessToken or companyId');
     return res.status(400).json({ error: 'Not connected to QuickBooks.' });
   }
 
-  // Year-to-date statement
   const today     = new Date();
   const startDate = new Date(today.getFullYear(), 0, 1).toISOString().split('T')[0];
   const endDate   = today.toISOString().split('T')[0];
@@ -480,39 +485,50 @@ app.get('/api/customer-statement/:customerId', async (req, res) => {
     ? ['https://quickbooks.api.intuit.com', 'https://qbo.api.intuit.com', 'https://c1.qbo.intuit.com', 'https://c3.qbo.intuit.com', 'https://c5.qbo.intuit.com']
     : ['https://sandbox-quickbooks.api.intuit.com'];
 
-  const headers = { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/pdf' };
+  const pdfHeaders = {
+    'Authorization': `Bearer ${accessToken}`,
+    'Accept': 'application/pdf'
+  };
+
+  // Two report endpoints to try per cluster
+  const buildUrls = (base) => [
+    `${base}/v3/company/${companyId}/reports/CustomerBalanceDetail?customer=${customerId}&start_date=${startDate}&end_date=${endDate}&minorversion=65`,
+    `${base}/v3/company/${companyId}/reports/AgedReceivableDetail?customer=${customerId}&report_date=${endDate}&minorversion=65`,
+  ];
 
   for (const baseUrl of baseUrls) {
-    const stmtUrl = `${baseUrl}/v3/company/${companyId}/customer/${customerId}/statement?startDate=${startDate}&endDate=${endDate}&minorversion=65`;
-    try {
-      console.log(`Trying statement URL: ${stmtUrl}`);
-      const qbRes = await fetch(stmtUrl, { method: 'GET', headers });
+    for (const stmtUrl of buildUrls(baseUrl)) {
+      try {
+        console.log(`[STATEMENT] Trying: ${stmtUrl}`);
+        const qbRes = await fetch(stmtUrl, { method: 'GET', headers: pdfHeaders });
 
-      if (qbRes.ok) {
-        console.log(`✓ Statement success for customer ${customerId} via ${baseUrl}`);
-        res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Cache-Control', 'no-store');
-        res.setHeader('Access-Control-Allow-Origin', '*');
-        qbRes.body.pipe(res);
-        return;
-      }
+        if (qbRes.ok) {
+          const ct = qbRes.headers.get('content-type') || '';
+          console.log(`[STATEMENT] ✓ Success for customer ${customerId} — content-type: ${ct}`);
+          res.setHeader('Content-Type', 'application/pdf');
+          res.setHeader('Cache-Control', 'no-store');
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          qbRes.body.pipe(res);
+          return;
+        }
 
-      const errText = await qbRes.text();
-      console.error(`QB Statement ${qbRes.status} from ${baseUrl}:`, errText.slice(0, 300));
+        const errText = await qbRes.text();
+        console.error(`[STATEMENT] ${qbRes.status} from ${stmtUrl.split('?')[0]}:`, errText.slice(0, 400));
 
-      if (qbRes.status === 401 || qbRes.status === 403) {
-        return res.status(qbRes.status).json({ error: `QB auth error ${qbRes.status}` });
+        if (qbRes.status === 401 || qbRes.status === 403) {
+          return res.status(qbRes.status).json({ error: `QB auth error ${qbRes.status}` });
+        }
+        // 400/404 = try next URL
+      } catch (err) {
+        console.error(`[STATEMENT] Network error on ${baseUrl}:`, err.message);
       }
-      if (qbRes.status !== 404) {
-        return res.status(qbRes.status).json({ error: `QB returned ${qbRes.status} for statement` });
-      }
-    } catch (err) {
-      console.error(`Network error fetching statement from ${baseUrl}:`, err.message);
     }
   }
 
-  res.status(404).json({ error: `Statement not found for customer ${customerId}` });
+  console.error(`[STATEMENT] All URLs exhausted for customer ${customerId}`);
+  res.status(404).json({ error: `Statement not available for customer ${customerId} — check Railway logs` });
 });
+
 
 // ─── FETCH CUSTOMERS ──────────────────────────────────────────────────────────
 app.get('/api/customers', async (req, res) => {
