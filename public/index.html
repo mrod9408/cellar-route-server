@@ -776,7 +776,7 @@ async function fetchInvoices() {
     if(overdueRes && overdueRes.ok) {
       const overdueData = await overdueRes.json();
       (overdueData.overdueCustomers||[]).forEach(c => {
-        overdueByCustomer[c.customerId] = {
+        overdueByCustomer[String(c.customerId)] = {
           overdueBalance:        c.overdueBalance,
           overdueInvoiceBalance: c.overdueInvoiceBalance,
           invoiceCount:          c.invoiceCount,
@@ -793,7 +793,7 @@ async function fetchInvoices() {
     updateStats();renderInvoiceSelectionList();renderOverdueSummary();
 
     const overdueCount = Object.keys(overdueByCustomer).length;
-    const overdueOnRoute = invoices.filter(inv => overdueByCustomer[inv.customerId]).length;
+    const overdueOnRoute = invoices.filter(inv => overdueByCustomer[String(inv.customerId)]).length;
     let toastMsg = `✓ ${invoices.length} invoices loaded`;
     if(overdueCount > 0) toastMsg += ` · ${overdueCount} overdue`;
     showToast(toastMsg);
@@ -829,7 +829,7 @@ function renderOverdueSummary() {
   if(!overdueCustomerIds.length){ banner.style.display='none'; return; }
 
   // Only count customers who appear on today's route
-  const overdueOnRoute = invoices.filter(inv => overdueByCustomer[inv.customerId]);
+  const overdueOnRoute = invoices.filter(inv => overdueByCustomer[String(inv.customerId)]);
   const uniqueOnRoute  = [...new Set(overdueOnRoute.map(inv => inv.customerId))];
 
   if(!uniqueOnRoute.length){ banner.style.display='none'; return; }
@@ -876,8 +876,8 @@ function renderInvoiceSelectionList() {
           const addr=(inv.shipAddress?.zip?inv.shipAddress:null)||(inv.billAddress?.zip?inv.billAddress:null)||inv.shipAddress||inv.billAddress;
           const city=addr?(addr.city||addr.line2||''):'';
           const checked=selectedInvoiceIds.has(inv.id);
-          const isOverdue=!!overdueByCustomer[inv.customerId];
-          const overdueInfo=isOverdue?overdueByCustomer[inv.customerId]:null;
+          const isOverdue=!!overdueByCustomer[String(inv.customerId)];
+          const overdueInfo=isOverdue?overdueByCustomer[String(inv.customerId)]:null;
           return `<div class="invoice-row ${checked?'':'unchecked'}" id="inv-row-${inv.id}">
             <input type="checkbox" class="inv-check" ${checked?'checked':''}
               onchange="toggleInvoiceCheck('${inv.id}',this.checked,'${state}')" />
@@ -947,7 +947,7 @@ function renderClusters(){
       <div class="stop-list">
         ${cluster.stops.map((inv,si)=>{
           const addr=inv.shipAddress||inv.billAddress;const isDone=completed[inv.id];
-          const isOverdue=!!overdueByCustomer[inv.customerId];
+          const isOverdue=!!overdueByCustomer[String(inv.customerId)];
           return `<div class="stop-row" style="${isDone?'opacity:0.5':''}">
             <div class="stop-num" style="background:${isDone?'var(--green)':cluster.color}">${isDone?'✓':si+1}</div>
             <div class="stop-details">
@@ -1007,13 +1007,13 @@ async function initOrRefreshMap(){
     gMapPolylines.push(polyline);routeMapObjects[ci].polyline=polyline;
     clusterStops.forEach(({inv,si,coords,color})=>{
       bounds.extend({lat:coords.lat,lng:coords.lng});
-      const isOverdue=!!overdueByCustomer[inv.customerId];
+      const isOverdue=!!overdueByCustomer[String(inv.customerId)];
       // Overdue stops get an orange ring around the marker
       const svgIcon={url:`data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="32" height="38" viewBox="0 0 32 38"><path d="M16 0C7.163 0 0 7.163 0 16c0 10.627 14 22 16 22s16-11.373 16-22C32 7.163 24.837 0 16 0z" fill="${color}"/>${isOverdue?`<circle cx="16" cy="15" r="12" fill="none" stroke="#C4621D" stroke-width="2.5"/>`:'<circle cx="16" cy="15" r="10" fill="white" opacity="0.2"/>'}<text x="16" y="20" text-anchor="middle" font-family="DM Sans,sans-serif" font-size="11" font-weight="700" fill="white">${si+1}</text></svg>`)}`,scaledSize:new google.maps.Size(32,38),anchor:new google.maps.Point(16,38)};
       const marker=new google.maps.Marker({position:{lat:coords.lat,lng:coords.lng},map:gMap,icon:svgIcon,title:inv.customerName,zIndex:100+si});
       const addr=(inv.shipAddress?.zip?inv.shipAddress:null)||(inv.billAddress?.zip?inv.billAddress:null)||inv.shipAddress||inv.billAddress;
       const addrText=addr?(addr.full||addr.line1||'No address'):'No address';
-      const overdueInfo=isOverdue?overdueByCustomer[inv.customerId]:null;
+      const overdueInfo=isOverdue?overdueByCustomer[String(inv.customerId)]:null;
       marker.addListener('click',()=>{
         gInfoWindow.setContent(`<div class="gm-popup"><div class="popup-inv">INV #${inv.invoiceNumber} · Route ${ci+1}</div><div class="popup-customer">${inv.customerName}</div><div class="popup-address">📍 ${addrText}</div><div class="popup-meta"><span class="popup-cases">📦 ${inv.cases} cases</span><span class="popup-route" style="background:${color}">Route ${ci+1}</span>${isOverdue?`<span class="popup-overdue">⚠ $${overdueInfo.overdueBalance.toFixed(2)} · ${overdueInfo.daysOverdue||'?'} days overdue</span>`:''}</div><button class="popup-reassign-btn" onclick="openReassignPanel('${inv.id}',${ci})">↔ Move to Different Route</button></div>`);
         gInfoWindow.open(gMap,marker);
@@ -1060,7 +1060,7 @@ function renderPdfPanel(){
   // Show note about statements if any overdue customers are on today's route
   const noteEl = document.getElementById('pdfOverdueNote');
   if(!noteEl)return;
-  const overdueOnRoute = clusters.flatMap(c=>c.stops).filter(inv=>overdueByCustomer[inv.customerId]);
+  const overdueOnRoute = clusters.flatMap(c=>c.stops).filter(inv=>overdueByCustomer[String(inv.customerId)]);
   const uniqueOverdue  = [...new Set(overdueOnRoute.map(inv=>inv.customerId))];
   if(uniqueOverdue.length){
     noteEl.textContent=`📋 Statements will be appended after invoices for ${uniqueOverdue.length} overdue customer${uniqueOverdue.length!==1?'s':''}: ${uniqueOverdue.map(cid=>overdueByCustomer[cid].customerName).join(', ')}`;
@@ -1130,7 +1130,7 @@ async function downloadAllRoutesPdf(){
 
   // Count total pages to fetch (invoices + statements)
   const allStops=clusters.flatMap(c=>c.stops);
-  const overdueOnRoute=[...new Set(allStops.filter(inv=>overdueByCustomer[inv.customerId]).map(inv=>inv.customerId))];
+  const overdueOnRoute=[...new Set(allStops.filter(inv=>overdueByCustomer[String(inv.customerId)]).map(inv=>inv.customerId))];
   const totalDocs=allStops.length+overdueOnRoute.length; // invoices + one statement per unique overdue customer
   // Track which customer statements have already been fetched & merged so we
   // don't duplicate a statement if a customer appears on multiple routes
@@ -1168,7 +1168,7 @@ async function downloadAllRoutesPdf(){
         // Statement PDF — only if this customer is overdue AND we haven't
         // already included their statement earlier in this PDF
         const custId=inv.customerId;
-        if(custId&&overdueByCustomer[custId]&&!fetchedStatements.has(custId)){
+        if(custId&&overdueByCustomer[String(custId)]&&!fetchedStatements.has(custId)){
           showPdfProgress(Math.round((fetched/totalDocs)*95));
           setPdfStatus(`Fetching statement: ${inv.customerName}…`);
           try{
