@@ -246,9 +246,74 @@ app.get('/api/invoices', async (req, res) => {
   }
 });
 
+// ─── OVERDUE INVOICES ─────────────────────────────────────────────────────────
+// Returns all open invoices with a DueDate before today, grouped by customer.
+// The frontend uses this to know which customers need a statement in the PDF.
+app.get('/api/overdue', async (req, res) => {
+  const accessToken = await getValidAccessToken();
+  const companyId   = tokenStore.companyId;
+  const environment = tokenStore.environment;
+  if (!accessToken || !companyId) return res.status(400).json({ error: 'Not connected to QuickBooks.' });
+
+  const baseUrls = environment === 'production'
+    ? ['https://quickbooks.api.intuit.com', 'https://qbo.api.intuit.com', 'https://c1.qbo.intuit.com', 'https://c3.qbo.intuit.com', 'https://c5.qbo.intuit.com']
+    : ['https://sandbox-quickbooks.api.intuit.com'];
+
+  const today = new Date().toISOString().split('T')[0];
+  // Fetch open invoices whose due date is before today
+  const query = environment === 'production'
+    ? `SELECT * FROM Invoice WHERE Balance > '0' AND DueDate < '${today}' ORDERBY CustomerRef ASC MAXRESULTS 500`
+    : `SELECT * FROM Invoice WHERE Balance > '0' ORDERBY DueDate ASC MAXRESULTS 500`;
+
+  try {
+    const qbHeaders = { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' };
+    let response = null, data = null;
+    for (const tryUrl of baseUrls) {
+      try {
+        const qbUrl = `${tryUrl}/v3/company/${companyId}/query?query=${encodeURIComponent(query)}&minorversion=65`;
+        response = await fetch(qbUrl, { method: 'GET', headers: qbHeaders });
+        data = await response.json();
+        if (response.ok) break;
+        if (data?.Fault?.Error?.[0]?.code !== '130') break;
+      } catch (urlErr) {
+        console.log(`Failed to connect to ${tryUrl}: ${urlErr.message}`);
+      }
+    }
+    if (!response || !response.ok) return res.status(500).json({ error: 'QuickBooks API error', details: data });
+
+    const invoices = data.QueryResponse?.Invoice || [];
+
+    // Group by customer — sum up total overdue balance per customer
+    const byCustomer = {};
+    invoices.forEach(inv => {
+      const custId   = inv.CustomerRef?.value;
+      const custName = inv.CustomerRef?.name || 'Unknown';
+      if (!custId) return;
+
+      // In sandbox we can't filter by DueDate in query, so filter here
+      if (environment !== 'production') {
+        const due = inv.DueDate ? new Date(inv.DueDate) : null;
+        const now = new Date(today);
+        if (!due || due >= now) return; // skip invoices not yet past due
+      }
+
+      if (!byCustomer[custId]) {
+        byCustomer[custId] = { customerId: custId, customerName: custName, overdueBalance: 0, invoiceCount: 0 };
+      }
+      byCustomer[custId].overdueBalance += Number(inv.Balance || 0);
+      byCustomer[custId].invoiceCount++;
+    });
+
+    const overdueCustomers = Object.values(byCustomer);
+    console.log(`Found ${overdueCustomers.length} customers with overdue balances`);
+    res.json({ count: overdueCustomers.length, overdueCustomers });
+  } catch (err) {
+    console.error('Overdue fetch error:', err);
+    res.status(500).json({ error: 'Server error fetching overdue invoices' });
+  }
+});
+
 // ─── INVOICE PDF PROXY ────────────────────────────────────────────────────────
-// Fetches a single invoice PDF from QuickBooks and streams it to the client.
-// The frontend (pdf-lib) then merges multiple PDFs in route order.
 app.get('/api/invoice-pdf/:invoiceId', async (req, res) => {
   const accessToken = await getValidAccessToken();
   const companyId   = tokenStore.companyId;
@@ -262,31 +327,75 @@ app.get('/api/invoice-pdf/:invoiceId', async (req, res) => {
     return res.status(400).json({ error: 'Not connected to QuickBooks.' });
   }
 
-  // Try all known QB base URLs in order — same approach as /api/invoices
   const baseUrls = environment === 'production'
-    ? [
-        'https://quickbooks.api.intuit.com',
-        'https://qbo.api.intuit.com',
-        'https://c1.qbo.intuit.com',
-        'https://c3.qbo.intuit.com',
-        'https://c5.qbo.intuit.com'
-      ]
+    ? ['https://quickbooks.api.intuit.com', 'https://qbo.api.intuit.com', 'https://c1.qbo.intuit.com', 'https://c3.qbo.intuit.com', 'https://c5.qbo.intuit.com']
     : ['https://sandbox-quickbooks.api.intuit.com'];
 
-  const headers = {
-    'Authorization': `Bearer ${accessToken}`,
-    'Accept': 'application/pdf'
-  };
+  const headers = { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/pdf' };
 
   for (const baseUrl of baseUrls) {
     const pdfUrl = `${baseUrl}/v3/company/${companyId}/invoice/${invoiceId}/pdf?minorversion=65`;
     try {
       console.log(`Trying PDF URL: ${pdfUrl}`);
       const qbRes = await fetch(pdfUrl, { method: 'GET', headers });
+      if (qbRes.ok) {
+        console.log(`✓ PDF success for invoice ${invoiceId} via ${baseUrl}`);
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Cache-Control', 'no-store');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        qbRes.body.pipe(res);
+        return;
+      }
+      const errText = await qbRes.text();
+      console.error(`QB PDF ${qbRes.status} from ${baseUrl} for invoice ${invoiceId}:`, errText.slice(0, 300));
+      if (qbRes.status === 401 || qbRes.status === 403) {
+        return res.status(qbRes.status).json({ error: `QB auth error ${qbRes.status}` });
+      }
+      if (qbRes.status !== 404) {
+        return res.status(qbRes.status).json({ error: `QB returned ${qbRes.status} for invoice ${invoiceId}` });
+      }
+    } catch (err) {
+      console.error(`Network error fetching PDF from ${baseUrl}:`, err.message);
+    }
+  }
+
+  res.status(404).json({ error: `Invoice ${invoiceId} PDF not found in QuickBooks` });
+});
+
+// ─── CUSTOMER STATEMENT PDF PROXY ─────────────────────────────────────────────
+// Fetches the QB statement PDF for a customer (year-to-date) and streams it.
+// Called by the frontend during PDF build for any stop with overdue balance.
+app.get('/api/customer-statement/:customerId', async (req, res) => {
+  const accessToken = await getValidAccessToken();
+  const companyId   = tokenStore.companyId;
+  const environment = tokenStore.environment;
+  const { customerId } = req.params;
+
+  console.log(`Statement request for customer ${customerId}, env=${environment}`);
+
+  if (!accessToken || !companyId) {
+    return res.status(400).json({ error: 'Not connected to QuickBooks.' });
+  }
+
+  // Year-to-date statement
+  const today     = new Date();
+  const startDate = new Date(today.getFullYear(), 0, 1).toISOString().split('T')[0];
+  const endDate   = today.toISOString().split('T')[0];
+
+  const baseUrls = environment === 'production'
+    ? ['https://quickbooks.api.intuit.com', 'https://qbo.api.intuit.com', 'https://c1.qbo.intuit.com', 'https://c3.qbo.intuit.com', 'https://c5.qbo.intuit.com']
+    : ['https://sandbox-quickbooks.api.intuit.com'];
+
+  const headers = { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/pdf' };
+
+  for (const baseUrl of baseUrls) {
+    const stmtUrl = `${baseUrl}/v3/company/${companyId}/customer/${customerId}/statement?startDate=${startDate}&endDate=${endDate}&minorversion=65`;
+    try {
+      console.log(`Trying statement URL: ${stmtUrl}`);
+      const qbRes = await fetch(stmtUrl, { method: 'GET', headers });
 
       if (qbRes.ok) {
-        const contentType = qbRes.headers.get('content-type') || '';
-        console.log(`✓ PDF success for invoice ${invoiceId} via ${baseUrl}, content-type: ${contentType}`);
+        console.log(`✓ Statement success for customer ${customerId} via ${baseUrl}`);
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Cache-Control', 'no-store');
         res.setHeader('Access-Control-Allow-Origin', '*');
@@ -295,25 +404,20 @@ app.get('/api/invoice-pdf/:invoiceId', async (req, res) => {
       }
 
       const errText = await qbRes.text();
-      console.error(`QB PDF ${qbRes.status} from ${baseUrl} for invoice ${invoiceId}:`, errText.slice(0, 300));
+      console.error(`QB Statement ${qbRes.status} from ${baseUrl}:`, errText.slice(0, 300));
 
-      // 404 = invoice not found on this cluster, try next
-      // 401/403 = auth issue, no point trying other clusters
       if (qbRes.status === 401 || qbRes.status === 403) {
-        return res.status(qbRes.status).json({ error: `QB auth error ${qbRes.status} — token may need refresh` });
+        return res.status(qbRes.status).json({ error: `QB auth error ${qbRes.status}` });
       }
-      // For non-404 errors, stop trying
       if (qbRes.status !== 404) {
-        return res.status(qbRes.status).json({ error: `QB returned ${qbRes.status} for invoice ${invoiceId}` });
+        return res.status(qbRes.status).json({ error: `QB returned ${qbRes.status} for statement` });
       }
-
     } catch (err) {
-      console.error(`Network error fetching PDF from ${baseUrl}:`, err.message);
+      console.error(`Network error fetching statement from ${baseUrl}:`, err.message);
     }
   }
 
-  console.error(`All QB URLs returned 404 for invoice ${invoiceId}`);
-  res.status(404).json({ error: `Invoice ${invoiceId} PDF not found in QuickBooks` });
+  res.status(404).json({ error: `Statement not found for customer ${customerId}` });
 });
 
 // ─── FETCH CUSTOMERS ──────────────────────────────────────────────────────────
@@ -333,7 +437,6 @@ app.get('/api/customers', async (req, res) => {
     let response = await fetch(custUrl, { method: 'GET', headers: custHeaders, redirect: 'manual' });
     if ([301, 302, 307, 308].includes(response.status)) {
       const redirectUrl = response.headers.get('location');
-      console.log(`Following QB redirect to: ${redirectUrl}`);
       response = await fetch(redirectUrl, { method: 'GET', headers: custHeaders });
     }
     const data = await response.json();
