@@ -44,8 +44,6 @@
     .pin-btn.empty { background: transparent !important; cursor: default; }
     .pin-error { color: #F28B82; font-size: 13px; margin-top: 16px; min-height: 18px; font-weight: 500; }
 
-    .btn-back:hover { color: var(--cream); }
-
     /* ── APP CHROME ───────────────────────────────────────────────────────── */
     .header { background: var(--burgundy-dark); padding: 18px 20px 14px; position: sticky; top: 0; z-index: 100; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 16px rgba(0,0,0,0.3); }
     .header-left { display: flex; align-items: center; gap: 10px; }
@@ -109,7 +107,15 @@
     .inv-city { font-size: 12px; color: var(--gray); white-space: nowrap; }
     .inv-cases { font-size: 12px; color: var(--green); font-weight: 600; white-space: nowrap; }
     .inv-amount { font-size: 12px; color: var(--burgundy); font-weight: 600; white-space: nowrap; }
+    .inv-overdue { font-size: 10px; font-weight: 700; color: var(--orange); background: var(--orange-light); padding: 2px 6px; border-radius: 6px; white-space: nowrap; flex-shrink: 0; }
     .selection-summary { background: var(--cream); border-radius: 10px; padding: 10px 14px; margin-top: 12px; font-size: 13px; color: var(--burgundy-dark); font-weight: 500; display: flex; justify-content: space-between; align-items: center; }
+
+    /* ── OVERDUE SUMMARY BANNER ───────────────────────────────────────────── */
+    .overdue-summary { background: var(--orange-light); border: 1.5px solid var(--orange); border-radius: 12px; padding: 12px 16px; margin-bottom: 14px; display: flex; align-items: flex-start; gap: 10px; }
+    .overdue-summary-icon { font-size: 20px; flex-shrink: 0; }
+    .overdue-summary-text { flex: 1; }
+    .overdue-summary-title { font-size: 13px; font-weight: 700; color: var(--orange); margin-bottom: 3px; }
+    .overdue-summary-detail { font-size: 12px; color: var(--orange); opacity: 0.85; }
 
     /* ── PLANNER ──────────────────────────────────────────────────────────── */
     .planner-card { background: var(--burgundy-dark); border-radius: var(--radius); padding: 18px; margin-bottom: 16px; color: var(--cream); }
@@ -137,7 +143,8 @@
     .stop-row:last-child { border-bottom: none; }
     .stop-num { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; margin-top: 2px; color: white; }
     .stop-details { flex: 1; min-width: 0; }
-    .stop-customer { font-size: 14px; font-weight: 600; color: var(--charcoal); }
+    .stop-customer { font-size: 14px; font-weight: 600; color: var(--charcoal); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+    .stop-overdue-badge { font-size: 10px; font-weight: 700; color: var(--orange); background: var(--orange-light); border: 1px solid var(--orange); padding: 2px 6px; border-radius: 6px; white-space: nowrap; }
     .stop-address { font-size: 12px; color: var(--gray); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .stop-cases { font-size: 11px; color: var(--green); font-weight: 600; margin-top: 2px; }
     .stop-inv { font-size: 10px; color: var(--gray-light); }
@@ -242,13 +249,15 @@
     .gm-popup .popup-meta { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
     .gm-popup .popup-cases { font-size: 11px; font-weight: 600; color: var(--green); background: var(--green-light); padding: 2px 8px; border-radius: 6px; }
     .gm-popup .popup-route { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 6px; color: white; }
+    .gm-popup .popup-overdue { font-size: 11px; font-weight: 700; color: var(--orange); background: var(--orange-light); padding: 2px 8px; border-radius: 6px; }
     .gm-popup .popup-reassign-btn { width: 100%; padding: 7px; background: var(--burgundy); color: var(--cream); border: none; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 600; cursor: pointer; margin-top: 4px; }
     .gm-popup .popup-reassign-btn:hover { background: var(--burgundy-light); }
 
     /* ── PDF DOWNLOAD ─────────────────────────────────────────────────────── */
     .pdf-panel { background: var(--white); border-radius: var(--radius); padding: 18px; margin-bottom: 16px; box-shadow: var(--shadow); border-left: 4px solid var(--burgundy); }
     .pdf-panel h3 { font-family: 'Playfair Display', serif; font-size: 15px; color: var(--burgundy-dark); margin-bottom: 12px; }
-
+    .pdf-overdue-note { font-size: 12px; color: var(--orange); background: var(--orange-light); border-radius: 8px; padding: 8px 12px; margin-bottom: 12px; display: none; }
+    .pdf-overdue-note.visible { display: block; }
     .pdf-progress { background: var(--cream-dark); border-radius: 8px; overflow: hidden; height: 6px; margin: 8px 0 4px; display: none; }
     .pdf-progress-bar { height: 100%; background: var(--burgundy); border-radius: 8px; transition: width 0.3s; width: 0%; }
     .pdf-status { font-size: 12px; color: var(--gray); min-height: 16px; }
@@ -283,7 +292,6 @@
     </div>
     <div class="pin-error" id="pinError"></div>
   </div>
-
 </div>
 
 <!-- ═══════════════════════ MAIN APP ═══════════════════════════════════════ -->
@@ -330,6 +338,15 @@
           <div class="stat-card"><div class="stat-number" id="stat-done">0</div><div class="stat-label">Done</div></div>
         </div>
 
+        <!-- OVERDUE SUMMARY — shown after fetch if any overdue customers on today's route -->
+        <div class="overdue-summary" id="overdueSummary" style="display:none">
+          <div class="overdue-summary-icon">⚠️</div>
+          <div class="overdue-summary-text">
+            <div class="overdue-summary-title" id="overdueSummaryTitle"></div>
+            <div class="overdue-summary-detail">Statements will be included automatically in the printed PDF after each overdue customer's invoice.</div>
+          </div>
+        </div>
+
         <!-- INVOICE SELECTION -->
         <div class="invoice-select-card" id="invoiceSelectCard">
           <div class="invoice-select-header">
@@ -364,10 +381,11 @@
         <div id="warningBanners"></div>
         <div id="clusterList"></div>
 
-        <!-- PDF DOWNLOAD PANEL — shown after routes are generated -->
+        <!-- PDF DOWNLOAD PANEL -->
         <div class="pdf-panel" id="pdfPanel" style="display:none">
           <h3>📄 Print-Ready Invoice PDF</h3>
-          <p style="font-size:13px;color:var(--gray);margin-bottom:14px">Downloads all invoices in delivery order, grouped by route with a divider page between each driver's stack.</p>
+          <p style="font-size:13px;color:var(--gray);margin-bottom:10px">Downloads all invoices in delivery order, grouped by route. Statements are automatically included after overdue customers' invoices.</p>
+          <div class="pdf-overdue-note" id="pdfOverdueNote"></div>
           <button class="btn-gold" id="btnAllPdf" onclick="downloadAllRoutesPdf()" style="font-size:14px;padding:13px">
             ⬇ Download Combined PDF — All Routes
           </button>
@@ -410,7 +428,6 @@
 
     <!-- ══ SETTINGS ══ -->
     <div class="view" id="view-settings">
-
       <div class="settings-card">
         <h3>🔐 Change PIN</h3>
         <p style="font-size:13px;color:var(--gray);margin-bottom:10px">Current PIN is shared with your whole team.</p>
@@ -453,7 +470,6 @@ const ROUTE_COLORS = [
 const WAREHOUSE = { lat: 41.0534, lng: -73.5387 };
 
 // ═══════════════════ ZIP → COORDINATES MAP ════════════════════════════════════
-// Used to geocode invoice addresses by ZIP prefix
 const ZIP_MAP = {
   '100': { lat:40.78, lng:-73.97 }, '101': { lat:40.75, lng:-73.99 },
   '102': { lat:40.71, lng:-74.01 }, '104': { lat:40.84, lng:-73.87 },
@@ -482,40 +498,33 @@ const ZIP_MAP = {
   '065': { lat:41.16, lng:-73.20 }, '064': { lat:41.35, lng:-73.08 },
   '063': { lat:41.30, lng:-72.92 }, '060': { lat:41.76, lng:-72.68 },
   '061': { lat:41.82, lng:-72.52 }, '062': { lat:41.56, lng:-72.08 },
-  // Washington DC
   '200': { lat:38.91, lng:-77.02 }, '201': { lat:38.88, lng:-77.10 },
   '202': { lat:38.89, lng:-77.03 }, '203': { lat:38.85, lng:-76.99 },
   '204': { lat:38.94, lng:-77.07 }, '205': { lat:38.96, lng:-77.09 },
-  // Pennsylvania — Philadelphia area
   '190': { lat:39.95, lng:-75.16 }, '191': { lat:39.95, lng:-75.17 },
   '192': { lat:39.95, lng:-75.15 }, '193': { lat:40.04, lng:-75.37 },
   '194': { lat:40.09, lng:-75.31 }, '195': { lat:40.24, lng:-75.35 },
   '196': { lat:40.19, lng:-75.18 },
-  // Pennsylvania — Pittsburgh area
   '150': { lat:40.44, lng:-79.99 }, '151': { lat:40.44, lng:-80.00 },
   '152': { lat:40.37, lng:-79.86 }, '153': { lat:40.30, lng:-79.54 },
   '154': { lat:40.00, lng:-79.57 }, '155': { lat:40.25, lng:-79.18 },
   '156': { lat:40.31, lng:-79.55 }, '157': { lat:40.40, lng:-78.92 },
   '158': { lat:40.48, lng:-78.40 }, '159': { lat:40.50, lng:-78.70 },
-  // Pennsylvania — Central PA
   '160': { lat:41.24, lng:-80.50 }, '161': { lat:41.41, lng:-79.83 },
   '162': { lat:41.12, lng:-79.19 }, '163': { lat:41.23, lng:-79.90 },
   '164': { lat:42.13, lng:-80.08 }, '165': { lat:41.85, lng:-80.13 },
   '166': { lat:40.79, lng:-77.86 }, '167': { lat:40.93, lng:-78.02 },
   '168': { lat:40.90, lng:-77.79 }, '169': { lat:40.60, lng:-77.57 },
-  // Pennsylvania — Lehigh Valley / Allentown / Easton
   '180': { lat:40.61, lng:-75.47 }, '181': { lat:40.60, lng:-75.49 },
   '182': { lat:40.76, lng:-75.22 }, '183': { lat:40.68, lng:-75.21 },
   '184': { lat:41.41, lng:-75.66 }, '185': { lat:41.24, lng:-75.88 },
   '186': { lat:41.07, lng:-76.07 }, '187': { lat:41.05, lng:-76.46 },
   '188': { lat:41.00, lng:-75.97 }, '189': { lat:40.32, lng:-75.13 },
-  // Pennsylvania — Scranton / Wilkes-Barre / Poconos
   '176': { lat:41.24, lng:-76.92 }, '177': { lat:41.24, lng:-76.92 },
   '178': { lat:40.27, lng:-76.88 }, '179': { lat:40.07, lng:-76.31 },
   '170': { lat:40.27, lng:-76.88 }, '171': { lat:40.26, lng:-76.87 },
   '172': { lat:40.04, lng:-76.31 }, '173': { lat:40.04, lng:-76.30 },
   '174': { lat:40.04, lng:-76.31 }, '175': { lat:40.42, lng:-76.93 },
-  // Delaware (close to Philly, often on PA routes)
   '197': { lat:39.74, lng:-75.54 }, '198': { lat:39.74, lng:-75.55 },
   '199': { lat:39.68, lng:-75.75 },
 };
@@ -528,7 +537,6 @@ function getCoords(inv) {
   const z = addr.zip.toString().replace(/\D/g, '').padStart(5, '0');
   const info = ZIP_MAP[z.slice(0,3)] || ZIP_MAP[z.slice(0,2).padStart(3,'0')];
   if (!info) return null;
-  // Add a small deterministic scatter so stops in same ZIP don't overlap exactly
   const seed = (inv.id ? parseInt(inv.id, 10) : 0) % 100;
   return {
     lat: info.lat + ((seed % 10) - 5) * 0.0025,
@@ -555,7 +563,6 @@ function getStateLabel(inv) {
   if (hv3.includes(prefix3)) return 'NY — Hudson Valley';
   const nj2 = ['07','08'];
   if (nj2.some(p => z.startsWith(p))) return 'NJ — New Jersey';
-  const ct2 = ['06'];
   if (z.startsWith('06')) return 'CT — Connecticut';
   const st = (addr.state||'').toUpperCase();
   if (st === 'NJ') return 'NJ — New Jersey';
@@ -567,87 +574,34 @@ function getStateLabel(inv) {
   return addr.state || 'Unknown';
 }
 
-// ═══════════════════ REALISTIC DRIVING DISTANCE ENGINE ═══════════════════════
-//
-// Core idea: straight-line (haversine) distances are wildly wrong for this
-// region because of Long Island Sound, the Hudson River, Newark Bay, and the
-// NJ/NY geography.  We fix this without any API calls by:
-//
-//  1. TERRITORY ZONES  — every ZIP belongs to a named zone. Stops are first
-//     grouped by zone so drivers stay in one geographic corridor.
-//
-//  2. BRIDGE/TUNNEL WAYPOINTS — when two stops are in different zones we
-//     route the distance *through* the real crossing point (GWB, Lincoln,
-//     Holland, Verrazzano, Throgs Neck, etc.) instead of across open water.
-//     This makes the distance calculation realistic and stops the algorithm
-//     from thinking "Stamford → Long Island = 20 miles straight line".
-//
-//  3. TERRITORY PENALTY MATRIX — some zone pairs are simply bad combinations
-//     (e.g. South Jersey + NYC).  A multiplier makes those combos expensive
-//     so the balancer never merges them onto one route.
-//
-//  4. NEAREST-NEIGHBOR TSP — once zones are assigned, stops within each
-//     route are ordered using realistic (waypointed) driving distances.
-
-// ── Zone definitions ─────────────────────────────────────────────────────────
-// Each ZIP prefix maps to a zone name used by the penalty matrix
+// ═══════════════════ ROUTING ENGINE (unchanged) ════════════════════════════
 const ZIP_ZONES = {
-  // Manhattan
   '100':'Manhattan','101':'Manhattan','102':'Manhattan',
-  // Bronx
-  '104':'Bronx',
-  // Staten Island
-  '103':'StatenIsland',
-  // Brooklyn
-  '112':'Brooklyn',
-  // Queens
+  '104':'Bronx','103':'StatenIsland','112':'Brooklyn',
   '110':'Queens','111':'Queens','113':'Queens','114':'Queens',
-  // Long Island
-  '115':'LongIsland','116':'LongIsland','117':'LongIsland',
-  '118':'LongIsland','119':'LongIsland',
-  // Westchester
-  '105':'Westchester','106':'Westchester','107':'Westchester',
-  '108':'Westchester','109':'Westchester',
-  // Hudson Valley
+  '115':'LongIsland','116':'LongIsland','117':'LongIsland','118':'LongIsland','119':'LongIsland',
+  '105':'Westchester','106':'Westchester','107':'Westchester','108':'Westchester','109':'Westchester',
   '125':'HudsonValley','126':'HudsonValley','127':'HudsonValley','128':'HudsonValley',
-  // NJ North (can pair with NYC via tunnels)
-  '070':'NJNorth','071':'NJNorth','072':'NJNorth','073':'NJNorth',
-  '074':'NJNorth','075':'NJNorth','076':'NJNorth','078':'NJNorth','079':'NJNorth',
-  // NJ Central
+  '070':'NJNorth','071':'NJNorth','072':'NJNorth','073':'NJNorth','074':'NJNorth',
+  '075':'NJNorth','076':'NJNorth','078':'NJNorth','079':'NJNorth',
   '077':'NJCentral','087':'NJCentral','088':'NJCentral','089':'NJCentral',
-  // NJ South — far, never mix with NYC or Long Island
   '080':'NJSouth','081':'NJSouth','082':'NJSouth','083':'NJSouth',
   '084':'NJSouth','085':'NJSouth','086':'NJSouth',
-  // CT Near Stamford (warehouse neighbors — passthrough to Westchester/NYC)
-  '068':'CTNear','069':'CTNear',
-  // CT West
-  '066':'CTWest','067':'CTWest',
-  // CT South / Central / East
+  '068':'CTNear','069':'CTNear','066':'CTWest','067':'CTWest',
   '060':'CTCentral','061':'CTCentral','062':'CTEast',
   '063':'CTSouth','064':'CTSouth','065':'CTSouth',
-  // Washington DC
   '200':'DC','201':'DC','202':'DC','203':'DC','204':'DC','205':'DC',
-  // Pennsylvania — Philadelphia & suburbs
-  '190':'PhillyPA','191':'PhillyPA','192':'PhillyPA',
-  '193':'PhillyPA','194':'PhillyPA','195':'PhillyPA','196':'PhillyPA',
-  '189':'PhillyPA',
-  // Pennsylvania — Lehigh Valley / Poconos / Easton (close to NJ)
+  '190':'PhillyPA','191':'PhillyPA','192':'PhillyPA','193':'PhillyPA',
+  '194':'PhillyPA','195':'PhillyPA','196':'PhillyPA','189':'PhillyPA',
   '180':'LehighPA','181':'LehighPA','182':'LehighPA','183':'LehighPA',
-  '184':'LehighPA','185':'LehighPA','186':'LehighPA','187':'LehighPA',
-  '188':'LehighPA',
-  // Pennsylvania — Scranton / Wilkes-Barre
-  '176':'NEPennsylvania','177':'NEPennsylvania','178':'NEPennsylvania',
-  '179':'NEPennsylvania','170':'CentralPA','171':'CentralPA',
-  '172':'CentralPA','173':'CentralPA','174':'CentralPA','175':'CentralPA',
-  // Pennsylvania — Pittsburgh & Western PA
-  '150':'PittsburghPA','151':'PittsburghPA','152':'PittsburghPA',
-  '153':'PittsburghPA','154':'PittsburghPA','155':'PittsburghPA',
-  '156':'PittsburghPA','157':'PittsburghPA','158':'PittsburghPA',
-  '159':'PittsburghPA',
+  '184':'LehighPA','185':'LehighPA','186':'LehighPA','187':'LehighPA','188':'LehighPA',
+  '176':'NEPennsylvania','177':'NEPennsylvania','178':'NEPennsylvania','179':'NEPennsylvania',
+  '170':'CentralPA','171':'CentralPA','172':'CentralPA','173':'CentralPA','174':'CentralPA','175':'CentralPA',
+  '150':'PittsburghPA','151':'PittsburghPA','152':'PittsburghPA','153':'PittsburghPA',
+  '154':'PittsburghPA','155':'PittsburghPA','156':'PittsburghPA','157':'PittsburghPA',
+  '158':'PittsburghPA','159':'PittsburghPA',
   '160':'WesternPA','161':'WesternPA','162':'WesternPA','163':'WesternPA',
-  '164':'WesternPA','165':'WesternPA','166':'CentralPA','167':'CentralPA',
-  '168':'CentralPA','169':'CentralPA',
-  // Delaware
+  '164':'WesternPA','165':'WesternPA','166':'CentralPA','167':'CentralPA','168':'CentralPA','169':'CentralPA',
   '197':'Delaware','198':'Delaware','199':'Delaware',
 };
 
@@ -660,368 +614,78 @@ function getZone(inv) {
   return ZIP_ZONES[z.slice(0,3)] || ZIP_ZONES[z.slice(0,2).padStart(3,'0')] || 'Unknown';
 }
 
-// ── Territory penalty matrix ──────────────────────────────────────────────────
-// Multiplier applied to driving distance between two zones.
-// High values (4-10) make the pairing very expensive so the balancer avoids it.
-// 1.0 = normal road driving, no penalty.
 const ZONE_PENALTY = {
-  // Long Island Sound — CT cannot drive straight to Long Island, ever
-  'CTNear:LongIsland':   8.0,  'CTWest:LongIsland':    8.0,
-  'CTCentral:LongIsland':8.0,  'CTSouth:LongIsland':   8.0,  'CTEast:LongIsland': 8.0,
-  // South Jersey mixing with NYC or Long Island is a terrible day
-  'NJSouth:Manhattan':   5.0,  'NJSouth:Brooklyn':     5.0,
-  'NJSouth:Queens':      5.0,  'NJSouth:LongIsland':   6.0,
-  'NJSouth:Bronx':       5.0,  'NJSouth:StatenIsland': 3.5,
-  'NJSouth:Westchester': 5.0,  'NJSouth:HudsonValley': 5.0,
-  'NJSouth:CTNear':      6.0,  'NJSouth:CTWest':       6.0,
-  // NJ Central mixed with Long Island or CT is also bad
-  'NJCentral:LongIsland':4.0,  'NJCentral:CTNear':     4.0,
-  'NJCentral:CTWest':    4.0,  'NJCentral:Westchester':3.0,
-  // Hudson Valley + Long Island / NJ South is a mess
-  'HudsonValley:LongIsland':4.0,'HudsonValley:NJSouth': 4.5,
-  'HudsonValley:NJCentral':3.0,
-  // Staten Island is somewhat isolated — penalise mixing with far zones
-  'StatenIsland:LongIsland':3.5,'StatenIsland:CTNear':  3.5,
-  'StatenIsland:Westchester':2.5,
-  // DC — far from NYC corridor, never mix with Long Island or CT
-  'DC:LongIsland':  6.0, 'DC:CTNear':    6.0, 'DC:CTWest':    6.0,
-  'DC:CTCentral':   6.0, 'DC:CTEast':    6.0, 'DC:CTSouth':   6.0,
-  'DC:Bronx':       4.0, 'DC:Queens':    4.0, 'DC:Brooklyn':  4.0,
-  'DC:Westchester': 4.0, 'DC:HudsonValley':5.0,
-  'DC:NJSouth':     2.0, 'DC:NJCentral': 2.5, 'DC:NJNorth':   3.0,
-  'DC:Manhattan':   3.5,
-  // Philly PA — natural corridor: NJ South, DC, Delaware
-  'PhillyPA:LongIsland':  4.0, 'PhillyPA:CTNear':  4.5, 'PhillyPA:CTWest':  4.5,
-  'PhillyPA:Bronx':       3.5, 'PhillyPA:Westchester':3.5, 'PhillyPA:HudsonValley':4.0,
-  'PhillyPA:Manhattan':   3.0, 'PhillyPA:Brooklyn': 3.0,
-  // Lehigh Valley / Poconos PA — between NYC and Philly corridor
-  'LehighPA:LongIsland':  3.0, 'LehighPA:CTNear':  3.0, 'LehighPA:CTWest':  3.0,
-  'LehighPA:DC':          3.5, 'LehighPA:PittsburghPA':4.0,
-  // Pittsburgh & Western PA — far from everything, own route
-  'PittsburghPA:LongIsland':7.0,'PittsburghPA:CTNear':  7.0,
-  'PittsburghPA:Manhattan': 6.0,'PittsburghPA:NJNorth': 5.0,
-  'PittsburghPA:NJSouth':   4.5,'PittsburghPA:DC':      4.0,
-  'PittsburghPA:PhillyPA':  3.0,
-  // NE Pennsylvania (Scranton) — moderate distance from NJ/NYC
-  'NEPennsylvania:LongIsland':3.5,'NEPennsylvania:CTNear':2.5,
-  'NEPennsylvania:Manhattan': 3.0,'NEPennsylvania:NJSouth':3.0,
+  'CTNear:LongIsland':8.0,'CTWest:LongIsland':8.0,'CTCentral:LongIsland':8.0,'CTSouth:LongIsland':8.0,'CTEast:LongIsland':8.0,
+  'NJSouth:Manhattan':5.0,'NJSouth:Brooklyn':5.0,'NJSouth:Queens':5.0,'NJSouth:LongIsland':6.0,'NJSouth:Bronx':5.0,
+  'NJSouth:StatenIsland':3.5,'NJSouth:Westchester':5.0,'NJSouth:HudsonValley':5.0,'NJSouth:CTNear':6.0,'NJSouth:CTWest':6.0,
+  'NJCentral:LongIsland':4.0,'NJCentral:CTNear':4.0,'NJCentral:CTWest':4.0,'NJCentral:Westchester':3.0,
+  'HudsonValley:LongIsland':4.0,'HudsonValley:NJSouth':4.5,'HudsonValley:NJCentral':3.0,
+  'StatenIsland:LongIsland':3.5,'StatenIsland:CTNear':3.5,'StatenIsland:Westchester':2.5,
+  'DC:LongIsland':6.0,'DC:CTNear':6.0,'DC:CTWest':6.0,'DC:CTCentral':6.0,'DC:CTEast':6.0,'DC:CTSouth':6.0,
+  'DC:Bronx':4.0,'DC:Queens':4.0,'DC:Brooklyn':4.0,'DC:Westchester':4.0,'DC:HudsonValley':5.0,
+  'DC:NJSouth':2.0,'DC:NJCentral':2.5,'DC:NJNorth':3.0,'DC:Manhattan':3.5,
+  'PhillyPA:LongIsland':4.0,'PhillyPA:CTNear':4.5,'PhillyPA:CTWest':4.5,'PhillyPA:Bronx':3.5,
+  'PhillyPA:Westchester':3.5,'PhillyPA:HudsonValley':4.0,'PhillyPA:Manhattan':3.0,'PhillyPA:Brooklyn':3.0,
+  'LehighPA:LongIsland':3.0,'LehighPA:CTNear':3.0,'LehighPA:CTWest':3.0,'LehighPA:DC':3.5,'LehighPA:PittsburghPA':4.0,
+  'PittsburghPA:LongIsland':7.0,'PittsburghPA:CTNear':7.0,'PittsburghPA:Manhattan':6.0,'PittsburghPA:NJNorth':5.0,
+  'PittsburghPA:NJSouth':4.5,'PittsburghPA:DC':4.0,'PittsburghPA:PhillyPA':3.0,
+  'NEPennsylvania:LongIsland':3.5,'NEPennsylvania:CTNear':2.5,'NEPennsylvania:Manhattan':3.0,'NEPennsylvania:NJSouth':3.0,
 };
+function zonePenalty(a,b){if(a===b)return 1.0;return ZONE_PENALTY[`${a}:${b}`]||ZONE_PENALTY[`${b}:${a}`]||1.0;}
 
-function zonePenalty(zoneA, zoneB) {
-  if (zoneA === zoneB) return 1.0;
-  return ZONE_PENALTY[`${zoneA}:${zoneB}`]
-      || ZONE_PENALTY[`${zoneB}:${zoneA}`]
-      || 1.0;
-}
-
-// ── Bridge / tunnel crossing waypoints ───────────────────────────────────────
-// When two stops are in different zones that require crossing water or a major
-// chokepoint, we route the distance *through* the real crossing.
-// Format: [zoneA, zoneB, waypointLatLng]
-const CROSSINGS = [
-  // GW Bridge — NJ North ↔ Manhattan / Bronx / Westchester
-  ['NJNorth','Manhattan',    { lat:40.851, lng:-73.953 }],
-  ['NJNorth','Bronx',        { lat:40.851, lng:-73.953 }],
-  ['NJNorth','Westchester',  { lat:40.851, lng:-73.953 }],
-  ['NJNorth','HudsonValley', { lat:40.851, lng:-73.953 }],
-  // Lincoln / Holland Tunnels — NJ North ↔ Manhattan (alternate)
-  ['NJNorth','Brooklyn',     { lat:40.740, lng:-74.030 }],
-  ['NJNorth','Queens',       { lat:40.740, lng:-74.030 }],
-  // NJ Central ↔ NYC via Goethals / Outerbridge or Turnpike
-  ['NJCentral','Manhattan',  { lat:40.640, lng:-74.150 }],
-  ['NJCentral','Brooklyn',   { lat:40.640, lng:-74.150 }],
-  ['NJCentral','Queens',     { lat:40.640, lng:-74.150 }],
-  ['NJCentral','StatenIsland',{ lat:40.640, lng:-74.150 }],
-  // NJ South ↔ anywhere — route through NJ Turnpike south entry
-  ['NJSouth','Manhattan',    { lat:40.200, lng:-74.750 }],
-  ['NJSouth','Brooklyn',     { lat:40.200, lng:-74.750 }],
-  ['NJSouth','Queens',       { lat:40.200, lng:-74.750 }],
-  ['NJSouth','NJNorth',      { lat:40.200, lng:-74.750 }],
-  // Verrazzano — Staten Island ↔ Brooklyn
-  ['StatenIsland','Brooklyn',{ lat:40.606, lng:-74.044 }],
-  ['StatenIsland','Queens',  { lat:40.606, lng:-74.044 }],
-  ['StatenIsland','Manhattan',{ lat:40.606, lng:-74.044 }],
-  // Throgs Neck / Whitestone — Bronx / Queens / Westchester ↔ Long Island
-  ['Queens','LongIsland',    { lat:40.780, lng:-73.790 }],
-  ['Bronx','LongIsland',     { lat:40.805, lng:-73.793 }],
-  ['Manhattan','LongIsland', { lat:40.780, lng:-73.790 }],
-  ['Westchester','LongIsland',{ lat:40.805, lng:-73.793 }],
-  // CT crossings: no bridge over Long Island Sound — must go around via NYC
-  // We route CT→LongIsland through the Throgs Neck area (long way round)
-  ['CTNear','LongIsland',    { lat:40.805, lng:-73.793 }],
-  ['CTWest','LongIsland',    { lat:40.805, lng:-73.793 }],
-  ['CTSouth','LongIsland',   { lat:40.805, lng:-73.793 }],
-  ['CTCentral','LongIsland', { lat:40.805, lng:-73.793 }],
-  ['CTEast','LongIsland',    { lat:40.805, lng:-73.793 }],
-  // CT near Stamford ↔ Westchester — easy, no penalty (I-95 / Merritt)
-  // CT ↔ Manhattan — Cross Bronx / I-95 route
-  ['CTNear','Manhattan',     { lat:40.851, lng:-73.880 }],
-  ['CTWest','Manhattan',     { lat:40.851, lng:-73.880 }],
-  ['CTSouth','Manhattan',    { lat:40.851, lng:-73.880 }],
-  // DC ↔ NJ/NYC — route through I-95 NJ Turnpike corridor
-  ['DC','Manhattan',         { lat:40.200, lng:-74.750 }],
-  ['DC','Brooklyn',          { lat:40.200, lng:-74.750 }],
-  ['DC','NJNorth',           { lat:39.550, lng:-75.400 }],
-  ['DC','NJCentral',         { lat:39.550, lng:-75.400 }],
-  ['DC','NJSouth',           { lat:39.400, lng:-75.100 }],
-  ['DC','PhillyPA',          { lat:39.880, lng:-75.250 }],
-  // Philadelphia ↔ NJ — via Ben Franklin / Walt Whitman bridges
-  ['PhillyPA','NJSouth',     { lat:39.952, lng:-75.134 }],
-  ['PhillyPA','NJCentral',   { lat:39.952, lng:-75.134 }],
-  ['PhillyPA','Manhattan',   { lat:40.200, lng:-74.750 }],
-  ['PhillyPA','DC',          { lat:39.600, lng:-75.700 }],
-  // Lehigh Valley ↔ NJ — via I-78 / Delaware Water Gap
-  ['LehighPA','NJNorth',     { lat:40.690, lng:-75.120 }],
-  ['LehighPA','NJCentral',   { lat:40.690, lng:-75.120 }],
-  ['LehighPA','Manhattan',   { lat:40.690, lng:-75.120 }],
-  // Pittsburgh — route everything through PA Turnpike
-  ['PittsburghPA','PhillyPA',{ lat:40.100, lng:-77.000 }],
-  ['PittsburghPA','DC',      { lat:39.800, lng:-77.500 }],
+const CROSSINGS=[
+  ['NJNorth','Manhattan',{lat:40.851,lng:-73.953}],['NJNorth','Bronx',{lat:40.851,lng:-73.953}],
+  ['NJNorth','Westchester',{lat:40.851,lng:-73.953}],['NJNorth','HudsonValley',{lat:40.851,lng:-73.953}],
+  ['NJNorth','Brooklyn',{lat:40.740,lng:-74.030}],['NJNorth','Queens',{lat:40.740,lng:-74.030}],
+  ['NJCentral','Manhattan',{lat:40.640,lng:-74.150}],['NJCentral','Brooklyn',{lat:40.640,lng:-74.150}],
+  ['NJCentral','Queens',{lat:40.640,lng:-74.150}],['NJCentral','StatenIsland',{lat:40.640,lng:-74.150}],
+  ['NJSouth','Manhattan',{lat:40.200,lng:-74.750}],['NJSouth','Brooklyn',{lat:40.200,lng:-74.750}],
+  ['NJSouth','Queens',{lat:40.200,lng:-74.750}],['NJSouth','NJNorth',{lat:40.200,lng:-74.750}],
+  ['StatenIsland','Brooklyn',{lat:40.606,lng:-74.044}],['StatenIsland','Queens',{lat:40.606,lng:-74.044}],
+  ['StatenIsland','Manhattan',{lat:40.606,lng:-74.044}],
+  ['Queens','LongIsland',{lat:40.780,lng:-73.790}],['Bronx','LongIsland',{lat:40.805,lng:-73.793}],
+  ['Manhattan','LongIsland',{lat:40.780,lng:-73.790}],['Westchester','LongIsland',{lat:40.805,lng:-73.793}],
+  ['CTNear','LongIsland',{lat:40.805,lng:-73.793}],['CTWest','LongIsland',{lat:40.805,lng:-73.793}],
+  ['CTSouth','LongIsland',{lat:40.805,lng:-73.793}],['CTCentral','LongIsland',{lat:40.805,lng:-73.793}],
+  ['CTEast','LongIsland',{lat:40.805,lng:-73.793}],
+  ['CTNear','Manhattan',{lat:40.851,lng:-73.880}],['CTWest','Manhattan',{lat:40.851,lng:-73.880}],
+  ['CTSouth','Manhattan',{lat:40.851,lng:-73.880}],
+  ['DC','Manhattan',{lat:40.200,lng:-74.750}],['DC','Brooklyn',{lat:40.200,lng:-74.750}],
+  ['DC','NJNorth',{lat:39.550,lng:-75.400}],['DC','NJCentral',{lat:39.550,lng:-75.400}],
+  ['DC','NJSouth',{lat:39.400,lng:-75.100}],['DC','PhillyPA',{lat:39.880,lng:-75.250}],
+  ['PhillyPA','NJSouth',{lat:39.952,lng:-75.134}],['PhillyPA','NJCentral',{lat:39.952,lng:-75.134}],
+  ['PhillyPA','Manhattan',{lat:40.200,lng:-74.750}],['PhillyPA','DC',{lat:39.600,lng:-75.700}],
+  ['LehighPA','NJNorth',{lat:40.690,lng:-75.120}],['LehighPA','NJCentral',{lat:40.690,lng:-75.120}],
+  ['LehighPA','Manhattan',{lat:40.690,lng:-75.120}],
+  ['PittsburghPA','PhillyPA',{lat:40.100,lng:-77.000}],['PittsburghPA','DC',{lat:39.800,lng:-77.500}],
 ];
+const CROSSING_MAP={};
+CROSSINGS.forEach(([a,b,wp])=>{CROSSING_MAP[`${a}|${b}`]=wp;CROSSING_MAP[`${b}|${a}`]=wp;});
 
-// Build a quick lookup: "zoneA|zoneB" → waypoint
-const CROSSING_MAP = {};
-CROSSINGS.forEach(([a, b, wp]) => {
-  CROSSING_MAP[`${a}|${b}`] = wp;
-  CROSSING_MAP[`${b}|${a}`] = wp;
-});
+function haversine(a,b){const R=3958.8;const dLat=(b.lat-a.lat)*Math.PI/180;const dLng=(b.lng-a.lng)*Math.PI/180;const s=Math.sin(dLat/2)**2+Math.cos(a.lat*Math.PI/180)*Math.cos(b.lat*Math.PI/180)*Math.sin(dLng/2)**2;return R*2*Math.atan2(Math.sqrt(s),Math.sqrt(1-s));}
+function drivingDist(a,b,zA,zB){if(!a||!b)return 9999;const wp=CROSSING_MAP[`${zA}|${zB}`];const raw=wp?haversine(a,wp)+haversine(wp,b):haversine(a,b);return raw*zonePenalty(zA,zB);}
+function drivingDistFromPoint(point,stop,stopZone){return drivingDist(point,stop._coords,'CTNear',stopZone);}
+function routeDistance(stops){if(!stops.length)return 0;let d=drivingDistFromPoint(WAREHOUSE,stops[0],stops[0]._zone);for(let i=1;i<stops.length;i++)d+=drivingDist(stops[i-1]._coords,stops[i]._coords,stops[i-1]._zone,stops[i]._zone);d+=drivingDistFromPoint(WAREHOUSE,stops[stops.length-1],stops[stops.length-1]._zone);return d;}
+function nearestNeighborTSP(stops){if(stops.length<=1)return[...stops];const remaining=[...stops];const ordered=[];let cc=WAREHOUSE,cz='CTNear';while(remaining.length){let bi=0,bd=Infinity;remaining.forEach((s,i)=>{const d=drivingDist(cc,s._coords,cz,s._zone);if(d<bd){bd=d;bi=i;}});ordered.push(remaining[bi]);cc=remaining[bi]._coords;cz=remaining[bi]._zone;remaining.splice(bi,1);}return ordered;}
+function centroid(stops){const n=stops.length;return{lat:stops.reduce((s,i)=>s+i._coords.lat,0)/n,lng:stops.reduce((s,i)=>s+i._coords.lng,0)/n};}
+function buildTerritoryGroups(stops){const groups={};stops.forEach(s=>{const z=s._zone||'Unknown';if(!groups[z])groups[z]=[];groups[z].push(s);});return groups;}
+const ZONE_MERGE_AFFINITY={'CTNear':['Westchester','CTWest','CTSouth'],'CTWest':['CTNear','CTSouth','CTCentral'],'CTSouth':['CTNear','CTWest','CTCentral'],'CTCentral':['CTWest','CTSouth','CTEast'],'CTEast':['CTCentral','CTSouth'],'Westchester':['CTNear','Bronx','Manhattan','HudsonValley'],'HudsonValley':['Westchester','CTWest'],'Bronx':['Westchester','Manhattan','Queens'],'Manhattan':['Bronx','Brooklyn','Queens','NJNorth'],'Brooklyn':['Manhattan','Queens','StatenIsland'],'Queens':['Brooklyn','Manhattan','Bronx','LongIsland'],'LongIsland':['Queens'],'StatenIsland':['Brooklyn','NJNorth','NJCentral'],'NJNorth':['Manhattan','Bronx','StatenIsland','NJCentral'],'NJCentral':['NJNorth','StatenIsland'],'NJSouth':['NJCentral','PhillyPA','Delaware'],'DC':['PhillyPA','Delaware','NJSouth'],'PhillyPA':['Delaware','NJSouth','DC','LehighPA','NJCentral'],'Delaware':['PhillyPA','NJSouth','DC'],'LehighPA':['PhillyPA','NEPennsylvania','NJCentral','NJNorth'],'NEPennsylvania':['LehighPA','CentralPA','NJNorth'],'CentralPA':['LehighPA','NEPennsylvania','PittsburghPA','PhillyPA'],'PittsburghPA':['WesternPA','CentralPA'],'WesternPA':['PittsburghPA','CentralPA'],'Unknown':[]};
+function mergeSmallestGroup(groups){const keys=Object.keys(groups);keys.sort((a,b)=>groups[a].length-groups[b].length);const sk=keys[0];const aff=ZONE_MERGE_AFFINITY[sk]||[];let tk=null;for(const p of aff){if(groups[p]){tk=p;break;}}if(!tk){let bp=Infinity;keys.slice(1).forEach(k=>{const p=zonePenalty(sk,k);if(p<bp){bp=p;tk=k;}});}if(!tk)tk=keys[1];groups[tk]=[...groups[tk],...groups[sk]];delete groups[sk];}
+function rebalanceGroups(groups,maxPasses=50){const keys=Object.keys(groups);if(keys.length<2)return groups;let improved=true,pass=0;while(improved&&pass++<maxPasses){improved=false;const tsp={};const dists={};keys.forEach(k=>{tsp[k]=nearestNeighborTSP(groups[k]);dists[k]=routeDistance(tsp[k]);});const maxKey=keys.reduce((m,k)=>dists[k]>dists[m]?k:m,keys[0]);const minKey=keys.reduce((m,k)=>dists[k]<dists[m]?k:m,keys[0]);if(maxKey===minKey||dists[maxKey]-dists[minKey]<8)break;let bestGain=2,bestStop=-1;groups[maxKey].forEach((stop,si)=>{if(zonePenalty(stop._zone,minKey)>2.0)return;const without=groups[maxKey].filter((_,i)=>i!==si);const nfd=routeDistance(nearestNeighborTSP(without));const ntd=routeDistance(nearestNeighborTSP([...groups[minKey],stop]));const gain=(dists[maxKey]-nfd)-(ntd-dists[minKey]);if(gain>bestGain){bestGain=gain;bestStop=si;}});if(bestStop>=0){groups[minKey].push(groups[maxKey].splice(bestStop,1)[0]);improved=true;}}return groups;}
 
-// ── Core distance functions ───────────────────────────────────────────────────
-function haversine(a, b) {
-  const R = 3958.8;
-  const dLat = (b.lat - a.lat) * Math.PI / 180;
-  const dLng = (b.lng - a.lng) * Math.PI / 180;
-  const s = Math.sin(dLat/2)**2 + Math.cos(a.lat*Math.PI/180)*Math.cos(b.lat*Math.PI/180)*Math.sin(dLng/2)**2;
-  return R * 2 * Math.atan2(Math.sqrt(s), Math.sqrt(1-s));
+function buildDistanceRoutes(selectedInvoices,driverCount,caseLimit){
+  selectedInvoices.forEach(inv=>{if(!inv._coords)inv._coords=getCoords(inv);if(!inv._zone)inv._zone=getZone(inv);});
+  const mappable=selectedInvoices.filter(inv=>inv._coords);
+  const unmappable=selectedInvoices.filter(inv=>!inv._coords);
+  let groups=buildTerritoryGroups(mappable);
+  while(Object.keys(groups).length>driverCount)mergeSmallestGroup(groups);
+  if(Object.keys(groups).length<driverCount&&mappable.length>=driverCount){const keys=Object.keys(groups);keys.sort((a,b)=>groups[b].length-groups[a].length);const bk=keys[0];const sorted=nearestNeighborTSP(groups[bk]);const half=Math.ceil(sorted.length/2);groups[bk+'_A']=sorted.slice(0,half);groups[bk+'_B']=sorted.slice(half);delete groups[bk];}
+  groups=rebalanceGroups(groups);
+  if(unmappable.length){const keys=Object.keys(groups);const sk=keys.reduce((m,k)=>routeDistance(groups[k])<routeDistance(groups[m])?k:m,keys[0]);groups[sk].push(...unmappable);}
+  const vans=Object.values(groups).map(grp=>{const ordered=nearestNeighborTSP(grp);const cases=ordered.reduce((s,i)=>s+(i.cases||0),0);const dist=Math.round(routeDistance(ordered));return{stops:ordered,cases,distance:dist,overLimit:cases>caseLimit};});
+  vans.sort((a,b)=>a.distance-b.distance);
+  return vans.map((van,i)=>({territory:`Route ${i+1}`,subRegion:null,stops:van.stops,cases:van.cases,distance:van.distance,overLimit:van.overLimit}));
 }
-
-// Realistic driving distance between two stops, routing through bridge/tunnel
-// waypoints when zones differ, and applying territory penalty multipliers.
-function drivingDist(a, b, zoneA, zoneB) {
-  if (!a || !b) return 9999;
-  const key = `${zoneA}|${zoneB}`;
-  const wp  = CROSSING_MAP[key];
-  const raw = wp
-    ? haversine(a, wp) + haversine(wp, b)   // route through crossing
-    : haversine(a, b);
-  return raw * zonePenalty(zoneA, zoneB);
-}
-
-// Driving distance from a point (no zone) — used for warehouse legs
-function drivingDistFromPoint(point, stop, stopZone) {
-  // Warehouse is in CTNear zone
-  return drivingDist(point, stop._coords, 'CTNear', stopZone);
-}
-
-// Total route distance using realistic driving distances
-function routeDistance(stops) {
-  if (!stops.length) return 0;
-  let d = drivingDistFromPoint(WAREHOUSE, stops[0], stops[0]._zone);
-  for (let i = 1; i < stops.length; i++) {
-    d += drivingDist(stops[i-1]._coords, stops[i]._coords, stops[i-1]._zone, stops[i]._zone);
-  }
-  d += drivingDistFromPoint(WAREHOUSE, stops[stops.length-1], stops[stops.length-1]._zone);
-  return d;
-}
-
-// Nearest-neighbor TSP using realistic driving distances
-function nearestNeighborTSP(stops) {
-  if (stops.length <= 1) return [...stops];
-  const remaining = [...stops];
-  const ordered   = [];
-  let currentCoords = WAREHOUSE;
-  let currentZone   = 'CTNear';
-  while (remaining.length) {
-    let bestIdx = 0, bestDist = Infinity;
-    remaining.forEach((s, i) => {
-      const d = drivingDist(currentCoords, s._coords, currentZone, s._zone);
-      if (d < bestDist) { bestDist = d; bestIdx = i; }
-    });
-    ordered.push(remaining[bestIdx]);
-    currentCoords = remaining[bestIdx]._coords;
-    currentZone   = remaining[bestIdx]._zone;
-    remaining.splice(bestIdx, 1);
-  }
-  return ordered;
-}
-
-// Centroid of a cluster (plain lat/lng average — just for k-means seeding)
-function centroid(stops) {
-  const n = stops.length;
-  return {
-    lat: stops.reduce((s,i) => s + i._coords.lat, 0) / n,
-    lng: stops.reduce((s,i) => s + i._coords.lng, 0) / n
-  };
-}
-
-// ── Territory-first clustering ────────────────────────────────────────────────
-// Group stops by zone first, then merge small groups up to driverCount routes.
-// This guarantees no driver is sent across Long Island Sound or to South Jersey
-// and back in the same day unless there are genuinely very few stops.
-function buildTerritoryGroups(stops) {
-  const groups = {};
-  stops.forEach(s => {
-    const z = s._zone || 'Unknown';
-    if (!groups[z]) groups[z] = [];
-    groups[z].push(s);
-  });
-  return groups;
-}
-
-// Zone priority order — determines which zones get merged together when we
-// have fewer drivers than territory groups.  Zones close together on the
-// same natural corridor are listed adjacent.
-const ZONE_MERGE_AFFINITY = {
-  'CTNear':      ['Westchester','CTWest','CTSouth'],
-  'CTWest':      ['CTNear','CTSouth','CTCentral'],
-  'CTSouth':     ['CTNear','CTWest','CTCentral'],
-  'CTCentral':   ['CTWest','CTSouth','CTEast'],
-  'CTEast':      ['CTCentral','CTSouth'],
-  'Westchester': ['CTNear','Bronx','Manhattan','HudsonValley'],
-  'HudsonValley':['Westchester','CTWest'],
-  'Bronx':       ['Westchester','Manhattan','Queens'],
-  'Manhattan':   ['Bronx','Brooklyn','Queens','NJNorth'],
-  'Brooklyn':    ['Manhattan','Queens','StatenIsland'],
-  'Queens':      ['Brooklyn','Manhattan','Bronx','LongIsland'],
-  'LongIsland':  ['Queens'],
-  'StatenIsland':['Brooklyn','NJNorth','NJCentral'],
-  'NJNorth':     ['Manhattan','Bronx','StatenIsland','NJCentral'],
-  'NJCentral':   ['NJNorth','StatenIsland'],
-  'NJSouth':     ['NJCentral','PhillyPA','Delaware'],
-  // DC / PA / DE corridor — these naturally travel together
-  'DC':          ['PhillyPA','Delaware','NJSouth'],
-  'PhillyPA':    ['Delaware','NJSouth','DC','LehighPA','NJCentral'],
-  'Delaware':    ['PhillyPA','NJSouth','DC'],
-  'LehighPA':    ['PhillyPA','NEPennsylvania','NJCentral','NJNorth'],
-  'NEPennsylvania':['LehighPA','CentralPA','NJNorth'],
-  'CentralPA':   ['LehighPA','NEPennsylvania','PittsburghPA','PhillyPA'],
-  'PittsburghPA':['WesternPA','CentralPA'],
-  'WesternPA':   ['PittsburghPA','CentralPA'],
-  'Unknown':     [],
-};
-
-function mergeSmallestGroup(groups, caseLimit) {
-  const keys = Object.keys(groups);
-  // Sort by stop count ascending so we merge the smallest group first
-  keys.sort((a,b) => groups[a].length - groups[b].length);
-  const smallestKey = keys[0];
-  const smallestGroup = groups[smallestKey];
-  // Find best merge target: prefer affinity neighbors, then lowest penalty neighbor
-  const affinityList = ZONE_MERGE_AFFINITY[smallestKey] || [];
-  let targetKey = null;
-  // 1. Try affinity neighbors first
-  for (const preferred of affinityList) {
-    if (groups[preferred]) { targetKey = preferred; break; }
-  }
-  // 2. Fall back to lowest penalty neighbor
-  if (!targetKey) {
-    let bestPenalty = Infinity;
-    keys.slice(1).forEach(k => {
-      const p = zonePenalty(smallestKey, k);
-      if (p < bestPenalty) { bestPenalty = p; targetKey = k; }
-    });
-  }
-  if (!targetKey) targetKey = keys[1]; // last resort
-  groups[targetKey] = [...groups[targetKey], ...smallestGroup];
-  delete groups[smallestKey];
-}
-
-// Rebalance groups by swapping stops to equalise total driving distance.
-// Only swaps stops between groups where the zone penalty is acceptable (< 2.5).
-function rebalanceGroups(groups, maxPasses = 50) {
-  const keys = Object.keys(groups);
-  if (keys.length < 2) return groups;
-  let improved = true, pass = 0;
-  while (improved && pass++ < maxPasses) {
-    improved = false;
-    const tsp   = {};
-    const dists = {};
-    keys.forEach(k => { tsp[k] = nearestNeighborTSP(groups[k]); dists[k] = routeDistance(tsp[k]); });
-    const maxKey = keys.reduce((m,k) => dists[k] > dists[m] ? k : m, keys[0]);
-    const minKey = keys.reduce((m,k) => dists[k] < dists[m] ? k : m, keys[0]);
-    if (maxKey === minKey || dists[maxKey] - dists[minKey] < 8) break;
-    let bestGain = 2, bestStop = -1; // require at least 2-mile improvement
-    groups[maxKey].forEach((stop, si) => {
-      // Only allow the swap if the cross-zone penalty is acceptable
-      if (zonePenalty(stop._zone, minKey) > 2.0) return;
-      const without    = groups[maxKey].filter((_,i) => i !== si);
-      const newFromD   = routeDistance(nearestNeighborTSP(without));
-      const newToD     = routeDistance(nearestNeighborTSP([...groups[minKey], stop]));
-      const gain = (dists[maxKey] - newFromD) - (newToD - dists[minKey]);
-      if (gain > bestGain) { bestGain = gain; bestStop = si; }
-    });
-    if (bestStop >= 0) {
-      groups[minKey].push(groups[maxKey].splice(bestStop, 1)[0]);
-      improved = true;
-    }
-  }
-  return groups;
-}
-
-// MAIN ROUTING FUNCTION
-function buildDistanceRoutes(selectedInvoices, driverCount, caseLimit) {
-  // Stamp zone + coords onto every invoice
-  selectedInvoices.forEach(inv => {
-    if (!inv._coords) inv._coords = getCoords(inv);
-    if (!inv._zone)   inv._zone   = getZone(inv);
-  });
-
-  const mappable   = selectedInvoices.filter(inv => inv._coords);
-  const unmappable = selectedInvoices.filter(inv => !inv._coords);
-
-  // Build territory groups
-  let groups = buildTerritoryGroups(mappable);
-
-  // Merge down to driverCount groups, always combining least-penalised neighbors
-  while (Object.keys(groups).length > driverCount) {
-    mergeSmallestGroup(groups, caseLimit);
-  }
-
-  // If we have fewer stops than drivers, each stop gets its own route
-  if (Object.keys(groups).length < driverCount && mappable.length >= driverCount) {
-    // Split the largest group by sub-zone or straight halving
-    const keys = Object.keys(groups);
-    keys.sort((a,b) => groups[b].length - groups[a].length);
-    const bigKey = keys[0];
-    const sorted = nearestNeighborTSP(groups[bigKey]);
-    const half   = Math.ceil(sorted.length / 2);
-    groups[bigKey + '_A'] = sorted.slice(0, half);
-    groups[bigKey + '_B'] = sorted.slice(half);
-    delete groups[bigKey];
-  }
-
-  // Rebalance driving distances across groups
-  groups = rebalanceGroups(groups);
-
-  // Append unmappable stops to the shortest route
-  if (unmappable.length) {
-    const keys = Object.keys(groups);
-    const shortestKey = keys.reduce((m,k) => routeDistance(groups[k]) < routeDistance(groups[m]) ? k : m, keys[0]);
-    groups[shortestKey].push(...unmappable);
-  }
-
-  // Order stops within each group using realistic TSP
-  const vans = Object.values(groups).map(grp => {
-    const ordered = nearestNeighborTSP(grp);
-    const cases   = ordered.reduce((s,i) => s + (i.cases||0), 0);
-    const dist    = Math.round(routeDistance(ordered));
-    return { stops: ordered, cases, distance: dist, overLimit: cases > caseLimit };
-  });
-
-  // Sort routes: shortest distance first
-  vans.sort((a, b) => a.distance - b.distance);
-
-  return vans.map((van, i) => ({
-    territory: `Route ${i+1}`,
-    subRegion: null,
-    stops: van.stops,
-    cases: van.cases,
-    distance: van.distance,
-    overLimit: van.overLimit
-  }));
-}
-
-
 
 // ═══════════════════ STATE ════════════════════════════════════════════════════
 let invoices=[], assignments={}, completed={}, clusters=[];
@@ -1032,77 +696,59 @@ let activeTab='route', activeDriverFilter='all';
 let currentUser=null;
 let appPin='2024';
 
+// ── NEW: overdue state ────────────────────────────────────────────────────────
+// Map of customerId → { overdueBalance, invoiceCount } for customers with
+// at least one past-due invoice. Populated in parallel with invoice fetch.
+let overdueByCustomer = {};
+
 // Google Maps state
 let gMap=null, gMapMarkers=[], gMapPolylines=[], gInfoWindow=null, selectedStopForReassign=null;
-let visibleRoutes=new Set(); // which route indices are currently shown on map
+let visibleRoutes=new Set();
 
 // ═══════════════════ LOAD GOOGLE MAPS ════════════════════════════════════════
-function loadGoogleMaps(key) {
-  if (gmapsLoadPromise) return gmapsLoadPromise;
-  gmapsLoadPromise = new Promise((resolve, reject) => {
-    if (window.google && window.google.maps) { gmapsLoaded=true; resolve(); return; }
-    window.__gmapsCallback = () => { gmapsLoaded=true; resolve(); };
-    const script = document.getElementById('gmaps-script');
-    script.src = `https://maps.googleapis.com/maps/api/js?key=${key}&libraries=geometry&callback=__gmapsCallback`;
-    script.onerror = () => reject(new Error('Failed to load Google Maps'));
-  });
-  return gmapsLoadPromise;
-}
+function loadGoogleMaps(key){if(gmapsLoadPromise)return gmapsLoadPromise;gmapsLoadPromise=new Promise((resolve,reject)=>{if(window.google&&window.google.maps){gmapsLoaded=true;resolve();return;}window.__gmapsCallback=()=>{gmapsLoaded=true;resolve();};const script=document.getElementById('gmaps-script');script.src=`https://maps.googleapis.com/maps/api/js?key=${key}&libraries=geometry&callback=__gmapsCallback`;script.onerror=()=>reject(new Error('Failed to load Google Maps'));});return gmapsLoadPromise;}
 
 // ═══════════════════ PIN LOGIN ════════════════════════════════════════════════
 let pinEntry='';
-function pinPress(digit) { if(pinEntry.length>=4)return; pinEntry+=digit; updateDots(); if(pinEntry.length===4)setTimeout(checkPin,150); }
-function pinDelete() { pinEntry=pinEntry.slice(0,-1); updateDots(); document.getElementById('pinError').textContent=''; document.querySelectorAll('.pin-dot').forEach(d=>d.classList.remove('error')); }
-function updateDots() { for(let i=0;i<4;i++) document.getElementById('dot'+i).classList.toggle('filled',i<pinEntry.length); }
-function checkPin() {
-  if(pinEntry===appPin) { document.getElementById('loginScreen').classList.add('hidden'); document.getElementById('appShell').style.display='block'; document.getElementById('userBadge').textContent=''; initApp(); setTimeout(()=>document.getElementById('loginScreen').style.display='none',400); }
-  else { document.querySelectorAll('.pin-dot').forEach(d=>{d.classList.remove('filled');d.classList.add('error');}); document.getElementById('pinError').textContent='Incorrect PIN. Try again.'; pinEntry=''; setTimeout(()=>document.querySelectorAll('.pin-dot').forEach(d=>d.classList.remove('error')),800); }
-}
-function logout() { currentUser=null; pinEntry=''; updateDots(); document.getElementById('pinError').textContent=''; document.getElementById('pinStep').classList.remove('hidden'); document.getElementById('loginScreen').style.display='flex'; document.getElementById('loginScreen').classList.remove('hidden'); document.getElementById('appShell').style.display='none'; }
-function changePin() { const val=document.getElementById('newPin').value.trim(); if(!/^\d{4}$/.test(val)){showToast('PIN must be exactly 4 digits');return;} appPin=val; document.getElementById('newPin').value=''; saveState(); showToast('✓ PIN updated'); }
+function pinPress(digit){if(pinEntry.length>=4)return;pinEntry+=digit;updateDots();if(pinEntry.length===4)setTimeout(checkPin,150);}
+function pinDelete(){pinEntry=pinEntry.slice(0,-1);updateDots();document.getElementById('pinError').textContent='';document.querySelectorAll('.pin-dot').forEach(d=>d.classList.remove('error'));}
+function updateDots(){for(let i=0;i<4;i++)document.getElementById('dot'+i).classList.toggle('filled',i<pinEntry.length);}
+function checkPin(){if(pinEntry===appPin){document.getElementById('loginScreen').classList.add('hidden');document.getElementById('appShell').style.display='block';document.getElementById('userBadge')&&(document.getElementById('userBadge').textContent='');initApp();setTimeout(()=>document.getElementById('loginScreen').style.display='none',400);}else{document.querySelectorAll('.pin-dot').forEach(d=>{d.classList.remove('filled');d.classList.add('error');});document.getElementById('pinError').textContent='Incorrect PIN. Try again.';pinEntry='';setTimeout(()=>document.querySelectorAll('.pin-dot').forEach(d=>d.classList.remove('error')),800);}}
+function logout(){currentUser=null;pinEntry='';updateDots();document.getElementById('pinError').textContent='';document.getElementById('pinStep').classList.remove('hidden');document.getElementById('loginScreen').style.display='flex';document.getElementById('loginScreen').classList.remove('hidden');document.getElementById('appShell').style.display='none';}
+function changePin(){const val=document.getElementById('newPin').value.trim();if(!/^\d{4}$/.test(val)){showToast('PIN must be exactly 4 digits');return;}appPin=val;document.getElementById('newPin').value='';saveState();showToast('✓ PIN updated');}
 
 // ═══════════════════ APP INIT ═════════════════════════════════════════════════
 async function initApp() {
   try {
     const base=(document.getElementById('serverUrl')?.value.trim())||serverUrl;
     const cfg=await fetch(base+'/api/config').then(r=>r.json()).catch(()=>({}));
-    if(cfg.googleMapsKey){ GOOGLE_MAPS_KEY=cfg.googleMapsKey; loadGoogleMaps(GOOGLE_MAPS_KEY).catch(()=>{}); }
-  } catch(e){ console.warn('Could not load config from server'); }
-
+    if(cfg.googleMapsKey){GOOGLE_MAPS_KEY=cfg.googleMapsKey;loadGoogleMaps(GOOGLE_MAPS_KEY).catch(()=>{});}
+  } catch(e){console.warn('Could not load config from server');}
   const now=new Date();
   document.getElementById('todayDate').textContent=now.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
-
   const saved=sessionStorage.getItem('cellarRouteState');
   if(saved){
     const s=JSON.parse(saved);
-    invoices=s.invoices||[]; assignments=s.assignments||{}; completed=s.completed||{};
-    drivers=s.drivers||drivers; serverUrl=s.serverUrl||serverUrl; clusters=s.clusters||[];
-    if(s.appPin) appPin=s.appPin;
-    if(s.selectedInvoiceIds) selectedInvoiceIds=new Set(s.selectedInvoiceIds);
+    invoices=s.invoices||[];assignments=s.assignments||{};completed=s.completed||{};
+    drivers=s.drivers||drivers;serverUrl=s.serverUrl||serverUrl;clusters=s.clusters||[];
+    if(s.appPin)appPin=s.appPin;
+    if(s.selectedInvoiceIds)selectedInvoiceIds=new Set(s.selectedInvoiceIds);
     else selectedInvoiceIds=new Set(invoices.map(i=>i.id));
+    if(s.overdueByCustomer)overdueByCustomer=s.overdueByCustomer;
   }
   document.getElementById('serverUrl').value=serverUrl;
   checkTokenStatus();
   if(invoices.length>0){
     document.getElementById('connectCard').style.display='none';
     document.getElementById('plannerSection').style.display='block';
-    updateStats(); renderInvoiceSelectionList();
-    if(clusters.length>0) renderClusters();
+    updateStats();renderInvoiceSelectionList();renderOverdueSummary();
+    if(clusters.length>0)renderClusters();
   }
 }
-function saveState() {
-  sessionStorage.setItem('cellarRouteState',JSON.stringify({ invoices,assignments,completed,drivers,serverUrl,clusters,appPin,selectedInvoiceIds:[...selectedInvoiceIds] }));
-}
+function saveState(){sessionStorage.setItem('cellarRouteState',JSON.stringify({invoices,assignments,completed,drivers,serverUrl,clusters,appPin,selectedInvoiceIds:[...selectedInvoiceIds],overdueByCustomer}));}
 
 // ═══════════════════ TABS ════════════════════════════════════════════════════
-function showTab(tab) {
-  activeTab=tab;
-  document.querySelectorAll('.tab').forEach((t,i)=>{t.classList.toggle('active',['route','map','settings'][i]===tab);});
-  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
-  document.getElementById('view-'+tab).classList.add('active');
-  if(tab==='deliveries') renderDeliveries();
-  if(tab==='map') setTimeout(()=>initOrRefreshMap(),80);
-}
+function showTab(tab){activeTab=tab;document.querySelectorAll('.tab').forEach((t,i)=>{t.classList.toggle('active',['route','map','settings'][i]===tab);});document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));document.getElementById('view-'+tab).classList.add('active');if(tab==='map')setTimeout(()=>initOrRefreshMap(),80);}
 
 // ═══════════════════ FETCH INVOICES ══════════════════════════════════════════
 async function fetchInvoices() {
@@ -1112,17 +758,42 @@ async function fetchInvoices() {
   document.getElementById('routeLoading').style.display='block';
   try {
     const base=document.getElementById('serverUrl').value.trim()||serverUrl;
-    const res=await fetch(base+'/api/invoices',{method:'GET',headers:{'Content-Type':'application/json'}});
-    const data=await res.json();
-    if(!res.ok) throw new Error(data.error||'Failed to fetch invoices');
+
+    // Fire invoices + overdue in parallel for speed
+    const [invRes, overdueRes] = await Promise.all([
+      fetch(base+'/api/invoices'),
+      fetch(base+'/api/overdue').catch(() => null) // overdue is non-critical
+    ]);
+
+    const data = await invRes.json();
+    if(!invRes.ok) throw new Error(data.error||'Failed to fetch invoices');
     invoices=(data.invoices||[]).map(inv=>({...inv,cases:extractCases(inv)}));
-    assignments={}; completed={}; clusters=[];
+    assignments={};completed={};clusters=[];
     selectedInvoiceIds=new Set(invoices.map(i=>i.id));
+
+    // Process overdue results
+    overdueByCustomer = {};
+    if(overdueRes && overdueRes.ok) {
+      const overdueData = await overdueRes.json();
+      (overdueData.overdueCustomers||[]).forEach(c => {
+        overdueByCustomer[c.customerId] = {
+          overdueBalance: c.overdueBalance,
+          invoiceCount: c.invoiceCount,
+          customerName: c.customerName
+        };
+      });
+    }
+
     saveState();
     document.getElementById('routeLoading').style.display='none';
     document.getElementById('plannerSection').style.display='block';
-    updateStats(); renderInvoiceSelectionList();
-    showToast(`✓ ${invoices.length} invoices loaded`);
+    updateStats();renderInvoiceSelectionList();renderOverdueSummary();
+
+    const overdueCount = Object.keys(overdueByCustomer).length;
+    const overdueOnRoute = invoices.filter(inv => overdueByCustomer[inv.customerId]).length;
+    let toastMsg = `✓ ${invoices.length} invoices loaded`;
+    if(overdueCount > 0) toastMsg += ` · ${overdueCount} overdue`;
+    showToast(toastMsg);
   } catch(err) {
     document.getElementById('routeLoading').style.display='none';
     document.getElementById('connectCard').style.display='block';
@@ -1131,14 +802,12 @@ async function fetchInvoices() {
     showToast('❌ '+err.message);
   }
 }
-function extractCases(inv) {
-  if(inv.lineItems&&Array.isArray(inv.lineItems)){ const t=inv.lineItems.reduce((s,l)=>s+(Number(l.qty)||0),0); if(t>0)return t; }
-  if(inv.totalAmount) return Math.max(1,Math.round(Number(inv.totalAmount)/120));
-  return 1;
-}
-function refreshInvoices() {
-  invoices=[];assignments={};completed={};clusters=[];selectedInvoiceIds=new Set();
-  clearMapObjects(); gMap=null; saveState();
+
+function extractCases(inv){if(inv.lineItems&&Array.isArray(inv.lineItems)){const t=inv.lineItems.reduce((s,l)=>s+(Number(l.qty)||0),0);if(t>0)return t;}if(inv.totalAmount)return Math.max(1,Math.round(Number(inv.totalAmount)/120));return 1;}
+
+function refreshInvoices(){
+  invoices=[];assignments={};completed={};clusters=[];selectedInvoiceIds=new Set();overdueByCustomer={};
+  clearMapObjects();gMap=null;saveState();
   document.getElementById('connectCard').style.display='block';
   document.getElementById('plannerSection').style.display='none';
   document.getElementById('fetchBtn').disabled=false;
@@ -1146,13 +815,32 @@ function refreshInvoices() {
   document.getElementById('clusterList').innerHTML='';
   document.getElementById('warningBanners').innerHTML='';
   document.getElementById('invoiceStateGroups').innerHTML='';
+  document.getElementById('overdueSummary').style.display='none';
   showTab('route');
 }
 
-// ═══════════════════ INVOICE SELECTION LIST ═══════════════════════════════════
+// ═══════════════════ OVERDUE SUMMARY BANNER ══════════════════════════════════
+function renderOverdueSummary() {
+  const banner = document.getElementById('overdueSummary');
+  const overdueCustomerIds = Object.keys(overdueByCustomer);
+  if(!overdueCustomerIds.length){ banner.style.display='none'; return; }
+
+  // Only count customers who appear on today's route
+  const overdueOnRoute = invoices.filter(inv => overdueByCustomer[inv.customerId]);
+  const uniqueOnRoute  = [...new Set(overdueOnRoute.map(inv => inv.customerId))];
+
+  if(!uniqueOnRoute.length){ banner.style.display='none'; return; }
+
+  const totalOwed = uniqueOnRoute.reduce((s, cid) => s + (overdueByCustomer[cid]?.overdueBalance || 0), 0);
+  document.getElementById('overdueSummaryTitle').textContent =
+    `${uniqueOnRoute.length} customer${uniqueOnRoute.length!==1?'s':''} on today's route have past-due balances totalling $${totalOwed.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
+  banner.style.display='flex';
+}
+
+// ═══════════════════ INVOICE SELECTION LIST ══════════════════════════════════
 function renderInvoiceSelectionList() {
   const byState={};
-  invoices.forEach(inv=>{ const s=getStateLabel(inv); if(!byState[s])byState[s]=[]; byState[s].push(inv); });
+  invoices.forEach(inv=>{const s=getStateLabel(inv);if(!byState[s])byState[s]=[];byState[s].push(inv);});
   const sorted=Object.keys(byState).sort((a,b)=>a.localeCompare(b));
   const container=document.getElementById('invoiceStateGroups');
   container.innerHTML='';
@@ -1161,7 +849,7 @@ function renderInvoiceSelectionList() {
     const allChecked=group.every(inv=>selectedInvoiceIds.has(inv.id));
     const someChecked=group.some(inv=>selectedInvoiceIds.has(inv.id));
     const groupEl=document.createElement('div');
-    groupEl.className='state-group'; groupEl.id=`state-group-${state.replace(/\W/g,'_')}`;
+    groupEl.className='state-group';groupEl.id=`state-group-${state.replace(/\W/g,'_')}`;
     const totalCases=group.reduce((s,i)=>s+(i.cases||0),0);
     groupEl.innerHTML=`
       <div class="state-group-header" onclick="toggleStateGroup('${state}')">
@@ -1176,6 +864,8 @@ function renderInvoiceSelectionList() {
           const addr=(inv.shipAddress?.zip?inv.shipAddress:null)||(inv.billAddress?.zip?inv.billAddress:null)||inv.shipAddress||inv.billAddress;
           const city=addr?(addr.city||addr.line2||''):'';
           const checked=selectedInvoiceIds.has(inv.id);
+          const isOverdue=!!overdueByCustomer[inv.customerId];
+          const overdueInfo=isOverdue?overdueByCustomer[inv.customerId]:null;
           return `<div class="invoice-row ${checked?'':'unchecked'}" id="inv-row-${inv.id}">
             <input type="checkbox" class="inv-check" ${checked?'checked':''}
               onchange="toggleInvoiceCheck('${inv.id}',this.checked,'${state}')" />
@@ -1183,103 +873,51 @@ function renderInvoiceSelectionList() {
             <span class="inv-city">${city}</span>
             <span class="inv-cases">📦 ${inv.cases}</span>
             <span class="inv-amount">$${Number(inv.totalAmount||0).toFixed(0)}</span>
+            ${isOverdue?`<span class="inv-overdue" title="Overdue balance: $${overdueInfo.overdueBalance.toFixed(2)}">⚠ OVERDUE</span>`:''}
           </div>`;
         }).join('')}
       </div>`;
     container.appendChild(groupEl);
     const cb=groupEl.querySelector(`#state-check-${state.replace(/\W/g,'_')}`);
-    if(!allChecked&&someChecked) cb.indeterminate=true;
+    if(!allChecked&&someChecked)cb.indeterminate=true;
   });
   updateSelectionSummary();
 }
-function toggleStateGroup(state) {
-  const key=state.replace(/\W/g,'_');
-  const rows=document.getElementById(`rows-${key}`);
-  const chev=document.getElementById(`chevron-${key}`);
-  if(!rows)return;
-  const isOpen=chev.classList.contains('open');
-  rows.style.display=isOpen?'none':'block';
-  chev.classList.toggle('open',!isOpen);
-}
-function toggleStateCheck(state,checked) {
-  const byState={};
-  invoices.forEach(inv=>{const s=getStateLabel(inv);if(!byState[s])byState[s]=[];byState[s].push(inv);});
-  (byState[state]||[]).forEach(inv=>{
-    if(checked)selectedInvoiceIds.add(inv.id);else selectedInvoiceIds.delete(inv.id);
-    const row=document.getElementById(`inv-row-${inv.id}`);
-    if(row){row.classList.toggle('unchecked',!checked);const cb=row.querySelector('.inv-check');if(cb)cb.checked=checked;}
-  });
-  updateSelectionSummary(); saveState();
-}
-function toggleInvoiceCheck(id,checked,state) {
-  if(checked)selectedInvoiceIds.add(id);else selectedInvoiceIds.delete(id);
-  const row=document.getElementById(`inv-row-${id}`);
-  if(row)row.classList.toggle('unchecked',!checked);
-  const key=state.replace(/\W/g,'_');
-  const stateInvs=invoices.filter(inv=>getStateLabel(inv)===state);
-  const allChecked=stateInvs.every(inv=>selectedInvoiceIds.has(inv.id));
-  const someChecked=stateInvs.some(inv=>selectedInvoiceIds.has(inv.id));
-  const stateCb=document.getElementById(`state-check-${key}`);
-  if(stateCb){stateCb.checked=allChecked;stateCb.indeterminate=!allChecked&&someChecked;}
-  updateSelectionSummary(); saveState();
-}
+function toggleStateGroup(state){const key=state.replace(/\W/g,'_');const rows=document.getElementById(`rows-${key}`);const chev=document.getElementById(`chevron-${key}`);if(!rows)return;const isOpen=chev.classList.contains('open');rows.style.display=isOpen?'none':'block';chev.classList.toggle('open',!isOpen);}
+function toggleStateCheck(state,checked){const byState={};invoices.forEach(inv=>{const s=getStateLabel(inv);if(!byState[s])byState[s]=[];byState[s].push(inv);});(byState[state]||[]).forEach(inv=>{if(checked)selectedInvoiceIds.add(inv.id);else selectedInvoiceIds.delete(inv.id);const row=document.getElementById(`inv-row-${inv.id}`);if(row){row.classList.toggle('unchecked',!checked);const cb=row.querySelector('.inv-check');if(cb)cb.checked=checked;}});updateSelectionSummary();saveState();}
+function toggleInvoiceCheck(id,checked,state){if(checked)selectedInvoiceIds.add(id);else selectedInvoiceIds.delete(id);const row=document.getElementById(`inv-row-${id}`);if(row)row.classList.toggle('unchecked',!checked);const key=state.replace(/\W/g,'_');const stateInvs=invoices.filter(inv=>getStateLabel(inv)===state);const allChecked=stateInvs.every(inv=>selectedInvoiceIds.has(inv.id));const someChecked=stateInvs.some(inv=>selectedInvoiceIds.has(inv.id));const stateCb=document.getElementById(`state-check-${key}`);if(stateCb){stateCb.checked=allChecked;stateCb.indeterminate=!allChecked&&someChecked;}updateSelectionSummary();saveState();}
 function selectAllInvoices(){invoices.forEach(inv=>selectedInvoiceIds.add(inv.id));renderInvoiceSelectionList();saveState();}
 function deselectAllInvoices(){selectedInvoiceIds.clear();renderInvoiceSelectionList();saveState();}
-function updateSelectionSummary(){
-  const sel=invoices.filter(inv=>selectedInvoiceIds.has(inv.id));
-  const totalCases=sel.reduce((s,i)=>s+(i.cases||0),0);
-  document.getElementById('selectionSummaryText').textContent=`${sel.length} of ${invoices.length} invoices selected`;
-  document.getElementById('selectionCasesText').textContent=`${totalCases} cases`;
-}
+function updateSelectionSummary(){const sel=invoices.filter(inv=>selectedInvoiceIds.has(inv.id));const totalCases=sel.reduce((s,i)=>s+(i.cases||0),0);document.getElementById('selectionSummaryText').textContent=`${sel.length} of ${invoices.length} invoices selected`;document.getElementById('selectionCasesText').textContent=`${totalCases} cases`;}
 
 // ═══════════════════ AUTO ROUTE ═══════════════════════════════════════════════
-function runAutoRoute() {
+function runAutoRoute(){
   const driverCount=parseInt(document.getElementById('driverCount').value)||0;
   const caseLimit=parseInt(document.getElementById('caseLimit').value)||250;
   if(!driverCount){showToast('Enter how many drivers you have today');return;}
   const selectedInvoices=invoices.filter(inv=>selectedInvoiceIds.has(inv.id));
   if(!selectedInvoices.length){showToast('No invoices selected');return;}
-
-  // Geocode + zone-stamp all invoices
-  selectedInvoices.forEach(inv=>{
-    if(!inv._coords) inv._coords=getCoords(inv);
-    if(!inv._zone)   inv._zone=getZone(inv);
-  });
-
+  selectedInvoices.forEach(inv=>{if(!inv._coords)inv._coords=getCoords(inv);if(!inv._zone)inv._zone=getZone(inv);});
   const geoVans=buildDistanceRoutes(selectedInvoices,driverCount,caseLimit);
-
-  clusters=geoVans.map((van,i)=>{
-    const zones=[...new Set(van.stops.map(s=>s._zone||'').filter(Boolean))];
-    const zoneLabel=zones.length<=3?zones.join(' + '):`${zones.slice(0,2).join(' + ')} +${zones.length-2} more`;
-    return {
-      id:i, stops:van.stops, cases:van.cases, distance:van.distance,
-      zone:zoneLabel, territory:zoneLabel,
-      overLimit:van.overLimit,
-      color:ROUTE_COLORS[i%ROUTE_COLORS.length]
-    };
-  });
-
+  clusters=geoVans.map((van,i)=>{const zones=[...new Set(van.stops.map(s=>s._zone||'').filter(Boolean))];const zoneLabel=zones.length<=3?zones.join(' + '):`${zones.slice(0,2).join(' + ')} +${zones.length-2} more`;return{id:i,stops:van.stops,cases:van.cases,distance:van.distance,zone:zoneLabel,territory:zoneLabel,overLimit:van.overLimit,color:ROUTE_COLORS[i%ROUTE_COLORS.length]};});
   const warns=[];
   clusters.filter(c=>c.overLimit).forEach(c=>warns.push(`⚠️ Route ${clusters.indexOf(c)+1} has ${c.cases} cases — over ${caseLimit} limit.`));
-
-  saveState(); updateStats();
+  saveState();updateStats();
   document.getElementById('warningBanners').innerHTML=warns.map(w=>`<div class="warn-banner"><span>${w.startsWith('⚠️')?'🟠':'ℹ️'}</span><span>${w}</span></div>`).join('');
   renderClusters();
   showToast(`✓ ${clusters.length} routes generated`);
 }
 
 // ═══════════════════ RENDER CLUSTERS ═════════════════════════════════════════
-function renderClusters() {
+function renderClusters(){
   const list=document.getElementById('clusterList');
   list.innerHTML='';
   if(!clusters.length){list.innerHTML=`<div class="empty-state"><div class="empty-icon">🗺️</div><div class="empty-title">No routes yet</div><div class="empty-text">Enter your driver count and hit Generate.</div></div>`;return;}
   const hdr=document.createElement('div');hdr.className='section-header';
   hdr.innerHTML=`<div class="section-title">Route Assignments</div><span class="badge">${clusters.length} routes</span>`;
   list.appendChild(hdr);
-  const mapBtn=document.createElement('button');
-  mapBtn.className='btn-gold';mapBtn.style.marginBottom='16px';
-  mapBtn.textContent='🗺 View All Routes on Map';
-  mapBtn.onclick=()=>showTab('map');
+  const mapBtn=document.createElement('button');mapBtn.className='btn-gold';mapBtn.style.marginBottom='16px';
+  mapBtn.textContent='🗺 View All Routes on Map';mapBtn.onclick=()=>showTab('map');
   list.appendChild(mapBtn);
   renderPdfPanel();
   clusters.forEach((cluster,ci)=>{
@@ -1294,14 +932,17 @@ function renderClusters() {
           <span class="meta-pill meta-cases ${cluster.overLimit?'over':''}">${cluster.cases} cases</span>
         </div>
       </div>
-
       <div class="stop-list">
         ${cluster.stops.map((inv,si)=>{
-          const addr=inv.shipAddress||inv.billAddress; const isDone=completed[inv.id];
+          const addr=inv.shipAddress||inv.billAddress;const isDone=completed[inv.id];
+          const isOverdue=!!overdueByCustomer[inv.customerId];
           return `<div class="stop-row" style="${isDone?'opacity:0.5':''}">
             <div class="stop-num" style="background:${isDone?'var(--green)':cluster.color}">${isDone?'✓':si+1}</div>
             <div class="stop-details">
-              <div class="stop-customer">${inv.customerName}</div>
+              <div class="stop-customer">
+                ${inv.customerName}
+                ${isOverdue?`<span class="stop-overdue-badge">⚠ STMT</span>`:''}
+              </div>
               <div class="stop-address">${addr?([addr.line1,addr.line2].filter(Boolean).join(', ')||'No address'):'No address'}</div>
               <div class="stop-cases">📦 ${inv.cases} case${inv.cases!==1?'s':''}</div>
               <div class="stop-inv">INV #${inv.invoiceNumber} · $${Number(inv.totalAmount||0).toFixed(2)}</div>
@@ -1315,399 +956,246 @@ function renderClusters() {
   });
 }
 
-function buildGoogleMapsUrl(stops) {
-  const addrs=stops.map(inv=>{const a=inv.shipAddress||inv.billAddress;return a?(a.full||a.line1):null;}).filter(Boolean);
-  if(!addrs.length)return null;
-  const warehouseAddr=encodeURIComponent('52 Poplar St, Stamford, CT 06902');
-  if(addrs.length===1)return `https://www.google.com/maps/dir/?api=1&origin=${warehouseAddr}&destination=${encodeURIComponent(addrs[0])}&travelmode=driving`;
-  const dest=encodeURIComponent(addrs[addrs.length-1]);
-  const wp=addrs.slice(0,-1).map(a=>encodeURIComponent(a)).join('|');
-  return `https://www.google.com/maps/dir/?api=1&origin=${warehouseAddr}&destination=${dest}&waypoints=${wp}&travelmode=driving`;
-}
-
-function markClusterComplete(ci){if(!clusters[ci])return;clusters[ci].stops.forEach(inv=>{completed[inv.id]=true;});saveState();updateStats();renderClusters();showToast(`✓ Route ${ci+1} complete`);}
+function buildGoogleMapsUrl(stops){const addrs=stops.map(inv=>{const a=inv.shipAddress||inv.billAddress;return a?(a.full||a.line1):null;}).filter(Boolean);if(!addrs.length)return null;const warehouseAddr=encodeURIComponent('52 Poplar St, Stamford, CT 06902');if(addrs.length===1)return `https://www.google.com/maps/dir/?api=1&origin=${warehouseAddr}&destination=${encodeURIComponent(addrs[0])}&travelmode=driving`;const dest=encodeURIComponent(addrs[addrs.length-1]);const wp=addrs.slice(0,-1).map(a=>encodeURIComponent(a)).join('|');return `https://www.google.com/maps/dir/?api=1&origin=${warehouseAddr}&destination=${dest}&waypoints=${wp}&travelmode=driving`;}
 
 // ═══════════════════ GOOGLE MAPS ══════════════════════════════════════════════
 function clearMapObjects(){gMapMarkers.forEach(m=>m.setMap(null));gMapPolylines.forEach(p=>p.setMap(null));gMapMarkers=[];gMapPolylines=[];if(gInfoWindow)gInfoWindow.close();}
 
-async function initOrRefreshMap() {
-  if(!clusters.length){ document.getElementById('mapEmptyState').style.display='block'; document.getElementById('mapContent').style.display='none'; return; }
-  if(!GOOGLE_MAPS_KEY){
-    try{ const base=document.getElementById('serverUrl')?.value.trim()||serverUrl; const cfg=await fetch(base+'/api/config').then(r=>r.json()).catch(()=>({})); if(cfg.googleMapsKey)GOOGLE_MAPS_KEY=cfg.googleMapsKey; }catch(e){}
-  }
-  if(!GOOGLE_MAPS_KEY){
-    document.getElementById('mapEmptyState').style.display='block';
-    document.getElementById('mapEmptyState').innerHTML=`<div class="empty-icon">⚠️</div><div class="empty-title">Map key not loaded</div><div class="empty-text">Set GOOGLE_MAPS_KEY in Railway environment variables.</div>`;
-    document.getElementById('mapContent').style.display='none'; return;
-  }
-  document.getElementById('mapEmptyState').style.display='none';
-  document.getElementById('mapContent').style.display='block';
+async function initOrRefreshMap(){
+  if(!clusters.length){document.getElementById('mapEmptyState').style.display='block';document.getElementById('mapContent').style.display='none';return;}
+  if(!GOOGLE_MAPS_KEY){try{const base=document.getElementById('serverUrl')?.value.trim()||serverUrl;const cfg=await fetch(base+'/api/config').then(r=>r.json()).catch(()=>({}));if(cfg.googleMapsKey)GOOGLE_MAPS_KEY=cfg.googleMapsKey;}catch(e){}}
+  if(!GOOGLE_MAPS_KEY){document.getElementById('mapEmptyState').style.display='block';document.getElementById('mapEmptyState').innerHTML=`<div class="empty-icon">⚠️</div><div class="empty-title">Map key not loaded</div><div class="empty-text">Set GOOGLE_MAPS_KEY in Railway environment variables.</div>`;document.getElementById('mapContent').style.display='none';return;}
+  document.getElementById('mapEmptyState').style.display='none';document.getElementById('mapContent').style.display='block';
   const wrapper=document.getElementById('routeMapWrapper');
   let loadingOverlay=document.getElementById('mapLoadingOverlay');
-  if(!loadingOverlay){ loadingOverlay=document.createElement('div'); loadingOverlay.id='mapLoadingOverlay'; loadingOverlay.className='map-loading-overlay'; loadingOverlay.innerHTML='<div class="spinner"></div><p>Loading map…</p>'; wrapper.appendChild(loadingOverlay); }
+  if(!loadingOverlay){loadingOverlay=document.createElement('div');loadingOverlay.id='mapLoadingOverlay';loadingOverlay.className='map-loading-overlay';loadingOverlay.innerHTML='<div class="spinner"></div><p>Loading map…</p>';wrapper.appendChild(loadingOverlay);}
   loadingOverlay.style.display='flex';
-  // Build legend
   document.getElementById('routeLegend').innerHTML=clusters.map((c,i)=>`<div class="legend-item"><div class="legend-dot" style="background:${c.color}"></div>Route ${i+1}</div>`).join('');
-
-  try{ await loadGoogleMaps(GOOGLE_MAPS_KEY); }catch(e){ loadingOverlay.style.display='none'; showToast('❌ Could not load Google Maps'); return; }
-
+  try{await loadGoogleMaps(GOOGLE_MAPS_KEY);}catch(e){loadingOverlay.style.display='none';showToast('❌ Could not load Google Maps');return;}
   const allStops=[];
-  clusters.forEach((cluster,ci)=>{
-    cluster.stops.forEach((inv,si)=>{ const coords=inv._coords||getCoords(inv); if(coords)allStops.push({inv,ci,si,coords,color:cluster.color}); });
-  });
-
-  if(!allStops.length){ loadingOverlay.style.display='none'; document.getElementById('mapEmptyState').style.display='block'; document.getElementById('mapEmptyState').innerHTML=`<div class="empty-icon">📍</div><div class="empty-title">No mappable stops</div><div class="empty-text">Check that your QuickBooks addresses include ZIP codes.</div>`; document.getElementById('mapContent').style.display='none'; return; }
-
+  clusters.forEach((cluster,ci)=>{cluster.stops.forEach((inv,si)=>{const coords=inv._coords||getCoords(inv);if(coords)allStops.push({inv,ci,si,coords,color:cluster.color});});});
+  if(!allStops.length){loadingOverlay.style.display='none';document.getElementById('mapEmptyState').style.display='block';document.getElementById('mapEmptyState').innerHTML=`<div class="empty-icon">📍</div><div class="empty-title">No mappable stops</div><div class="empty-text">Check that your QuickBooks addresses include ZIP codes.</div>`;document.getElementById('mapContent').style.display='none';return;}
   clearMapObjects();
-
-  // Initialise visibleRoutes to show all
   visibleRoutes=new Set(clusters.map((_,i)=>i));
   renderMapRouteToggles();
-
   const mapEl=document.getElementById('routeMap');
   mapEl.style.height='520px';
-  if(!gMap){ gMap=new google.maps.Map(mapEl,{zoom:10,center:{lat:41.0534,lng:-73.5387},mapTypeId:'roadmap',mapTypeControl:true,mapTypeControlOptions:{style:google.maps.MapTypeControlStyle.HORIZONTAL_BAR,position:google.maps.ControlPosition.TOP_LEFT},fullscreenControl:true,streetViewControl:false,styles:[{featureType:'poi',elementType:'labels',stylers:[{visibility:'off'}]},{featureType:'transit',elementType:'labels',stylers:[{visibility:'off'}]}]}); gInfoWindow=new google.maps.InfoWindow(); }
-
+  if(!gMap){gMap=new google.maps.Map(mapEl,{zoom:10,center:{lat:41.0534,lng:-73.5387},mapTypeId:'roadmap',mapTypeControl:true,mapTypeControlOptions:{style:google.maps.MapTypeControlStyle.HORIZONTAL_BAR,position:google.maps.ControlPosition.TOP_LEFT},fullscreenControl:true,streetViewControl:false,styles:[{featureType:'poi',elementType:'labels',stylers:[{visibility:'off'}]},{featureType:'transit',elementType:'labels',stylers:[{visibility:'off'}]}]});gInfoWindow=new google.maps.InfoWindow();}
   const bounds=new google.maps.LatLngBounds();
-  const warehousePos={lat:41.0534,lng:-73.5387};
-  bounds.extend(warehousePos);
-  const warehouseMarker=new google.maps.Marker({position:warehousePos,map:gMap,title:'Warehouse — 52 Poplar St, Stamford CT',icon:{path:google.maps.SymbolPath.CIRCLE,scale:14,fillColor:'#4A1320',fillOpacity:1,strokeColor:'#C9A84C',strokeWeight:3},label:{text:'🏭',fontSize:'14px'},zIndex:1000});
-  warehouseMarker.addListener('click',()=>{ gInfoWindow.setContent(`<div class="gm-popup"><div class="popup-inv">WAREHOUSE</div><div class="popup-customer">52 Poplar St</div><div class="popup-address">Stamford, CT 06902</div></div>`); gInfoWindow.open(gMap,warehouseMarker); });
+  const warehousePos={lat:41.0534,lng:-73.5387};bounds.extend(warehousePos);
+  const warehouseMarker=new google.maps.Marker({position:warehousePos,map:gMap,title:'Warehouse',icon:{path:google.maps.SymbolPath.CIRCLE,scale:14,fillColor:'#4A1320',fillOpacity:1,strokeColor:'#C9A84C',strokeWeight:3},label:{text:'🏭',fontSize:'14px'},zIndex:1000});
+  warehouseMarker.addListener('click',()=>{gInfoWindow.setContent(`<div class="gm-popup"><div class="popup-inv">WAREHOUSE</div><div class="popup-customer">52 Poplar St</div><div class="popup-address">Stamford, CT 06902</div></div>`);gInfoWindow.open(gMap,warehouseMarker);});
   gMapMarkers.push(warehouseMarker);
-
-  // Track markers/polylines per route index for toggling
-  const routeMapObjects={}; // ci -> {markers:[], polyline}
-
+  const routeMapObjects={};
   clusters.forEach((cluster,ci)=>{
-    const clusterStops=allStops.filter(s=>s.ci===ci);
-    if(!clusterStops.length)return;
+    const clusterStops=allStops.filter(s=>s.ci===ci);if(!clusterStops.length)return;
     routeMapObjects[ci]={markers:[],polyline:null};
     const pathCoords=[{lat:WAREHOUSE.lat,lng:WAREHOUSE.lng},...clusterStops.map(s=>({lat:s.coords.lat,lng:s.coords.lng})),{lat:WAREHOUSE.lat,lng:WAREHOUSE.lng}];
     const polyline=new google.maps.Polyline({path:pathCoords,geodesic:true,strokeColor:cluster.color,strokeOpacity:0.75,strokeWeight:3,map:gMap});
-    gMapPolylines.push(polyline);
-    routeMapObjects[ci].polyline=polyline;
+    gMapPolylines.push(polyline);routeMapObjects[ci].polyline=polyline;
     clusterStops.forEach(({inv,si,coords,color})=>{
       bounds.extend({lat:coords.lat,lng:coords.lng});
-      const svgIcon={url:`data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="32" height="38" viewBox="0 0 32 38"><path d="M16 0C7.163 0 0 7.163 0 16c0 10.627 14 22 16 22s16-11.373 16-22C32 7.163 24.837 0 16 0z" fill="${color}"/><circle cx="16" cy="15" r="10" fill="white" opacity="0.2"/><text x="16" y="20" text-anchor="middle" font-family="DM Sans,sans-serif" font-size="11" font-weight="700" fill="white">${si+1}</text></svg>`)}`,scaledSize:new google.maps.Size(32,38),anchor:new google.maps.Point(16,38)};
+      const isOverdue=!!overdueByCustomer[inv.customerId];
+      // Overdue stops get an orange ring around the marker
+      const svgIcon={url:`data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="32" height="38" viewBox="0 0 32 38"><path d="M16 0C7.163 0 0 7.163 0 16c0 10.627 14 22 16 22s16-11.373 16-22C32 7.163 24.837 0 16 0z" fill="${color}"/>${isOverdue?`<circle cx="16" cy="15" r="12" fill="none" stroke="#C4621D" stroke-width="2.5"/>`:'<circle cx="16" cy="15" r="10" fill="white" opacity="0.2"/>'}<text x="16" y="20" text-anchor="middle" font-family="DM Sans,sans-serif" font-size="11" font-weight="700" fill="white">${si+1}</text></svg>`)}`,scaledSize:new google.maps.Size(32,38),anchor:new google.maps.Point(16,38)};
       const marker=new google.maps.Marker({position:{lat:coords.lat,lng:coords.lng},map:gMap,icon:svgIcon,title:inv.customerName,zIndex:100+si});
       const addr=(inv.shipAddress?.zip?inv.shipAddress:null)||(inv.billAddress?.zip?inv.billAddress:null)||inv.shipAddress||inv.billAddress;
       const addrText=addr?(addr.full||addr.line1||'No address'):'No address';
-      marker.addListener('click',()=>{ gInfoWindow.setContent(`<div class="gm-popup"><div class="popup-inv">INV #${inv.invoiceNumber} · Route ${ci+1}</div><div class="popup-customer">${inv.customerName}</div><div class="popup-address">📍 ${addrText}</div><div class="popup-meta"><span class="popup-cases">📦 ${inv.cases} cases</span><span class="popup-route" style="background:${color}">Route ${ci+1}</span></div><button class="popup-reassign-btn" onclick="openReassignPanel('${inv.id}',${ci})">↔ Move to Different Route</button></div>`); gInfoWindow.open(gMap,marker); });
-      gMapMarkers.push(marker);
-      routeMapObjects[ci].markers.push(marker);
+      const overdueInfo=isOverdue?overdueByCustomer[inv.customerId]:null;
+      marker.addListener('click',()=>{
+        gInfoWindow.setContent(`<div class="gm-popup"><div class="popup-inv">INV #${inv.invoiceNumber} · Route ${ci+1}</div><div class="popup-customer">${inv.customerName}</div><div class="popup-address">📍 ${addrText}</div><div class="popup-meta"><span class="popup-cases">📦 ${inv.cases} cases</span><span class="popup-route" style="background:${color}">Route ${ci+1}</span>${isOverdue?`<span class="popup-overdue">⚠ $${overdueInfo.overdueBalance.toFixed(2)} overdue</span>`:''}</div><button class="popup-reassign-btn" onclick="openReassignPanel('${inv.id}',${ci})">↔ Move to Different Route</button></div>`);
+        gInfoWindow.open(gMap,marker);
+      });
+      gMapMarkers.push(marker);routeMapObjects[ci].markers.push(marker);
     });
   });
-
-  // Expose routeMapObjects globally so toggle function can access it
   window._routeMapObjects=routeMapObjects;
-
   gMap.fitBounds(bounds,{top:60,right:40,bottom:40,left:40});
   loadingOverlay.style.display='none';
 }
 
 // ═══════════════════ MAP ROUTE TOGGLES ═══════════════════════════════════════
-function renderMapRouteToggles() {
-  const container = document.getElementById('mapRouteToggles');
-  if (!container || !clusters.length) return;
-  const allVisible = visibleRoutes.size === clusters.length;
-  container.innerHTML = `
-    <button class="route-toggle-btn route-toggle-all ${allVisible?'active':'inactive'}" onclick="toggleAllRoutes()">
-      ${allVisible ? '👁 All Routes' : '👁 Show All'}
-    </button>
-    ${clusters.map((c,i) => `
-      <button class="route-toggle-btn ${visibleRoutes.has(i)?'active':'inactive'}"
-        style="${visibleRoutes.has(i)?`background:${c.color};border-color:${c.color}`:'border-color:'+c.color}"
-        onclick="toggleMapRoute(${i})">
-        <span class="toggle-dot" style="background:${visibleRoutes.has(i)?'white':c.color}"></span>
-        Route ${i+1}
-      </button>`).join('')}`;
-}
-
-function toggleMapRoute(ci) {
-  if (visibleRoutes.has(ci)) {
-    // Don't allow hiding the last visible route
-    if (visibleRoutes.size === 1) return;
-    visibleRoutes.delete(ci);
-  } else {
-    visibleRoutes.add(ci);
-  }
-  applyRouteVisibility();
-  renderMapRouteToggles();
-}
-
-function toggleAllRoutes() {
-  if (visibleRoutes.size === clusters.length) {
-    // All visible — show only first route
-    visibleRoutes = new Set([0]);
-  } else {
-    // Show all
-    visibleRoutes = new Set(clusters.map((_,i) => i));
-  }
-  applyRouteVisibility();
-  renderMapRouteToggles();
-}
-
-function applyRouteVisibility() {
-  const objs = window._routeMapObjects || {};
-  clusters.forEach((_, ci) => {
-    const show = visibleRoutes.has(ci);
-    const routeObj = objs[ci];
-    if (!routeObj) return;
-    routeObj.markers.forEach(m => m.setVisible(show));
-    if (routeObj.polyline) routeObj.polyline.setVisible(show);
-  });
-}
+function renderMapRouteToggles(){const container=document.getElementById('mapRouteToggles');if(!container||!clusters.length)return;const allVisible=visibleRoutes.size===clusters.length;container.innerHTML=`<button class="route-toggle-btn route-toggle-all ${allVisible?'active':'inactive'}" onclick="toggleAllRoutes()">${allVisible?'👁 All Routes':'👁 Show All'}</button>${clusters.map((c,i)=>`<button class="route-toggle-btn ${visibleRoutes.has(i)?'active':'inactive'}" style="${visibleRoutes.has(i)?`background:${c.color};border-color:${c.color}`:'border-color:'+c.color}" onclick="toggleMapRoute(${i})"><span class="toggle-dot" style="background:${visibleRoutes.has(i)?'white':c.color}"></span>Route ${i+1}</button>`).join('')}`;}
+function toggleMapRoute(ci){if(visibleRoutes.has(ci)){if(visibleRoutes.size===1)return;visibleRoutes.delete(ci);}else{visibleRoutes.add(ci);}applyRouteVisibility();renderMapRouteToggles();}
+function toggleAllRoutes(){if(visibleRoutes.size===clusters.length){visibleRoutes=new Set([0]);}else{visibleRoutes=new Set(clusters.map((_,i)=>i));}applyRouteVisibility();renderMapRouteToggles();}
+function applyRouteVisibility(){const objs=window._routeMapObjects||{};clusters.forEach((_,ci)=>{const show=visibleRoutes.has(ci);const routeObj=objs[ci];if(!routeObj)return;routeObj.markers.forEach(m=>m.setVisible(show));if(routeObj.polyline)routeObj.polyline.setVisible(show);});}
 
 // ═══════════════════ REASSIGN STOP ═══════════════════════════════════════════
-function openReassignPanel(invId,currentClusterIdx){
-  selectedStopForReassign={invId,currentClusterIdx};
-  const inv=invoices.find(i=>i.id==invId);
-  if(gInfoWindow)gInfoWindow.close();
-  const panel=document.getElementById('reassignPanel');
-  document.getElementById('reassignTitle').textContent=`Move "${inv?inv.customerName:invId}" to a different route`;
-  const sel=document.getElementById('reassignSelect');
-  sel.innerHTML=clusters.filter((_,i)=>i!==currentClusterIdx).map(c=>{const ri=clusters.indexOf(c);return `<option value="${ri}">Route ${ri+1} · ${c.stops.length} stops</option>`;}).join('');
-  panel.classList.add('visible');
-}
-function confirmReassign(){
-  if(!selectedStopForReassign)return;
-  const{invId,currentClusterIdx}=selectedStopForReassign;
-  const targetIdx=parseInt(document.getElementById('reassignSelect').value);
-  if(isNaN(targetIdx))return;
-  const fromCluster=clusters[currentClusterIdx],toCluster=clusters[targetIdx];
-  const inv=fromCluster.stops.find(i=>i.id==invId);
-  if(!inv)return;
-  fromCluster.stops=fromCluster.stops.filter(i=>i.id!=invId);
-  fromCluster.cases=fromCluster.stops.reduce((s,i)=>s+(i.cases||0),0);
-  fromCluster.stops=nearestNeighborTSP(fromCluster.stops.filter(s=>s._coords));
-  fromCluster.distance=Math.round(routeDistance(fromCluster.stops));
-  toCluster.stops=nearestNeighborTSP([...toCluster.stops,inv].filter(s=>s._coords));
-  toCluster.cases=toCluster.stops.reduce((s,i)=>s+(i.cases||0),0);
-  toCluster.distance=Math.round(routeDistance(toCluster.stops));
-  // Refresh zone labels after reassign
-  [fromCluster,toCluster].forEach(c=>{const zs=[...new Set(c.stops.map(s=>s._zone||'').filter(Boolean))];c.zone=zs.length<=3?zs.join(' + '):`${zs.slice(0,2).join(' + ')} +${zs.length-2} more`;c.territory=c.zone;});
-  if(toCluster.driver)assignments[inv.id]=toCluster.driver;else delete assignments[inv.id];
-  saveState();cancelReassign();renderClusters();initOrRefreshMap();
-  showToast(`✓ Moved to Route ${targetIdx+1}`);
-}
+function openReassignPanel(invId,currentClusterIdx){selectedStopForReassign={invId,currentClusterIdx};const inv=invoices.find(i=>i.id==invId);if(gInfoWindow)gInfoWindow.close();const panel=document.getElementById('reassignPanel');document.getElementById('reassignTitle').textContent=`Move "${inv?inv.customerName:invId}" to a different route`;const sel=document.getElementById('reassignSelect');sel.innerHTML=clusters.filter((_,i)=>i!==currentClusterIdx).map(c=>{const ri=clusters.indexOf(c);return `<option value="${ri}">Route ${ri+1} · ${c.stops.length} stops</option>`;}).join('');panel.classList.add('visible');}
+function confirmReassign(){if(!selectedStopForReassign)return;const{invId,currentClusterIdx}=selectedStopForReassign;const targetIdx=parseInt(document.getElementById('reassignSelect').value);if(isNaN(targetIdx))return;const fromCluster=clusters[currentClusterIdx],toCluster=clusters[targetIdx];const inv=fromCluster.stops.find(i=>i.id==invId);if(!inv)return;fromCluster.stops=fromCluster.stops.filter(i=>i.id!=invId);fromCluster.cases=fromCluster.stops.reduce((s,i)=>s+(i.cases||0),0);fromCluster.stops=nearestNeighborTSP(fromCluster.stops.filter(s=>s._coords));fromCluster.distance=Math.round(routeDistance(fromCluster.stops));toCluster.stops=nearestNeighborTSP([...toCluster.stops,inv].filter(s=>s._coords));toCluster.cases=toCluster.stops.reduce((s,i)=>s+(i.cases||0),0);toCluster.distance=Math.round(routeDistance(toCluster.stops));[fromCluster,toCluster].forEach(c=>{const zs=[...new Set(c.stops.map(s=>s._zone||'').filter(Boolean))];c.zone=zs.length<=3?zs.join(' + '):`${zs.slice(0,2).join(' + ')} +${zs.length-2} more`;c.territory=c.zone;});if(toCluster.driver)assignments[inv.id]=toCluster.driver;else delete assignments[inv.id];saveState();cancelReassign();renderClusters();initOrRefreshMap();showToast(`✓ Moved to Route ${targetIdx+1}`);}
 function cancelReassign(){selectedStopForReassign=null;document.getElementById('reassignPanel').classList.remove('visible');}
 
-
 // ═══════════════════ STATS ════════════════════════════════════════════════════
-function updateStats(){
-  const sel=invoices.filter(i=>selectedInvoiceIds.has(i.id));
-  const tc=sel.reduce((s,i)=>s+(i.cases||0),0);
-  const cl=parseInt(document.getElementById('caseLimit')?.value)||250;
-  const mv=Math.ceil(tc/cl);
-  document.getElementById('stat-total').textContent=sel.length;
-  document.getElementById('stat-cases').textContent=tc;
-  document.getElementById('stat-vans').textContent=mv||'—';
-  document.getElementById('stat-done').textContent=Object.keys(completed).length;
-  document.getElementById('stat-vans').classList.toggle('warn',mv>(parseInt(document.getElementById('driverCount')?.value)||0));
-}
+function updateStats(){const sel=invoices.filter(i=>selectedInvoiceIds.has(i.id));const tc=sel.reduce((s,i)=>s+(i.cases||0),0);const cl=parseInt(document.getElementById('caseLimit')?.value)||250;const mv=Math.ceil(tc/cl);document.getElementById('stat-total').textContent=sel.length;document.getElementById('stat-cases').textContent=tc;document.getElementById('stat-vans').textContent=mv||'—';document.getElementById('stat-done').textContent=Object.keys(completed).length;document.getElementById('stat-vans').classList.toggle('warn',mv>(parseInt(document.getElementById('driverCount')?.value)||0));}
 
 // ═══════════════════ SETTINGS ═════════════════════════════════════════════════
-
-
-
 function saveSettings(){serverUrl=document.getElementById('serverUrl').value.trim()||serverUrl;saveState();showToast('Settings saved');}
-function clearAll(){if(!confirm('Clear all delivery data?'))return;invoices=[];assignments={};completed={};clusters=[];selectedInvoiceIds=new Set();clearMapObjects();gMap=null;saveState();document.getElementById('connectCard').style.display='block';document.getElementById('plannerSection').style.display='none';document.getElementById('clusterList').innerHTML='';document.getElementById('warningBanners').innerHTML='';document.getElementById('invoiceStateGroups').innerHTML='';document.getElementById('fetchBtn').disabled=false;document.getElementById('fetchBtn').textContent="Pull Today's Deliveries";showToast('Data cleared');showTab('route');}
+function clearAll(){if(!confirm('Clear all delivery data?'))return;invoices=[];assignments={};completed={};clusters=[];selectedInvoiceIds=new Set();overdueByCustomer={};clearMapObjects();gMap=null;saveState();document.getElementById('connectCard').style.display='block';document.getElementById('plannerSection').style.display='none';document.getElementById('clusterList').innerHTML='';document.getElementById('warningBanners').innerHTML='';document.getElementById('invoiceStateGroups').innerHTML='';document.getElementById('overdueSummary').style.display='none';document.getElementById('fetchBtn').disabled=false;document.getElementById('fetchBtn').textContent="Pull Today's Deliveries";showToast('Data cleared');showTab('route');}
 function openMap(a){if(!a||a.trim()===''){showToast('No address available');return;}window.open('https://maps.google.com/?q='+a,'_blank');}
 
 // ═══════════════════ TOKEN STATUS ════════════════════════════════════════════
-async function checkTokenStatus(){
-  try{
-    const base=document.getElementById('serverUrl')?.value.trim()||serverUrl;
-    const res=await fetch(base+'/api/token-status');
-    if(!res.ok)return;
-    const data=await res.json();
-    const banner=document.getElementById('tokenBanner');
-    if(!banner)return;
-    if(!data.connected){banner.style.display='flex';banner.style.background='#FDF0E8';banner.style.border='1.5px solid var(--orange)';banner.style.color='var(--orange)';banner.innerHTML=`<span style="font-size:20px">⚠️</span><div><strong>QuickBooks token expired</strong><br><span style="font-weight:400">Update QB_REFRESH_TOKEN in Railway.</span></div>`;}
-    else if(data.connected){banner.style.display='flex';banner.style.background='var(--green-light)';banner.style.border='1.5px solid var(--green)';banner.style.color='var(--green)';banner.innerHTML=`<span style="font-size:20px">✓</span><div><strong>QuickBooks connected</strong><br><span style="font-weight:400">Auto-refresh active · ${data.environment}</span></div>`;setTimeout(()=>{banner.style.display='none';},4000);}
-  }catch(e){}
-}
-
+async function checkTokenStatus(){try{const base=document.getElementById('serverUrl')?.value.trim()||serverUrl;const res=await fetch(base+'/api/token-status');if(!res.ok)return;const data=await res.json();const banner=document.getElementById('tokenBanner');if(!banner)return;if(!data.connected){banner.style.display='flex';banner.style.background='#FDF0E8';banner.style.border='1.5px solid var(--orange)';banner.style.color='var(--orange)';banner.innerHTML=`<span style="font-size:20px">⚠️</span><div><strong>QuickBooks token expired</strong><br><span style="font-weight:400">Update QB_REFRESH_TOKEN in Railway.</span></div>`;}else if(data.connected){banner.style.display='flex';banner.style.background='var(--green-light)';banner.style.border='1.5px solid var(--green)';banner.style.color='var(--green)';banner.innerHTML=`<span style="font-size:20px">✓</span><div><strong>QuickBooks connected</strong><br><span style="font-weight:400">Auto-refresh active · ${data.environment}</span></div>`;setTimeout(()=>{banner.style.display='none';},4000);}}catch(e){}}
 
 // ═══════════════════ PDF INVOICE DOWNLOAD ════════════════════════════════════
 
-function renderPdfPanel() {
-  const panel = document.getElementById('pdfPanel');
-  if (!panel) return;
-  panel.style.display = clusters.length ? 'block' : 'none';
-  // Reset button state and status on re-render
-  const btn = document.getElementById('btnAllPdf');
-  if (btn) { btn.disabled = false; btn.textContent = '⬇ Download Combined PDF — All Routes'; }
-  setPdfStatus('');
-  hidePdfProgress();
+function renderPdfPanel(){
+  const panel=document.getElementById('pdfPanel');if(!panel)return;
+  panel.style.display=clusters.length?'block':'none';
+  const btn=document.getElementById('btnAllPdf');
+  if(btn){btn.disabled=false;btn.textContent='⬇ Download Combined PDF — All Routes';}
+  setPdfStatus('');hidePdfProgress();
+
+  // Show note about statements if any overdue customers are on today's route
+  const noteEl = document.getElementById('pdfOverdueNote');
+  if(!noteEl)return;
+  const overdueOnRoute = clusters.flatMap(c=>c.stops).filter(inv=>overdueByCustomer[inv.customerId]);
+  const uniqueOverdue  = [...new Set(overdueOnRoute.map(inv=>inv.customerId))];
+  if(uniqueOverdue.length){
+    noteEl.textContent=`📋 Statements will be appended after invoices for ${uniqueOverdue.length} overdue customer${uniqueOverdue.length!==1?'s':''}: ${uniqueOverdue.map(cid=>overdueByCustomer[cid].customerName).join(', ')}`;
+    noteEl.classList.add('visible');
+  } else {
+    noteEl.classList.remove('visible');
+  }
 }
 
-// Fetch a single invoice PDF as ArrayBuffer via the server proxy
-async function fetchInvoicePdf(invoiceId) {
-  const base = document.getElementById('serverUrl')?.value.trim() || serverUrl;
-  const res  = await fetch(`${base}/api/invoice-pdf/${invoiceId}`);
-  if (!res.ok) throw new Error(`PDF fetch failed for invoice ${invoiceId}: ${res.status}`);
+async function fetchInvoicePdf(invoiceId){const base=document.getElementById('serverUrl')?.value.trim()||serverUrl;const res=await fetch(`${base}/api/invoice-pdf/${invoiceId}`);if(!res.ok)throw new Error(`PDF fetch failed for invoice ${invoiceId}: ${res.status}`);return res.arrayBuffer();}
+
+// NEW: Fetch statement PDF for a customer
+async function fetchStatementPdf(customerId){
+  const base=document.getElementById('serverUrl')?.value.trim()||serverUrl;
+  const res=await fetch(`${base}/api/customer-statement/${customerId}`);
+  if(!res.ok)throw new Error(`Statement fetch failed for customer ${customerId}: ${res.status}`);
   return res.arrayBuffer();
 }
 
-// Build a divider page using pdf-lib, listing all stops in order
-async function makeDividerPage(pdfDoc, routeNum, stops, cases, dist, date) {
-  const { rgb, StandardFonts } = PDFLib;
-  const page    = pdfDoc.addPage([612, 792]); // US Letter
-  const boldFont = await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-  const regFont  = await pdfDoc.embedFont(StandardFonts.Helvetica);
+async function makeDividerPage(pdfDoc,routeNum,stops,cases,dist,date){
+  const{rgb,StandardFonts}=PDFLib;
+  const page=pdfDoc.addPage([612,792]);
+  const boldFont=await pdfDoc.embedFont(StandardFonts.HelveticaBold);
+  const regFont=await pdfDoc.embedFont(StandardFonts.Helvetica);
+  page.drawRectangle({x:0,y:692,width:612,height:100,color:rgb(0.29,0.075,0.176)});
+  page.drawText(`ROUTE ${routeNum}`,{x:40,y:755,size:30,font:boldFont,color:rgb(0.788,0.659,0.298)});
+  const meta=`${stops.length} stops  ·  ${cases} cases  ·  ${date}`;
+  page.drawText(meta,{x:40,y:670,size:11,font:regFont,color:rgb(0.42,0.42,0.42)});
+  page.drawLine({start:{x:40,y:655},end:{x:572,y:655},thickness:1.5,color:rgb(0.83,0.71,0.74)});
+  page.drawText('STOP ORDER',{x:40,y:638,size:8,font:boldFont,color:rgb(0.55,0.55,0.55)});
 
-  // Dark burgundy header bar
-  page.drawRectangle({ x:0, y:692, width:612, height:100, color: rgb(0.29, 0.075, 0.176) });
+  // Count overdue stops on this route for the divider
+  const overdueStops = stops.filter(s => overdueByCustomer[s.customerId]);
+  if(overdueStops.length){
+    page.drawText(`⚠ ${overdueStops.length} overdue customer${overdueStops.length!==1?'s':''} — statements included`,{x:40,y:620,size:9,font:boldFont,color:rgb(0.769,0.384,0.114)});
+  }
 
-  // Route title
-  page.drawText(`ROUTE ${routeNum}`, {
-    x:40, y:755, size:30, font:boldFont, color: rgb(0.788, 0.659, 0.298)
-  });
-
-  // Driver name
-
-
-  // Meta line
-  const meta = `${stops.length} stops  ·  ${cases} cases  ·  ${date}`;
-  page.drawText(meta, { x:40, y:670, size:11, font:regFont, color: rgb(0.42, 0.42, 0.42) });
-
-  // Section header
-  page.drawLine({ start:{x:40,y:655}, end:{x:572,y:655}, thickness:1.5, color: rgb(0.83,0.71,0.74) });
-  page.drawText('STOP ORDER', { x:40, y:638, size:8, font:boldFont, color: rgb(0.55,0.55,0.55) });
-
-  // Stop list — two columns if more than 14 stops
-  const col1X=40, col2X=326, rowH=19, startY=618;
-  const useTwo = stops.length > 14;
-  const col1Stops = useTwo ? stops.slice(0, Math.ceil(stops.length/2)) : stops;
-  const col2Stops = useTwo ? stops.slice(Math.ceil(stops.length/2)) : [];
-
-  const drawStopRow = (stop, idx, x, y) => {
-    // Stop number bubble background
-    page.drawRectangle({ x:x, y:y-3, width:20, height:16, borderRadius:4, color: rgb(0.29,0.075,0.176) });
-    page.drawText(String(idx+1), {
-      x: x + (idx+1 < 10 ? 7 : 3), y: y+1, size:9, font:boldFont, color: rgb(1,1,1)
-    });
-    // Customer name
-    const name = stop.customerName || 'Unknown';
-    const truncated = name.length > 28 ? name.slice(0,26)+'…' : name;
-    page.drawText(truncated, { x:x+26, y:y+1, size:10, font:boldFont, color: rgb(0.15,0.15,0.15) });
-    // Address city/state
-    const addr = (stop.shipAddress?.zip ? stop.shipAddress : null) || (stop.billAddress?.zip ? stop.billAddress : null) || stop.shipAddress || stop.billAddress;
-    const cityState = addr ? [addr.city, addr.state].filter(Boolean).join(', ') : '';
-    if (cityState) page.drawText(cityState, { x:x+26, y:y-9, size:8, font:regFont, color: rgb(0.5,0.5,0.5) });
-    // Cases
-    const casesLabel = `${stop.cases||0} cs`;
-    page.drawText(casesLabel, { x:x+230, y:y+1, size:9, font:regFont, color: rgb(0.18,0.49,0.36) });
+  const col1X=40,col2X=326,rowH=19,startY=overdueStops.length?600:618;
+  const useTwo=stops.length>14;
+  const col1Stops=useTwo?stops.slice(0,Math.ceil(stops.length/2)):stops;
+  const col2Stops=useTwo?stops.slice(Math.ceil(stops.length/2)):[];
+  const drawStopRow=(stop,idx,x,y)=>{
+    const hasStmt=!!overdueByCustomer[stop.customerId];
+    page.drawRectangle({x:x,y:y-3,width:20,height:16,borderRadius:4,color:rgb(0.29,0.075,0.176)});
+    page.drawText(String(idx+1),{x:x+(idx+1<10?7:3),y:y+1,size:9,font:boldFont,color:rgb(1,1,1)});
+    const name=stop.customerName||'Unknown';
+    const truncated=name.length>28?name.slice(0,26)+'…':name;
+    page.drawText(truncated,{x:x+26,y:y+1,size:10,font:boldFont,color:rgb(0.15,0.15,0.15)});
+    const addr=(stop.shipAddress?.zip?stop.shipAddress:null)||(stop.billAddress?.zip?stop.billAddress:null)||stop.shipAddress||stop.billAddress;
+    const cityState=addr?[addr.city,addr.state].filter(Boolean).join(', '):'';
+    if(cityState)page.drawText(cityState,{x:x+26,y:y-9,size:8,font:regFont,color:rgb(0.5,0.5,0.5)});
+    page.drawText(`${stop.cases||0} cs`,{x:x+220,y:y+1,size:9,font:regFont,color:rgb(0.18,0.49,0.36)});
+    // Small "STMT" indicator for overdue stops
+    if(hasStmt)page.drawText('STMT',{x:x+250,y:y+1,size:7,font:boldFont,color:rgb(0.769,0.384,0.114)});
   };
-
-  col1Stops.forEach((stop, i) => {
-    const y = startY - (i * rowH);
-    if (y < 40) return;
-    drawStopRow(stop, i, col1X, y);
-  });
-
-  col2Stops.forEach((stop, i) => {
-    const actualIdx = Math.ceil(stops.length/2) + i;
-    const y = startY - (i * rowH);
-    if (y < 40) return;
-    drawStopRow(stop, actualIdx, col2X, y);
-  });
-
-  // Vertical separator between columns
-  if (useTwo) {
-    page.drawLine({ start:{x:312,y:startY+10}, end:{x:312,y:Math.max(40, startY-(col1Stops.length*rowH))}, thickness:0.5, color:rgb(0.85,0.85,0.85) });
-  }
+  col1Stops.forEach((stop,i)=>{const y=startY-(i*rowH);if(y<40)return;drawStopRow(stop,i,col1X,y);});
+  col2Stops.forEach((stop,i)=>{const actualIdx=Math.ceil(stops.length/2)+i;const y=startY-(i*rowH);if(y<40)return;drawStopRow(stop,actualIdx,col2X,y);});
+  if(useTwo)page.drawLine({start:{x:312,y:startY+10},end:{x:312,y:Math.max(40,startY-(col1Stops.length*rowH))},thickness:0.5,color:rgb(0.85,0.85,0.85)});
 }
 
-// Merge multiple ArrayBuffers (individual invoice PDFs) into one pdf-lib doc
-async function mergeInvoicePdfs(pdfBuffers) {
-  const { PDFDocument } = PDFLib;
-  const merged = await PDFDocument.create();
-  for (const buf of pdfBuffers) {
-    try {
-      const src   = await PDFDocument.load(buf);
-      const pages = await merged.copyPages(src, src.getPageIndices());
-      pages.forEach(p => merged.addPage(p));
-    } catch(e) {
-      console.warn('Could not load one invoice PDF, skipping:', e.message);
-    }
-  }
-  return merged;
-}
+// Download one combined PDF — invoices in stop order, with statements
+// inserted immediately after the invoice for any overdue customer.
+async function downloadAllRoutesPdf(){
+  if(!clusters.length){showToast('No routes to download');return;}
+  const btn=document.getElementById('btnAllPdf');
+  btn.disabled=true;btn.textContent='⏳ Building…';
 
-// Download one combined PDF with all routes, each separated by a divider page
-async function downloadAllRoutesPdf() {
-  if (!clusters.length) { showToast('No routes to download'); return; }
-  const btn = document.getElementById('btnAllPdf');
-  btn.disabled = true; btn.textContent = '⏳ Building…';
-
-  const totalStops = clusters.reduce((s,c) => s + c.stops.length, 0);
-  let fetched = 0;
+  // Count total pages to fetch (invoices + statements)
+  const allStops=clusters.flatMap(c=>c.stops);
+  const overdueOnRoute=[...new Set(allStops.filter(inv=>overdueByCustomer[inv.customerId]).map(inv=>inv.customerId))];
+  const totalDocs=allStops.length+overdueOnRoute.length; // invoices + one statement per unique overdue customer
+  // Track which customer statements have already been fetched & merged so we
+  // don't duplicate a statement if a customer appears on multiple routes
+  const fetchedStatements=new Set();
+  let fetched=0;
   showPdfProgress(0);
 
-  try {
-    const { PDFDocument } = PDFLib;
-    const merged = await PDFDocument.create();
-    const date   = new Date().toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+  try{
+    const{PDFDocument}=PDFLib;
+    const merged=await PDFDocument.create();
+    const date=new Date().toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
 
-    for (let ci = 0; ci < clusters.length; ci++) {
-      const cluster = clusters[ci];
+    for(let ci=0;ci<clusters.length;ci++){
+      const cluster=clusters[ci];
       setPdfStatus(`Route ${ci+1} of ${clusters.length}: fetching ${cluster.stops.length} invoices…`);
 
       // Divider page
-      await makeDividerPage(merged, ci+1, cluster.stops, cluster.cases, cluster.distance, date);
+      await makeDividerPage(merged,ci+1,cluster.stops,cluster.cases,cluster.distance,date);
 
-      // Invoices in stop order
-      for (let i = 0; i < cluster.stops.length; i++) {
-        const inv = cluster.stops[i];
-        showPdfProgress(Math.round((fetched / totalStops) * 95));
-        setPdfStatus(`Fetching stop ${fetched+1} of ${totalStops}: ${inv.customerName}…`);
-        try {
-          const buf  = await fetchInvoicePdf(inv.id);
-          const src  = await PDFDocument.load(buf);
-          const pages = await merged.copyPages(src, src.getPageIndices());
-          pages.forEach(p => merged.addPage(p));
-        } catch(e) {
-          console.warn(`Skipped invoice ${inv.invoiceNumber}:`, e.message);
-        }
+      // Invoices + optional statement per stop
+      for(let i=0;i<cluster.stops.length;i++){
+        const inv=cluster.stops[i];
+        showPdfProgress(Math.round((fetched/totalDocs)*95));
+        setPdfStatus(`Fetching ${fetched+1} of ${totalDocs}: ${inv.customerName}…`);
+
+        // Invoice PDF
+        try{
+          const buf=await fetchInvoicePdf(inv.id);
+          const src=await PDFDocument.load(buf);
+          const pages=await merged.copyPages(src,src.getPageIndices());
+          pages.forEach(p=>merged.addPage(p));
+        }catch(e){console.warn(`Skipped invoice ${inv.invoiceNumber}:`,e.message);}
         fetched++;
+
+        // Statement PDF — only if this customer is overdue AND we haven't
+        // already included their statement earlier in this PDF
+        const custId=inv.customerId;
+        if(custId&&overdueByCustomer[custId]&&!fetchedStatements.has(custId)){
+          showPdfProgress(Math.round((fetched/totalDocs)*95));
+          setPdfStatus(`Fetching statement: ${inv.customerName}…`);
+          try{
+            const stmtBuf=await fetchStatementPdf(custId);
+            const stmtSrc=await PDFDocument.load(stmtBuf);
+            const stmtPages=await merged.copyPages(stmtSrc,stmtSrc.getPageIndices());
+            stmtPages.forEach(p=>merged.addPage(p));
+            fetchedStatements.add(custId);
+          }catch(e){console.warn(`Skipped statement for ${inv.customerName}:`,e.message);}
+          fetched++;
+        }
       }
     }
 
     showPdfProgress(100);
-    const bytes = await merged.save();
-    const blob  = new Blob([bytes], { type:'application/pdf' });
-    const url   = URL.createObjectURL(blob);
-    const a     = document.createElement('a');
-    a.href      = url;
-    a.download  = `Cellar_Route_All_${new Date().toISOString().slice(0,10)}.pdf`;
-    a.click();
-    URL.revokeObjectURL(url);
-    setPdfStatus(`✓ All routes PDF downloaded — ${totalStops} invoices across ${clusters.length} routes`);
-    showToast(`✓ All routes PDF ready`);
-  } catch(err) {
+    const bytes=await merged.save();
+    const blob=new Blob([bytes],{type:'application/pdf'});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement('a');
+    a.href=url;a.download=`Cellar_Route_All_${new Date().toISOString().slice(0,10)}.pdf`;
+    a.click();URL.revokeObjectURL(url);
+
+    const stmtCount=fetchedStatements.size;
+    setPdfStatus(`✓ Downloaded — ${allStops.length} invoices${stmtCount?` + ${stmtCount} statement${stmtCount!==1?'s':''}`:''} across ${clusters.length} routes`);
+    showToast(`✓ PDF ready${stmtCount?` · ${stmtCount} statements included`:''}`);
+  }catch(err){
     setPdfStatus(`❌ Error: ${err.message}`);
     showToast('❌ PDF download failed');
     console.error(err);
-  } finally {
-    btn.disabled = false; btn.textContent = '⬇ Download All Routes (Combined PDF)';
-    setTimeout(() => { hidePdfProgress(); }, 4000);
+  }finally{
+    btn.disabled=false;btn.textContent='⬇ Download All Routes (Combined PDF)';
+    setTimeout(()=>{hidePdfProgress();},4000);
   }
 }
 
-function showPdfProgress(pct) {
-  document.getElementById('pdfProgress').style.display = 'block';
-  document.getElementById('pdfProgressBar').style.width = pct + '%';
-}
-function hidePdfProgress() {
-  document.getElementById('pdfProgress').style.display = 'none';
-  document.getElementById('pdfProgressBar').style.width = '0%';
-}
-function setPdfStatus(msg) { document.getElementById('pdfStatus').textContent = msg; }
-
+function showPdfProgress(pct){document.getElementById('pdfProgress').style.display='block';document.getElementById('pdfProgressBar').style.width=pct+'%';}
+function hidePdfProgress(){document.getElementById('pdfProgress').style.display='none';document.getElementById('pdfProgressBar').style.width='0%';}
+function setPdfStatus(msg){document.getElementById('pdfStatus').textContent=msg;}
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500);}
-document.getElementById('newDriverName')?.addEventListener('keydown',e=>{if(e.key==='Enter')addDriver();});
 </script>
 </body>
 </html>
