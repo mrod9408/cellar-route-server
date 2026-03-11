@@ -1,1201 +1,623 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
-  <title>Cellar Route</title>
-  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
-  <script id="gmaps-script"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
-  <style>
-    :root {
-      --burgundy: #6B1E2E; --burgundy-dark: #4A1320; --burgundy-light: #8B2E42;
-      --gold: #C9A84C; --gold-light: #E8C97A; --cream: #F7F2EA; --cream-dark: #EDE5D6;
-      --charcoal: #1C1C1E; --gray: #6B6B6B; --gray-light: #D4CBBC; --white: #FFFFFF;
-      --green: #2E7D5B; --green-light: #E8F5EE; --orange: #C4621D; --orange-light: #FDF0E8;
-      --shadow: 0 4px 24px rgba(107,30,46,0.12); --radius: 16px;
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'DM Sans', sans-serif; background: var(--cream); color: var(--charcoal); min-height: 100vh; overflow-x: hidden; }
+const express = require('express');
+const cors = require('cors');
+const fetch = require('node-fetch');
+const path = require('path');
 
-    /* ── LOGIN SCREEN ─────────────────────────────────────────────────────── */
-    #loginScreen {
-      position: fixed; inset: 0; background: var(--burgundy-dark);
-      display: flex; flex-direction: column; align-items: center;
-      justify-content: center; z-index: 9999; padding: 32px 24px;
-      transition: opacity 0.4s;
-    }
-    #loginScreen.hidden { opacity: 0; pointer-events: none; }
-    .login-logo { font-size: 56px; margin-bottom: 12px; }
-    .login-title { font-family: 'Playfair Display', serif; color: var(--cream); font-size: 32px; margin-bottom: 4px; text-align: center; }
-    .login-subtitle { color: var(--gold-light); font-size: 14px; margin-bottom: 44px; letter-spacing: 0.5px; text-align: center; }
-    .login-step { width: 100%; max-width: 300px; text-align: center; transition: opacity 0.3s; }
-    .login-step.hidden { display: none; }
-    .pin-label { color: rgba(247,242,234,0.6); font-size: 12px; font-weight: 600; margin-bottom: 18px; text-transform: uppercase; letter-spacing: 1px; }
-    .pin-dots { display: flex; justify-content: center; gap: 14px; margin-bottom: 30px; }
-    .pin-dot { width: 14px; height: 14px; border-radius: 50%; background: rgba(255,255,255,0.2); transition: all 0.15s; }
-    .pin-dot.filled { background: var(--gold); transform: scale(1.1); }
-    .pin-dot.error { background: #F28B82; }
-    .pin-pad { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
-    .pin-btn { background: rgba(255,255,255,0.1); border: none; border-radius: 14px; color: var(--cream); font-family: 'Playfair Display', serif; font-size: 24px; padding: 16px; cursor: pointer; transition: background 0.15s, transform 0.1s; user-select: none; }
-    .pin-btn:hover { background: rgba(255,255,255,0.2); }
-    .pin-btn:active { transform: scale(0.9); background: var(--gold); color: var(--burgundy-dark); }
-    .pin-btn.del { font-family: 'DM Sans', sans-serif; font-size: 20px; }
-    .pin-btn.empty { background: transparent !important; cursor: default; }
-    .pin-error { color: #F28B82; font-size: 13px; margin-top: 16px; min-height: 18px; font-weight: 500; }
+const app = express();
+const PORT = process.env.PORT || 8080;
 
-    /* ── APP CHROME ───────────────────────────────────────────────────────── */
-    .header { background: var(--burgundy-dark); padding: 18px 20px 14px; position: sticky; top: 0; z-index: 100; display: flex; align-items: center; justify-content: space-between; box-shadow: 0 2px 16px rgba(0,0,0,0.3); }
-    .header-left { display: flex; align-items: center; gap: 10px; }
-    .logo-mark { width: 36px; height: 36px; background: var(--gold); border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; }
-    .header-title { font-family: 'Playfair Display', serif; color: var(--cream); font-size: 20px; }
-    .header-date { color: var(--gold-light); font-size: 12px; font-weight: 500; }
-    .header-right { display: flex; gap: 8px; align-items: center; }
-    .user-badge { background: rgba(201,168,76,0.2); border: 1px solid var(--gold); border-radius: 20px; padding: 4px 12px; color: var(--gold-light); font-size: 12px; font-weight: 500; }
-    .btn-icon { background: rgba(255,255,255,0.1); border: none; border-radius: 10px; padding: 8px 12px; color: var(--cream); font-size: 13px; font-family: 'DM Sans', sans-serif; font-weight: 500; cursor: pointer; }
-    .btn-icon:hover { background: rgba(255,255,255,0.2); }
-    .tabs { background: var(--burgundy); display: flex; padding: 0 16px; gap: 4px; overflow-x: auto; scrollbar-width: none; }
-    .tabs::-webkit-scrollbar { display: none; }
-    .tab { padding: 12px 16px; color: rgba(247,242,234,0.6); font-size: 13px; font-weight: 500; cursor: pointer; border-bottom: 2px solid transparent; white-space: nowrap; transition: all 0.2s; }
-    .tab.active { color: var(--gold-light); border-bottom-color: var(--gold); }
-    .main { padding: 16px; max-width: 600px; margin: 0 auto; }
+app.use(cors({
+  origin: '*',
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+app.use(express.json());
+app.options('*', cors());
 
-    /* ── STATS ────────────────────────────────────────────────────────────── */
-    .stats-bar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 16px; }
-    .stat-card { background: var(--white); border-radius: var(--radius); padding: 12px 8px; text-align: center; box-shadow: var(--shadow); }
-    .stat-number { font-family: 'Playfair Display', serif; font-size: 22px; color: var(--burgundy); line-height: 1; }
-    .stat-number.warn { color: var(--orange); }
-    .stat-label { font-size: 10px; color: var(--gray); margin-top: 4px; font-weight: 500; text-transform: uppercase; letter-spacing: 0.5px; }
+// Serve the Cellar Route frontend app from /public folder
+app.use(express.static(path.join(__dirname, 'public')));
 
-    /* ── FORMS & BUTTONS ──────────────────────────────────────────────────── */
-    .connect-card { background: var(--white); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); margin-bottom: 16px; border-left: 4px solid var(--gold); }
-    .connect-card h3 { font-family: 'Playfair Display', serif; font-size: 16px; color: var(--burgundy-dark); margin-bottom: 14px; }
-    .form-row { margin-bottom: 12px; }
-    .form-label { display: block; font-size: 11px; font-weight: 600; color: var(--gray); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px; }
-    .form-input { width: 100%; padding: 10px 14px; border: 1.5px solid var(--cream-dark); border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 14px; color: var(--charcoal); background: var(--cream); outline: none; transition: border-color 0.2s; }
-    .form-input:focus { border-color: var(--burgundy); background: var(--white); }
-    .form-select { width: 100%; padding: 10px 14px; border: 1.5px solid var(--cream-dark); border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 14px; color: var(--charcoal); background: var(--cream); outline: none; cursor: pointer; }
-    .btn-primary { width: 100%; padding: 13px; background: var(--burgundy); color: var(--cream); border: none; border-radius: 12px; font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 600; cursor: pointer; transition: background 0.2s; }
-    .btn-primary:hover { background: var(--burgundy-light); }
-    .btn-primary:disabled { background: var(--gray-light); cursor: not-allowed; }
-    .btn-secondary { padding: 9px 16px; background: var(--cream-dark); color: var(--burgundy); border: none; border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; }
-    .btn-gold { padding: 13px; background: var(--gold); color: var(--burgundy-dark); border: none; border-radius: 12px; font-family: 'DM Sans', sans-serif; font-size: 15px; font-weight: 700; cursor: pointer; width: 100%; }
-    .btn-gold:hover { background: var(--gold-light); }
-
-    /* ── INVOICE SELECTION LIST ───────────────────────────────────────────── */
-    .invoice-select-card { background: var(--white); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); margin-bottom: 16px; }
-    .invoice-select-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; flex-wrap: wrap; gap: 8px; }
-    .invoice-select-header h3 { font-family: 'Playfair Display', serif; font-size: 16px; color: var(--burgundy-dark); }
-    .select-actions { display: flex; gap: 8px; }
-    .btn-xs { padding: 5px 12px; background: var(--cream-dark); color: var(--burgundy); border: none; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 600; cursor: pointer; }
-    .btn-xs:hover { background: var(--gray-light); }
-    .state-group { margin-bottom: 10px; border: 1.5px solid var(--cream-dark); border-radius: 12px; overflow: hidden; }
-    .state-group-header { display: flex; align-items: center; gap: 10px; padding: 10px 14px; background: var(--cream); cursor: pointer; user-select: none; }
-    .state-group-header:hover { background: var(--cream-dark); }
-    .state-toggle-check { width: 18px; height: 18px; accent-color: var(--burgundy); cursor: pointer; flex-shrink: 0; }
-    .state-name { font-weight: 700; font-size: 13px; color: var(--burgundy-dark); flex: 1; text-transform: uppercase; letter-spacing: 0.5px; }
-    .state-count { font-size: 12px; color: var(--gray); font-weight: 500; }
-    .state-chevron { font-size: 11px; color: var(--gray); transition: transform 0.2s; }
-    .state-chevron.open { transform: rotate(180deg); }
-    .invoice-rows { border-top: 1px solid var(--cream-dark); }
-    .invoice-row { display: flex; align-items: center; gap: 10px; padding: 9px 14px; border-bottom: 1px solid var(--cream-dark); transition: background 0.15s; }
-    .invoice-row:last-child { border-bottom: none; }
-    .invoice-row:hover { background: #FAF7F2; }
-    .invoice-row.unchecked { opacity: 0.45; }
-    .inv-check { width: 16px; height: 16px; accent-color: var(--burgundy); cursor: pointer; flex-shrink: 0; }
-    .inv-customer { flex: 1; font-size: 13px; font-weight: 500; color: var(--charcoal); min-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .inv-city { font-size: 12px; color: var(--gray); white-space: nowrap; }
-    .inv-cases { font-size: 12px; color: var(--green); font-weight: 600; white-space: nowrap; }
-    .inv-amount { font-size: 12px; color: var(--burgundy); font-weight: 600; white-space: nowrap; }
-    .inv-overdue { font-size: 10px; font-weight: 700; color: var(--orange); background: var(--orange-light); padding: 2px 6px; border-radius: 6px; white-space: nowrap; flex-shrink: 0; }
-    .selection-summary { background: var(--cream); border-radius: 10px; padding: 10px 14px; margin-top: 12px; font-size: 13px; color: var(--burgundy-dark); font-weight: 500; display: flex; justify-content: space-between; align-items: center; }
-
-    /* ── OVERDUE SUMMARY BANNER ───────────────────────────────────────────── */
-    .overdue-summary { background: var(--orange-light); border: 1.5px solid var(--orange); border-radius: 12px; padding: 12px 16px; margin-bottom: 14px; display: flex; align-items: flex-start; gap: 10px; }
-    .overdue-summary-icon { font-size: 20px; flex-shrink: 0; }
-    .overdue-summary-text { flex: 1; }
-    .overdue-summary-title { font-size: 13px; font-weight: 700; color: var(--orange); margin-bottom: 3px; }
-    .overdue-summary-detail { font-size: 12px; color: var(--orange); opacity: 0.85; }
-
-    /* ── PLANNER ──────────────────────────────────────────────────────────── */
-    .planner-card { background: var(--burgundy-dark); border-radius: var(--radius); padding: 18px; margin-bottom: 16px; color: var(--cream); }
-    .planner-card h3 { font-family: 'Playfair Display', serif; font-size: 16px; color: var(--gold-light); margin-bottom: 14px; }
-    .planner-row { display: flex; gap: 10px; align-items: flex-end; margin-bottom: 12px; }
-    .planner-field { flex: 1; }
-    .planner-label { font-size: 11px; font-weight: 600; color: rgba(247,242,234,0.6); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 5px; display: block; }
-    .planner-input { width: 100%; padding: 10px 14px; border: 1.5px solid rgba(255,255,255,0.15); border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 14px; color: var(--cream); background: rgba(255,255,255,0.1); outline: none; }
-    .planner-input:focus { border-color: var(--gold); }
-    .planner-input::placeholder { color: rgba(247,242,234,0.4); }
-
-    /* ── CLUSTER CARDS ────────────────────────────────────────────────────── */
-    .cluster-card { background: var(--white); border-radius: var(--radius); padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow); }
-    .cluster-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; flex-wrap: wrap; gap: 8px; }
-    .cluster-title { font-family: 'Playfair Display', serif; font-size: 16px; color: var(--burgundy-dark); }
-    .cluster-meta { display: flex; gap: 6px; flex-wrap: wrap; }
-    .meta-pill { font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 20px; }
-    .meta-stops { background: var(--cream-dark); color: var(--burgundy); }
-    .meta-cases { background: var(--green-light); color: var(--green); }
-    .meta-cases.over { background: var(--orange-light); color: var(--orange); }
-    .cluster-color-dot { width: 14px; height: 14px; border-radius: 50%; flex-shrink: 0; display: inline-block; margin-right: 6px; vertical-align: middle; }
-
-    .stop-list { border-top: 1px solid var(--cream-dark); padding-top: 10px; }
-    .stop-row { display: flex; align-items: flex-start; gap: 10px; padding: 8px 0; border-bottom: 1px solid var(--cream-dark); }
-    .stop-row:last-child { border-bottom: none; }
-    .stop-num { width: 24px; height: 24px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; flex-shrink: 0; margin-top: 2px; color: white; }
-    .stop-details { flex: 1; min-width: 0; }
-    .stop-customer { font-size: 14px; font-weight: 600; color: var(--charcoal); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
-    .stop-overdue-badge { font-size: 10px; font-weight: 700; color: var(--orange); background: var(--orange-light); border: 1px solid var(--orange); padding: 2px 6px; border-radius: 6px; white-space: nowrap; }
-    .stop-address { font-size: 12px; color: var(--gray); margin-top: 2px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-    .stop-cases { font-size: 11px; color: var(--green); font-weight: 600; margin-top: 2px; }
-    .stop-inv { font-size: 10px; color: var(--gray-light); }
-    .btn-map-sm { background: var(--cream-dark); border: none; border-radius: 8px; padding: 6px 8px; font-size: 14px; cursor: pointer; flex-shrink: 0; }
-    .btn-gmaps { display: block; width: 100%; padding: 9px; background: var(--cream-dark); color: var(--burgundy); border: none; border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; text-align: center; margin-top: 10px; }
-
-    /* ── MAP VIEW ─────────────────────────────────────────────────────────── */
-    #view-map { display: none; }
-    #view-map.active { display: block; }
-    .map-toolbar { background: var(--white); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 12px; box-shadow: var(--shadow); display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
-    .map-toolbar-title { font-family: 'Playfair Display', serif; font-size: 15px; color: var(--burgundy-dark); flex: 1; }
-    .route-legend { display: flex; gap: 8px; flex-wrap: wrap; }
-    .legend-item { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--charcoal); font-weight: 500; }
-    .legend-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
-    #routeMap { width: 100%; height: 520px; border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
-    .map-reassign-panel { background: var(--white); border-radius: var(--radius); padding: 16px; margin-top: 12px; box-shadow: var(--shadow); display: none; border-left: 4px solid var(--gold); }
-    .map-reassign-panel.visible { display: block; }
-    .map-reassign-panel h4 { font-family: 'Playfair Display', serif; font-size: 15px; color: var(--burgundy-dark); margin-bottom: 10px; }
-    .reassign-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-    .reassign-select { flex: 1; min-width: 140px; padding: 9px 12px; border: 1.5px solid var(--cream-dark); border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 13px; color: var(--charcoal); background: var(--cream); outline: none; }
-    .btn-reassign { padding: 9px 18px; background: var(--burgundy); color: var(--cream); border: none; border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; }
-    .btn-cancel-reassign { padding: 9px 14px; background: var(--cream-dark); color: var(--gray); border: none; border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 13px; cursor: pointer; }
-
-    /* ── MAP LOADING ──────────────────────────────────────────────────────── */
-    .map-loading-overlay { position: absolute; inset: 0; background: rgba(247,242,234,0.85); display: flex; flex-direction: column; align-items: center; justify-content: center; z-index: 10; border-radius: var(--radius); }
-    .map-loading-overlay .spinner { width: 36px; height: 36px; border: 3px solid var(--cream-dark); border-top-color: var(--burgundy); border-radius: 50%; animation: spin 0.8s linear infinite; margin-bottom: 12px; }
-    .map-loading-overlay p { font-size: 13px; color: var(--burgundy); font-weight: 500; }
-    #routeMapWrapper { position: relative; }
-    .map-route-toggles { display:flex; flex-wrap:wrap; gap:8px; padding:10px 16px 4px; }
-    .route-toggle-btn { display:flex; align-items:center; gap:7px; padding:7px 14px; border-radius:20px; border:2px solid transparent; font-family:'DM Sans',sans-serif; font-size:12px; font-weight:600; cursor:pointer; transition:all 0.18s; background:var(--cream); color:var(--charcoal); }
-    .route-toggle-btn .toggle-dot { width:11px; height:11px; border-radius:50%; flex-shrink:0; }
-    .route-toggle-btn.active { color:white; }
-    .route-toggle-btn.inactive { opacity:0.45; background:var(--cream-dark); }
-    .route-toggle-all { background:var(--burgundy); color:var(--cream); border-color:var(--burgundy); }
-    .route-toggle-all.inactive { background:var(--cream-dark); color:var(--gray); border-color:transparent; opacity:0.7; }
-
-    /* ── WARN BANNER ──────────────────────────────────────────────────────── */
-    .warn-banner { background: var(--orange-light); border: 1.5px solid var(--orange); border-radius: 12px; padding: 12px 16px; margin-bottom: 14px; font-size: 13px; color: var(--orange); font-weight: 500; display: flex; gap: 8px; }
-
-    /* ── DELIVERY CARDS ───────────────────────────────────────────────────── */
-    .delivery-card { background: var(--white); border-radius: var(--radius); padding: 16px; margin-bottom: 12px; box-shadow: var(--shadow); position: relative; overflow: hidden; }
-    .delivery-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--burgundy); border-radius: 4px 0 0 4px; }
-    .delivery-card.completed::before { background: var(--green); }
-    .delivery-card.assigned::before { background: var(--gold); }
-    .card-top { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 8px; }
-    .card-top-left { flex: 1; }
-    .invoice-num { font-size: 11px; font-weight: 600; color: var(--gold); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 3px; }
-    .customer-name { font-family: 'Playfair Display', serif; font-size: 16px; color: var(--charcoal); line-height: 1.2; }
-    .card-badges { display: flex; gap: 6px; flex-direction: column; align-items: flex-end; }
-    .amount-badge { background: var(--cream); border: 1.5px solid var(--cream-dark); border-radius: 10px; padding: 4px 10px; font-size: 13px; font-weight: 600; color: var(--burgundy); white-space: nowrap; }
-    .cases-badge { background: var(--green-light); border-radius: 8px; padding: 3px 8px; font-size: 11px; font-weight: 600; color: var(--green); }
-    .cases-badge.unknown { background: var(--cream-dark); color: var(--gray); }
-    .address-row { display: flex; align-items: flex-start; gap: 7px; margin-bottom: 10px; }
-    .address-text { font-size: 13px; color: var(--gray); line-height: 1.4; }
-    .no-address { font-size: 12px; color: var(--gray-light); font-style: italic; }
-    .card-actions { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
-    .btn-complete { padding: 8px 14px; background: var(--green); color: white; border: none; border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; white-space: nowrap; }
-    .btn-map { padding: 8px 12px; background: var(--cream-dark); color: var(--burgundy); border: none; border-radius: 10px; font-size: 16px; cursor: pointer; }
-    .completed-banner { display: flex; align-items: center; gap: 6px; background: var(--green-light); color: var(--green); border-radius: 8px; padding: 7px 12px; font-size: 13px; font-weight: 600; width: 100%; }
-    .status-pill { display: inline-block; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.6px; padding: 3px 8px; border-radius: 6px; margin-top: 4px; }
-    .status-pill.unassigned { background: var(--cream-dark); color: var(--gray); }
-    .status-pill.assigned { background: #FDF3D8; color: #8B6914; }
-    .status-pill.completed { background: var(--green-light); color: var(--green); }
-
-    /* ── SECTION / DRIVER FILTER ──────────────────────────────────────────── */
-    .section-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; margin-top: 8px; }
-    .section-title { font-family: 'Playfair Display', serif; font-size: 17px; color: var(--burgundy-dark); }
-    .badge { background: var(--burgundy); color: var(--cream); font-size: 11px; font-weight: 600; padding: 3px 9px; border-radius: 20px; }
-    .driver-filter { display: flex; gap: 8px; overflow-x: auto; scrollbar-width: none; padding-bottom: 4px; margin-bottom: 16px; }
-    .driver-filter::-webkit-scrollbar { display: none; }
-    .driver-chip { padding: 8px 16px; border-radius: 20px; border: 1.5px solid var(--cream-dark); background: var(--white); color: var(--gray); font-size: 13px; font-weight: 500; cursor: pointer; white-space: nowrap; transition: all 0.2s; font-family: 'DM Sans', sans-serif; }
-    .driver-chip.active { background: var(--burgundy); border-color: var(--burgundy); color: var(--cream); }
-
-    /* ── SETTINGS ─────────────────────────────────────────────────────────── */
-    .settings-card { background: var(--white); border-radius: var(--radius); padding: 20px; box-shadow: var(--shadow); margin-bottom: 16px; }
-    .settings-card h3 { font-family: 'Playfair Display', serif; font-size: 16px; color: var(--burgundy-dark); margin-bottom: 14px; }
-    .driver-list { display: flex; flex-direction: column; gap: 8px; }
-    .btn-remove { background: none; border: none; color: var(--burgundy); font-size: 16px; cursor: pointer; padding: 4px; }
-    .pin-change-row { display: flex; gap: 8px; margin-top: 10px; }
-
-    /* ── LOADING / EMPTY ──────────────────────────────────────────────────── */
-    .empty-state { text-align: center; padding: 48px 24px; color: var(--gray); }
-    .empty-icon { font-size: 48px; margin-bottom: 12px; }
-    .empty-title { font-family: 'Playfair Display', serif; font-size: 18px; color: var(--burgundy-dark); margin-bottom: 8px; }
-    .empty-text { font-size: 14px; line-height: 1.5; }
-    .loading { text-align: center; padding: 40px; color: var(--gray); }
-    .spinner { width: 36px; height: 36px; border: 3px solid var(--cream-dark); border-top-color: var(--burgundy); border-radius: 50%; animation: spin 0.8s linear infinite; margin: 0 auto 14px; }
-    @keyframes spin { to { transform: rotate(360deg); } }
-
-    /* ── TOAST ────────────────────────────────────────────────────────────── */
-    .toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(80px); background: var(--charcoal); color: var(--cream); padding: 12px 20px; border-radius: 12px; font-size: 14px; font-weight: 500; z-index: 9998; transition: transform 0.3s cubic-bezier(0.34,1.56,0.64,1); white-space: nowrap; box-shadow: 0 8px 32px rgba(0,0,0,0.3); }
-    .toast.show { transform: translateX(-50%) translateY(0); }
-
-    .view { display: none; }
-    .view.active { display: block; }
-
-    /* ── GOOGLE MAPS INFO WINDOW ──────────────────────────────────────────── */
-    .gm-popup { font-family: 'DM Sans', sans-serif; min-width: 200px; }
-    .gm-popup .popup-inv { font-size: 10px; font-weight: 700; color: var(--gold); text-transform: uppercase; letter-spacing: 0.8px; margin-bottom: 3px; }
-    .gm-popup .popup-customer { font-family: 'Playfair Display', serif; font-size: 15px; color: var(--charcoal); margin-bottom: 5px; line-height: 1.2; }
-    .gm-popup .popup-address { font-size: 12px; color: var(--gray); margin-bottom: 6px; line-height: 1.4; }
-    .gm-popup .popup-meta { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
-    .gm-popup .popup-cases { font-size: 11px; font-weight: 600; color: var(--green); background: var(--green-light); padding: 2px 8px; border-radius: 6px; }
-    .gm-popup .popup-route { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 6px; color: white; }
-    .gm-popup .popup-overdue { font-size: 11px; font-weight: 700; color: var(--orange); background: var(--orange-light); padding: 2px 8px; border-radius: 6px; }
-    .gm-popup .popup-reassign-btn { width: 100%; padding: 7px; background: var(--burgundy); color: var(--cream); border: none; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 600; cursor: pointer; margin-top: 4px; }
-    .gm-popup .popup-reassign-btn:hover { background: var(--burgundy-light); }
-
-    /* ── PDF DOWNLOAD ─────────────────────────────────────────────────────── */
-    .pdf-panel { background: var(--white); border-radius: var(--radius); padding: 18px; margin-bottom: 16px; box-shadow: var(--shadow); border-left: 4px solid var(--burgundy); }
-    .pdf-panel h3 { font-family: 'Playfair Display', serif; font-size: 15px; color: var(--burgundy-dark); margin-bottom: 12px; }
-    .pdf-overdue-note { font-size: 12px; color: var(--orange); background: var(--orange-light); border-radius: 8px; padding: 8px 12px; margin-bottom: 12px; display: none; }
-    .pdf-overdue-note.visible { display: block; }
-    .pdf-progress { background: var(--cream-dark); border-radius: 8px; overflow: hidden; height: 6px; margin: 8px 0 4px; display: none; }
-    .pdf-progress-bar { height: 100%; background: var(--burgundy); border-radius: 8px; transition: width 0.3s; width: 0%; }
-    .pdf-status { font-size: 12px; color: var(--gray); min-height: 16px; }
-  </style>
-</head>
-<body>
-
-<!-- ═══════════════════════ LOGIN SCREEN ═══════════════════════════════════ -->
-<div id="loginScreen">
-  <div class="login-logo">🍷</div>
-  <div class="login-title">Cellar Route</div>
-  <div class="login-subtitle">Classic Wines Inc.</div>
-  <div class="login-step" id="pinStep">
-    <div class="pin-label">Enter your PIN</div>
-    <div class="pin-dots" id="pinDots">
-      <div class="pin-dot" id="dot0"></div><div class="pin-dot" id="dot1"></div>
-      <div class="pin-dot" id="dot2"></div><div class="pin-dot" id="dot3"></div>
-    </div>
-    <div class="pin-pad">
-      <button class="pin-btn" onclick="pinPress('1')">1</button>
-      <button class="pin-btn" onclick="pinPress('2')">2</button>
-      <button class="pin-btn" onclick="pinPress('3')">3</button>
-      <button class="pin-btn" onclick="pinPress('4')">4</button>
-      <button class="pin-btn" onclick="pinPress('5')">5</button>
-      <button class="pin-btn" onclick="pinPress('6')">6</button>
-      <button class="pin-btn" onclick="pinPress('7')">7</button>
-      <button class="pin-btn" onclick="pinPress('8')">8</button>
-      <button class="pin-btn" onclick="pinPress('9')">9</button>
-      <button class="pin-btn empty" disabled></button>
-      <button class="pin-btn" onclick="pinPress('0')">0</button>
-      <button class="pin-btn del" onclick="pinDelete()">⌫</button>
-    </div>
-    <div class="pin-error" id="pinError"></div>
-  </div>
-</div>
-
-<!-- ═══════════════════════ MAIN APP ═══════════════════════════════════════ -->
-<div id="appShell" style="display:none">
-  <div class="header">
-    <div class="header-left">
-      <div class="logo-mark">🍷</div>
-      <div>
-        <div class="header-title">Cellar Route</div>
-        <div class="header-date" id="todayDate"></div>
-      </div>
-    </div>
-    <div class="header-right">
-      <button class="btn-icon" onclick="refreshInvoices()">↻</button>
-      <button class="btn-icon" onclick="showTab('settings')">⚙</button>
-      <button class="btn-icon" onclick="logout()" title="Log out">⏻</button>
-    </div>
-  </div>
-
-  <div class="tabs">
-    <div class="tab active" onclick="showTab('route')">Route Planner</div>
-    <div class="tab" onclick="showTab('map')">Route Map</div>
-    <div class="tab" onclick="showTab('settings')">Settings</div>
-  </div>
-
-  <div class="main">
-
-    <!-- ══ ROUTE PLANNER ══ -->
-    <div class="view active" id="view-route">
-      <div id="tokenBanner" style="display:none;border-radius:var(--radius);padding:14px 16px;margin-bottom:16px;font-size:13px;font-weight:500;align-items:flex-start;gap:10px;"></div>
-
-      <div class="connect-card" id="connectCard">
-        <h3>🔌 QuickBooks</h3>
-        <p style="font-size:13px;color:var(--gray);margin-bottom:16px">Credentials are stored securely on the server. Hit the button below to pull today's deliveries.</p>
-        <p style="font-size:12px;color:var(--green);background:var(--green-light);padding:10px 14px;border-radius:10px;margin-bottom:14px">🔄 Auto-refresh is active — tokens renew automatically all day.</p>
-        <button class="btn-primary" id="fetchBtn" onclick="fetchInvoices()">Pull Today's Deliveries</button>
-      </div>
-
-      <div id="plannerSection" style="display:none">
-        <div class="stats-bar">
-          <div class="stat-card"><div class="stat-number" id="stat-total">0</div><div class="stat-label">Stops</div></div>
-          <div class="stat-card"><div class="stat-number" id="stat-cases">0</div><div class="stat-label">Cases</div></div>
-          <div class="stat-card"><div class="stat-number" id="stat-vans">0</div><div class="stat-label">Vans Min</div></div>
-          <div class="stat-card"><div class="stat-number" id="stat-done">0</div><div class="stat-label">Done</div></div>
-        </div>
-
-        <!-- OVERDUE SUMMARY — shown after fetch if any overdue customers on today's route -->
-        <div class="overdue-summary" id="overdueSummary" style="display:none">
-          <div class="overdue-summary-icon">⚠️</div>
-          <div class="overdue-summary-text">
-            <div class="overdue-summary-title" id="overdueSummaryTitle"></div>
-            <div class="overdue-summary-detail">Statements will be included automatically in the printed PDF after each overdue customer's invoice.</div>
-          </div>
-        </div>
-
-        <!-- INVOICE SELECTION -->
-        <div class="invoice-select-card" id="invoiceSelectCard">
-          <div class="invoice-select-header">
-            <h3>📋 Select Invoices to Route</h3>
-            <div class="select-actions">
-              <button class="btn-xs" onclick="selectAllInvoices()">All</button>
-              <button class="btn-xs" onclick="deselectAllInvoices()">None</button>
-            </div>
-          </div>
-          <div id="invoiceStateGroups"></div>
-          <div class="selection-summary">
-            <span id="selectionSummaryText">0 invoices selected</span>
-            <span id="selectionCasesText" style="color:var(--green);font-weight:600;"></span>
-          </div>
-        </div>
-
-        <div class="planner-card">
-          <h3>🚚 Auto-Route Planner</h3>
-          <div class="planner-row">
-            <div class="planner-field">
-              <label class="planner-label">Drivers today</label>
-              <input class="planner-input" type="number" id="driverCount" min="1" max="20" placeholder="e.g. 4" />
-            </div>
-            <div class="planner-field">
-              <label class="planner-label">Max cases/van</label>
-              <input class="planner-input" type="number" id="caseLimit" value="250" min="1" />
-            </div>
-          </div>
-          <button class="btn-gold" onclick="runAutoRoute()">⚡ Generate Optimal Routes</button>
-        </div>
-
-        <div id="warningBanners"></div>
-        <div id="clusterList"></div>
-
-        <!-- PDF DOWNLOAD PANEL -->
-        <div class="pdf-panel" id="pdfPanel" style="display:none">
-          <h3>📄 Print-Ready Invoice PDF</h3>
-          <p style="font-size:13px;color:var(--gray);margin-bottom:10px">Downloads all invoices in delivery order, grouped by route. Statements are automatically included after overdue customers' invoices.</p>
-          <div class="pdf-overdue-note" id="pdfOverdueNote"></div>
-          <button class="btn-gold" id="btnAllPdf" onclick="downloadAllRoutesPdf()" style="font-size:14px;padding:13px">
-            ⬇ Download Combined PDF — All Routes
-          </button>
-          <div class="pdf-progress" id="pdfProgress"><div class="pdf-progress-bar" id="pdfProgressBar"></div></div>
-          <div class="pdf-status" id="pdfStatus"></div>
-        </div>
-      </div>
-
-      <div id="routeLoading" style="display:none" class="loading">
-        <div class="spinner"></div>Pulling invoices from QuickBooks...
-      </div>
-    </div>
-
-    <!-- ══ ROUTE MAP ══ -->
-    <div class="view" id="view-map">
-      <div id="mapEmptyState" class="empty-state" style="display:none">
-        <div class="empty-icon">🗺️</div>
-        <div class="empty-title">No routes yet</div>
-        <div class="empty-text">Generate routes in the Route Planner tab first, then come back here to see them on the map.</div>
-      </div>
-      <div id="mapContent" style="display:none">
-        <div class="map-toolbar">
-          <div class="map-toolbar-title">🗺 Route Map</div>
-          <div class="route-legend" id="routeLegend"></div>
-        </div>
-        <div class="map-route-toggles" id="mapRouteToggles"></div>
-        <div id="routeMapWrapper">
-          <div id="routeMap"></div>
-        </div>
-        <div class="map-reassign-panel" id="reassignPanel">
-          <h4 id="reassignTitle">Move stop to a different route</h4>
-          <div class="reassign-row">
-            <select class="reassign-select" id="reassignSelect"></select>
-            <button class="btn-reassign" onclick="confirmReassign()">Move Stop</button>
-            <button class="btn-cancel-reassign" onclick="cancelReassign()">Cancel</button>
-          </div>
-        </div>
-      </div>
-    </div>
-
-    <!-- ══ SETTINGS ══ -->
-    <div class="view" id="view-settings">
-      <div class="settings-card">
-        <h3>🔐 Change PIN</h3>
-        <p style="font-size:13px;color:var(--gray);margin-bottom:10px">Current PIN is shared with your whole team.</p>
-        <div class="pin-change-row">
-          <input class="form-input" type="password" id="newPin" placeholder="New 4-digit PIN" maxlength="4" />
-          <button class="btn-secondary" onclick="changePin()">Save</button>
-        </div>
-      </div>
-      <div class="settings-card">
-        <h3>🔗 Server URL</h3>
-        <div class="form-row">
-          <input class="form-input" type="text" id="serverUrl" placeholder="https://cellar-route-server-production.up.railway.app" />
-        </div>
-        <button class="btn-primary" onclick="saveSettings()">Save Settings</button>
-      </div>
-      <div class="settings-card">
-        <h3>🗑️ Reset Data</h3>
-        <button class="btn-primary" style="background:var(--gray)" onclick="clearAll()">Clear All Delivery Data</button>
-      </div>
-    </div>
-
-  </div>
-</div>
-
-<div class="toast" id="toast"></div>
-
-<script>
-// ═══════════════════ CONFIG ═══════════════════════════════════════════════════
-let GOOGLE_MAPS_KEY = '';
-let gmapsLoaded = false;
-let gmapsLoadPromise = null;
-
-const ROUTE_COLORS = [
-  '#E05A2B', '#2E7D5B', '#4338CA', '#B5432A',
-  '#0369A1', '#7C3AED', '#B45309', '#0F766E',
-  '#C026D3', '#065F46', '#9333EA', '#1D4ED8'
-];
-
-// ═══════════════════ WAREHOUSE ════════════════════════════════════════════════
-const WAREHOUSE = { lat: 41.0534, lng: -73.5387 };
-
-// ═══════════════════ ZIP → COORDINATES MAP ════════════════════════════════════
-const ZIP_MAP = {
-  '100': { lat:40.78, lng:-73.97 }, '101': { lat:40.75, lng:-73.99 },
-  '102': { lat:40.71, lng:-74.01 }, '104': { lat:40.84, lng:-73.87 },
-  '103': { lat:40.58, lng:-74.15 }, '112': { lat:40.65, lng:-73.95 },
-  '110': { lat:40.73, lng:-73.79 }, '111': { lat:40.72, lng:-73.85 },
-  '113': { lat:40.70, lng:-73.74 }, '114': { lat:40.73, lng:-73.70 },
-  '115': { lat:40.72, lng:-73.60 }, '116': { lat:40.80, lng:-73.50 },
-  '117': { lat:40.82, lng:-73.33 }, '118': { lat:40.87, lng:-73.20 },
-  '119': { lat:40.92, lng:-73.10 }, '105': { lat:41.05, lng:-73.82 },
-  '106': { lat:41.10, lng:-73.78 }, '107': { lat:41.00, lng:-73.85 },
-  '108': { lat:41.15, lng:-73.72 }, '109': { lat:41.30, lng:-73.75 },
-  '125': { lat:41.70, lng:-73.93 }, '126': { lat:41.50, lng:-74.00 },
-  '127': { lat:41.90, lng:-73.98 }, '128': { lat:42.10, lng:-74.36 },
-  '070': { lat:40.92, lng:-74.17 }, '071': { lat:40.86, lng:-74.07 },
-  '072': { lat:40.80, lng:-74.12 }, '073': { lat:40.73, lng:-74.17 },
-  '074': { lat:41.00, lng:-74.30 }, '075': { lat:40.95, lng:-74.13 },
-  '076': { lat:40.88, lng:-74.25 }, '077': { lat:40.57, lng:-74.15 },
-  '078': { lat:40.77, lng:-74.32 }, '079': { lat:40.83, lng:-74.32 },
-  '080': { lat:39.93, lng:-74.99 }, '081': { lat:39.95, lng:-74.20 },
-  '082': { lat:39.72, lng:-75.11 }, '083': { lat:39.50, lng:-75.02 },
-  '084': { lat:40.22, lng:-74.76 }, '085': { lat:40.22, lng:-74.76 },
-  '086': { lat:40.22, lng:-74.76 }, '087': { lat:40.43, lng:-74.42 },
-  '088': { lat:40.50, lng:-74.30 }, '089': { lat:40.45, lng:-74.38 },
-  '069': { lat:41.08, lng:-73.55 }, '068': { lat:41.05, lng:-73.54 },
-  '066': { lat:41.45, lng:-73.42 }, '067': { lat:41.60, lng:-73.05 },
-  '065': { lat:41.16, lng:-73.20 }, '064': { lat:41.35, lng:-73.08 },
-  '063': { lat:41.30, lng:-72.92 }, '060': { lat:41.76, lng:-72.68 },
-  '061': { lat:41.82, lng:-72.52 }, '062': { lat:41.56, lng:-72.08 },
-  '200': { lat:38.91, lng:-77.02 }, '201': { lat:38.88, lng:-77.10 },
-  '202': { lat:38.89, lng:-77.03 }, '203': { lat:38.85, lng:-76.99 },
-  '204': { lat:38.94, lng:-77.07 }, '205': { lat:38.96, lng:-77.09 },
-  '190': { lat:39.95, lng:-75.16 }, '191': { lat:39.95, lng:-75.17 },
-  '192': { lat:39.95, lng:-75.15 }, '193': { lat:40.04, lng:-75.37 },
-  '194': { lat:40.09, lng:-75.31 }, '195': { lat:40.24, lng:-75.35 },
-  '196': { lat:40.19, lng:-75.18 },
-  '150': { lat:40.44, lng:-79.99 }, '151': { lat:40.44, lng:-80.00 },
-  '152': { lat:40.37, lng:-79.86 }, '153': { lat:40.30, lng:-79.54 },
-  '154': { lat:40.00, lng:-79.57 }, '155': { lat:40.25, lng:-79.18 },
-  '156': { lat:40.31, lng:-79.55 }, '157': { lat:40.40, lng:-78.92 },
-  '158': { lat:40.48, lng:-78.40 }, '159': { lat:40.50, lng:-78.70 },
-  '160': { lat:41.24, lng:-80.50 }, '161': { lat:41.41, lng:-79.83 },
-  '162': { lat:41.12, lng:-79.19 }, '163': { lat:41.23, lng:-79.90 },
-  '164': { lat:42.13, lng:-80.08 }, '165': { lat:41.85, lng:-80.13 },
-  '166': { lat:40.79, lng:-77.86 }, '167': { lat:40.93, lng:-78.02 },
-  '168': { lat:40.90, lng:-77.79 }, '169': { lat:40.60, lng:-77.57 },
-  '180': { lat:40.61, lng:-75.47 }, '181': { lat:40.60, lng:-75.49 },
-  '182': { lat:40.76, lng:-75.22 }, '183': { lat:40.68, lng:-75.21 },
-  '184': { lat:41.41, lng:-75.66 }, '185': { lat:41.24, lng:-75.88 },
-  '186': { lat:41.07, lng:-76.07 }, '187': { lat:41.05, lng:-76.46 },
-  '188': { lat:41.00, lng:-75.97 }, '189': { lat:40.32, lng:-75.13 },
-  '176': { lat:41.24, lng:-76.92 }, '177': { lat:41.24, lng:-76.92 },
-  '178': { lat:40.27, lng:-76.88 }, '179': { lat:40.07, lng:-76.31 },
-  '170': { lat:40.27, lng:-76.88 }, '171': { lat:40.26, lng:-76.87 },
-  '172': { lat:40.04, lng:-76.31 }, '173': { lat:40.04, lng:-76.30 },
-  '174': { lat:40.04, lng:-76.31 }, '175': { lat:40.42, lng:-76.93 },
-  '197': { lat:39.74, lng:-75.54 }, '198': { lat:39.74, lng:-75.55 },
-  '199': { lat:39.68, lng:-75.75 },
+// ─── TOKEN STORE ─────────────────────────────────────────────────────────────
+let tokenStore = {
+  accessToken: null,
+  refreshToken: process.env.QB_REFRESH_TOKEN || null,
+  clientId: process.env.QB_CLIENT_ID || null,
+  clientSecret: process.env.QB_CLIENT_SECRET || null,
+  companyId: process.env.QB_COMPANY_ID || null,
+  environment: process.env.QB_ENVIRONMENT || 'sandbox',
+  expiresAt: null,
+  refreshTokenExpiresAt: Date.now() + (101 * 24 * 60 * 60 * 1000)
 };
 
-function getCoords(inv) {
-  const addr = (inv.shipAddress?.zip ? inv.shipAddress : null)
-    || (inv.billAddress?.zip ? inv.billAddress : null)
-    || inv.shipAddress || inv.billAddress;
-  if (!addr || !addr.zip) return null;
-  const z = addr.zip.toString().replace(/\D/g, '').padStart(5, '0');
-  const info = ZIP_MAP[z.slice(0,3)] || ZIP_MAP[z.slice(0,2).padStart(3,'0')];
-  if (!info) return null;
-  const seed = (inv.id ? parseInt(inv.id, 10) : 0) % 100;
-  return {
-    lat: info.lat + ((seed % 10) - 5) * 0.0025,
-    lng: info.lng + (Math.floor(seed / 10) - 5) * 0.0025
-  };
-}
-
-function getStateLabel(inv) {
-  const addr = (inv.shipAddress?.zip ? inv.shipAddress : null)
-    || (inv.billAddress?.zip ? inv.billAddress : null)
-    || inv.shipAddress || inv.billAddress;
-  if (!addr) return 'Unknown';
-  const z = addr.zip ? addr.zip.toString().replace(/\D/g,'').padStart(5,'0') : '';
-  const prefix3 = z.slice(0,3), prefix2 = z.slice(0,2).padStart(3,'0');
-  const nyc3 = ['100','101','102','104','103'];
-  const li3  = ['115','116','117','118','119'];
-  const bk3  = ['112']; const qns3 = ['110','111','113','114'];
-  const bx3  = ['104'];
-  if (nyc3.includes(prefix3)||bk3.includes(prefix3)||qns3.includes(prefix3)||bx3.includes(prefix3)) return 'NY — New York City';
-  if (li3.includes(prefix3)) return 'NY — Long Island';
-  const wc3 = ['105','106','107','108','109'];
-  if (wc3.includes(prefix3)) return 'NY — Westchester';
-  const hv3 = ['125','126','127','128'];
-  if (hv3.includes(prefix3)) return 'NY — Hudson Valley';
-  const nj2 = ['07','08'];
-  if (nj2.some(p => z.startsWith(p))) return 'NJ — New Jersey';
-  if (z.startsWith('06')) return 'CT — Connecticut';
-  const st = (addr.state||'').toUpperCase();
-  if (st === 'NJ') return 'NJ — New Jersey';
-  if (st === 'CT') return 'CT — Connecticut';
-  if (st === 'NY') return 'NY — New York';
-  if (st === 'PA') return 'PA — Pennsylvania';
-  if (st === 'DC') return 'DC — Washington DC';
-  if (st === 'DE') return 'DE — Delaware';
-  return addr.state || 'Unknown';
-}
-
-// ═══════════════════ ROUTING ENGINE (unchanged) ════════════════════════════
-const ZIP_ZONES = {
-  '100':'Manhattan','101':'Manhattan','102':'Manhattan',
-  '104':'Bronx','103':'StatenIsland','112':'Brooklyn',
-  '110':'Queens','111':'Queens','113':'Queens','114':'Queens',
-  '115':'LongIsland','116':'LongIsland','117':'LongIsland','118':'LongIsland','119':'LongIsland',
-  '105':'Westchester','106':'Westchester','107':'Westchester','108':'Westchester','109':'Westchester',
-  '125':'HudsonValley','126':'HudsonValley','127':'HudsonValley','128':'HudsonValley',
-  '070':'NJNorth','071':'NJNorth','072':'NJNorth','073':'NJNorth','074':'NJNorth',
-  '075':'NJNorth','076':'NJNorth','078':'NJNorth','079':'NJNorth',
-  '077':'NJCentral','087':'NJCentral','088':'NJCentral','089':'NJCentral',
-  '080':'NJSouth','081':'NJSouth','082':'NJSouth','083':'NJSouth',
-  '084':'NJSouth','085':'NJSouth','086':'NJSouth',
-  '068':'CTNear','069':'CTNear','066':'CTWest','067':'CTWest',
-  '060':'CTCentral','061':'CTCentral','062':'CTEast',
-  '063':'CTSouth','064':'CTSouth','065':'CTSouth',
-  '200':'DC','201':'DC','202':'DC','203':'DC','204':'DC','205':'DC',
-  '190':'PhillyPA','191':'PhillyPA','192':'PhillyPA','193':'PhillyPA',
-  '194':'PhillyPA','195':'PhillyPA','196':'PhillyPA','189':'PhillyPA',
-  '180':'LehighPA','181':'LehighPA','182':'LehighPA','183':'LehighPA',
-  '184':'LehighPA','185':'LehighPA','186':'LehighPA','187':'LehighPA','188':'LehighPA',
-  '176':'NEPennsylvania','177':'NEPennsylvania','178':'NEPennsylvania','179':'NEPennsylvania',
-  '170':'CentralPA','171':'CentralPA','172':'CentralPA','173':'CentralPA','174':'CentralPA','175':'CentralPA',
-  '150':'PittsburghPA','151':'PittsburghPA','152':'PittsburghPA','153':'PittsburghPA',
-  '154':'PittsburghPA','155':'PittsburghPA','156':'PittsburghPA','157':'PittsburghPA',
-  '158':'PittsburghPA','159':'PittsburghPA',
-  '160':'WesternPA','161':'WesternPA','162':'WesternPA','163':'WesternPA',
-  '164':'WesternPA','165':'WesternPA','166':'CentralPA','167':'CentralPA','168':'CentralPA','169':'CentralPA',
-  '197':'Delaware','198':'Delaware','199':'Delaware',
-};
-
-function getZone(inv) {
-  const addr = (inv.shipAddress?.zip ? inv.shipAddress : null)
-    || (inv.billAddress?.zip ? inv.billAddress : null)
-    || inv.shipAddress || inv.billAddress;
-  if (!addr || !addr.zip) return 'Unknown';
-  const z = addr.zip.toString().replace(/\D/g,'').padStart(5,'0');
-  return ZIP_ZONES[z.slice(0,3)] || ZIP_ZONES[z.slice(0,2).padStart(3,'0')] || 'Unknown';
-}
-
-const ZONE_PENALTY = {
-  'CTNear:LongIsland':8.0,'CTWest:LongIsland':8.0,'CTCentral:LongIsland':8.0,'CTSouth:LongIsland':8.0,'CTEast:LongIsland':8.0,
-  'NJSouth:Manhattan':5.0,'NJSouth:Brooklyn':5.0,'NJSouth:Queens':5.0,'NJSouth:LongIsland':6.0,'NJSouth:Bronx':5.0,
-  'NJSouth:StatenIsland':3.5,'NJSouth:Westchester':5.0,'NJSouth:HudsonValley':5.0,'NJSouth:CTNear':6.0,'NJSouth:CTWest':6.0,
-  'NJCentral:LongIsland':4.0,'NJCentral:CTNear':4.0,'NJCentral:CTWest':4.0,'NJCentral:Westchester':3.0,
-  'HudsonValley:LongIsland':4.0,'HudsonValley:NJSouth':4.5,'HudsonValley:NJCentral':3.0,
-  'StatenIsland:LongIsland':3.5,'StatenIsland:CTNear':3.5,'StatenIsland:Westchester':2.5,
-  'DC:LongIsland':6.0,'DC:CTNear':6.0,'DC:CTWest':6.0,'DC:CTCentral':6.0,'DC:CTEast':6.0,'DC:CTSouth':6.0,
-  'DC:Bronx':4.0,'DC:Queens':4.0,'DC:Brooklyn':4.0,'DC:Westchester':4.0,'DC:HudsonValley':5.0,
-  'DC:NJSouth':2.0,'DC:NJCentral':2.5,'DC:NJNorth':3.0,'DC:Manhattan':3.5,
-  'PhillyPA:LongIsland':4.0,'PhillyPA:CTNear':4.5,'PhillyPA:CTWest':4.5,'PhillyPA:Bronx':3.5,
-  'PhillyPA:Westchester':3.5,'PhillyPA:HudsonValley':4.0,'PhillyPA:Manhattan':3.0,'PhillyPA:Brooklyn':3.0,
-  'LehighPA:LongIsland':3.0,'LehighPA:CTNear':3.0,'LehighPA:CTWest':3.0,'LehighPA:DC':3.5,'LehighPA:PittsburghPA':4.0,
-  'PittsburghPA:LongIsland':7.0,'PittsburghPA:CTNear':7.0,'PittsburghPA:Manhattan':6.0,'PittsburghPA:NJNorth':5.0,
-  'PittsburghPA:NJSouth':4.5,'PittsburghPA:DC':4.0,'PittsburghPA:PhillyPA':3.0,
-  'NEPennsylvania:LongIsland':3.5,'NEPennsylvania:CTNear':2.5,'NEPennsylvania:Manhattan':3.0,'NEPennsylvania:NJSouth':3.0,
-};
-function zonePenalty(a,b){if(a===b)return 1.0;return ZONE_PENALTY[`${a}:${b}`]||ZONE_PENALTY[`${b}:${a}`]||1.0;}
-
-const CROSSINGS=[
-  ['NJNorth','Manhattan',{lat:40.851,lng:-73.953}],['NJNorth','Bronx',{lat:40.851,lng:-73.953}],
-  ['NJNorth','Westchester',{lat:40.851,lng:-73.953}],['NJNorth','HudsonValley',{lat:40.851,lng:-73.953}],
-  ['NJNorth','Brooklyn',{lat:40.740,lng:-74.030}],['NJNorth','Queens',{lat:40.740,lng:-74.030}],
-  ['NJCentral','Manhattan',{lat:40.640,lng:-74.150}],['NJCentral','Brooklyn',{lat:40.640,lng:-74.150}],
-  ['NJCentral','Queens',{lat:40.640,lng:-74.150}],['NJCentral','StatenIsland',{lat:40.640,lng:-74.150}],
-  ['NJSouth','Manhattan',{lat:40.200,lng:-74.750}],['NJSouth','Brooklyn',{lat:40.200,lng:-74.750}],
-  ['NJSouth','Queens',{lat:40.200,lng:-74.750}],['NJSouth','NJNorth',{lat:40.200,lng:-74.750}],
-  ['StatenIsland','Brooklyn',{lat:40.606,lng:-74.044}],['StatenIsland','Queens',{lat:40.606,lng:-74.044}],
-  ['StatenIsland','Manhattan',{lat:40.606,lng:-74.044}],
-  ['Queens','LongIsland',{lat:40.780,lng:-73.790}],['Bronx','LongIsland',{lat:40.805,lng:-73.793}],
-  ['Manhattan','LongIsland',{lat:40.780,lng:-73.790}],['Westchester','LongIsland',{lat:40.805,lng:-73.793}],
-  ['CTNear','LongIsland',{lat:40.805,lng:-73.793}],['CTWest','LongIsland',{lat:40.805,lng:-73.793}],
-  ['CTSouth','LongIsland',{lat:40.805,lng:-73.793}],['CTCentral','LongIsland',{lat:40.805,lng:-73.793}],
-  ['CTEast','LongIsland',{lat:40.805,lng:-73.793}],
-  ['CTNear','Manhattan',{lat:40.851,lng:-73.880}],['CTWest','Manhattan',{lat:40.851,lng:-73.880}],
-  ['CTSouth','Manhattan',{lat:40.851,lng:-73.880}],
-  ['DC','Manhattan',{lat:40.200,lng:-74.750}],['DC','Brooklyn',{lat:40.200,lng:-74.750}],
-  ['DC','NJNorth',{lat:39.550,lng:-75.400}],['DC','NJCentral',{lat:39.550,lng:-75.400}],
-  ['DC','NJSouth',{lat:39.400,lng:-75.100}],['DC','PhillyPA',{lat:39.880,lng:-75.250}],
-  ['PhillyPA','NJSouth',{lat:39.952,lng:-75.134}],['PhillyPA','NJCentral',{lat:39.952,lng:-75.134}],
-  ['PhillyPA','Manhattan',{lat:40.200,lng:-74.750}],['PhillyPA','DC',{lat:39.600,lng:-75.700}],
-  ['LehighPA','NJNorth',{lat:40.690,lng:-75.120}],['LehighPA','NJCentral',{lat:40.690,lng:-75.120}],
-  ['LehighPA','Manhattan',{lat:40.690,lng:-75.120}],
-  ['PittsburghPA','PhillyPA',{lat:40.100,lng:-77.000}],['PittsburghPA','DC',{lat:39.800,lng:-77.500}],
-];
-const CROSSING_MAP={};
-CROSSINGS.forEach(([a,b,wp])=>{CROSSING_MAP[`${a}|${b}`]=wp;CROSSING_MAP[`${b}|${a}`]=wp;});
-
-function haversine(a,b){const R=3958.8;const dLat=(b.lat-a.lat)*Math.PI/180;const dLng=(b.lng-a.lng)*Math.PI/180;const s=Math.sin(dLat/2)**2+Math.cos(a.lat*Math.PI/180)*Math.cos(b.lat*Math.PI/180)*Math.sin(dLng/2)**2;return R*2*Math.atan2(Math.sqrt(s),Math.sqrt(1-s));}
-function drivingDist(a,b,zA,zB){if(!a||!b)return 9999;const wp=CROSSING_MAP[`${zA}|${zB}`];const raw=wp?haversine(a,wp)+haversine(wp,b):haversine(a,b);return raw*zonePenalty(zA,zB);}
-function drivingDistFromPoint(point,stop,stopZone){return drivingDist(point,stop._coords,'CTNear',stopZone);}
-function routeDistance(stops){if(!stops.length)return 0;let d=drivingDistFromPoint(WAREHOUSE,stops[0],stops[0]._zone);for(let i=1;i<stops.length;i++)d+=drivingDist(stops[i-1]._coords,stops[i]._coords,stops[i-1]._zone,stops[i]._zone);d+=drivingDistFromPoint(WAREHOUSE,stops[stops.length-1],stops[stops.length-1]._zone);return d;}
-function nearestNeighborTSP(stops){if(stops.length<=1)return[...stops];const remaining=[...stops];const ordered=[];let cc=WAREHOUSE,cz='CTNear';while(remaining.length){let bi=0,bd=Infinity;remaining.forEach((s,i)=>{const d=drivingDist(cc,s._coords,cz,s._zone);if(d<bd){bd=d;bi=i;}});ordered.push(remaining[bi]);cc=remaining[bi]._coords;cz=remaining[bi]._zone;remaining.splice(bi,1);}return ordered;}
-function centroid(stops){const n=stops.length;return{lat:stops.reduce((s,i)=>s+i._coords.lat,0)/n,lng:stops.reduce((s,i)=>s+i._coords.lng,0)/n};}
-function buildTerritoryGroups(stops){const groups={};stops.forEach(s=>{const z=s._zone||'Unknown';if(!groups[z])groups[z]=[];groups[z].push(s);});return groups;}
-const ZONE_MERGE_AFFINITY={'CTNear':['Westchester','CTWest','CTSouth'],'CTWest':['CTNear','CTSouth','CTCentral'],'CTSouth':['CTNear','CTWest','CTCentral'],'CTCentral':['CTWest','CTSouth','CTEast'],'CTEast':['CTCentral','CTSouth'],'Westchester':['CTNear','Bronx','Manhattan','HudsonValley'],'HudsonValley':['Westchester','CTWest'],'Bronx':['Westchester','Manhattan','Queens'],'Manhattan':['Bronx','Brooklyn','Queens','NJNorth'],'Brooklyn':['Manhattan','Queens','StatenIsland'],'Queens':['Brooklyn','Manhattan','Bronx','LongIsland'],'LongIsland':['Queens'],'StatenIsland':['Brooklyn','NJNorth','NJCentral'],'NJNorth':['Manhattan','Bronx','StatenIsland','NJCentral'],'NJCentral':['NJNorth','StatenIsland'],'NJSouth':['NJCentral','PhillyPA','Delaware'],'DC':['PhillyPA','Delaware','NJSouth'],'PhillyPA':['Delaware','NJSouth','DC','LehighPA','NJCentral'],'Delaware':['PhillyPA','NJSouth','DC'],'LehighPA':['PhillyPA','NEPennsylvania','NJCentral','NJNorth'],'NEPennsylvania':['LehighPA','CentralPA','NJNorth'],'CentralPA':['LehighPA','NEPennsylvania','PittsburghPA','PhillyPA'],'PittsburghPA':['WesternPA','CentralPA'],'WesternPA':['PittsburghPA','CentralPA'],'Unknown':[]};
-function mergeSmallestGroup(groups){const keys=Object.keys(groups);keys.sort((a,b)=>groups[a].length-groups[b].length);const sk=keys[0];const aff=ZONE_MERGE_AFFINITY[sk]||[];let tk=null;for(const p of aff){if(groups[p]){tk=p;break;}}if(!tk){let bp=Infinity;keys.slice(1).forEach(k=>{const p=zonePenalty(sk,k);if(p<bp){bp=p;tk=k;}});}if(!tk)tk=keys[1];groups[tk]=[...groups[tk],...groups[sk]];delete groups[sk];}
-function rebalanceGroups(groups,maxPasses=50){const keys=Object.keys(groups);if(keys.length<2)return groups;let improved=true,pass=0;while(improved&&pass++<maxPasses){improved=false;const tsp={};const dists={};keys.forEach(k=>{tsp[k]=nearestNeighborTSP(groups[k]);dists[k]=routeDistance(tsp[k]);});const maxKey=keys.reduce((m,k)=>dists[k]>dists[m]?k:m,keys[0]);const minKey=keys.reduce((m,k)=>dists[k]<dists[m]?k:m,keys[0]);if(maxKey===minKey||dists[maxKey]-dists[minKey]<8)break;let bestGain=2,bestStop=-1;groups[maxKey].forEach((stop,si)=>{if(zonePenalty(stop._zone,minKey)>2.0)return;const without=groups[maxKey].filter((_,i)=>i!==si);const nfd=routeDistance(nearestNeighborTSP(without));const ntd=routeDistance(nearestNeighborTSP([...groups[minKey],stop]));const gain=(dists[maxKey]-nfd)-(ntd-dists[minKey]);if(gain>bestGain){bestGain=gain;bestStop=si;}});if(bestStop>=0){groups[minKey].push(groups[maxKey].splice(bestStop,1)[0]);improved=true;}}return groups;}
-
-function buildDistanceRoutes(selectedInvoices,driverCount,caseLimit){
-  selectedInvoices.forEach(inv=>{if(!inv._coords)inv._coords=getCoords(inv);if(!inv._zone)inv._zone=getZone(inv);});
-  const mappable=selectedInvoices.filter(inv=>inv._coords);
-  const unmappable=selectedInvoices.filter(inv=>!inv._coords);
-  let groups=buildTerritoryGroups(mappable);
-  while(Object.keys(groups).length>driverCount)mergeSmallestGroup(groups);
-  if(Object.keys(groups).length<driverCount&&mappable.length>=driverCount){const keys=Object.keys(groups);keys.sort((a,b)=>groups[b].length-groups[a].length);const bk=keys[0];const sorted=nearestNeighborTSP(groups[bk]);const half=Math.ceil(sorted.length/2);groups[bk+'_A']=sorted.slice(0,half);groups[bk+'_B']=sorted.slice(half);delete groups[bk];}
-  groups=rebalanceGroups(groups);
-  if(unmappable.length){const keys=Object.keys(groups);const sk=keys.reduce((m,k)=>routeDistance(groups[k])<routeDistance(groups[m])?k:m,keys[0]);groups[sk].push(...unmappable);}
-  const vans=Object.values(groups).map(grp=>{const ordered=nearestNeighborTSP(grp);const cases=ordered.reduce((s,i)=>s+(i.cases||0),0);const dist=Math.round(routeDistance(ordered));return{stops:ordered,cases,distance:dist,overLimit:cases>caseLimit};});
-  vans.sort((a,b)=>a.distance-b.distance);
-  return vans.map((van,i)=>({territory:`Route ${i+1}`,subRegion:null,stops:van.stops,cases:van.cases,distance:van.distance,overLimit:van.overLimit}));
-}
-
-// ═══════════════════ STATE ════════════════════════════════════════════════════
-let invoices=[], assignments={}, completed={}, clusters=[];
-let selectedInvoiceIds = new Set();
-let drivers=['Maria','John','Carlos','Tamika','Luis','Devon'];
-let serverUrl='https://cellar-route-server-production.up.railway.app';
-let activeTab='route', activeDriverFilter='all';
-let currentUser=null;
-let appPin='2024';
-
-// ── NEW: overdue state ────────────────────────────────────────────────────────
-// Map of customerId → { overdueBalance, invoiceCount } for customers with
-// at least one past-due invoice. Populated in parallel with invoice fetch.
-let overdueByCustomer = {};
-
-// Google Maps state
-let gMap=null, gMapMarkers=[], gMapPolylines=[], gInfoWindow=null, selectedStopForReassign=null;
-let visibleRoutes=new Set();
-
-// ═══════════════════ LOAD GOOGLE MAPS ════════════════════════════════════════
-function loadGoogleMaps(key){if(gmapsLoadPromise)return gmapsLoadPromise;gmapsLoadPromise=new Promise((resolve,reject)=>{if(window.google&&window.google.maps){gmapsLoaded=true;resolve();return;}window.__gmapsCallback=()=>{gmapsLoaded=true;resolve();};const script=document.getElementById('gmaps-script');script.src=`https://maps.googleapis.com/maps/api/js?key=${key}&libraries=geometry&callback=__gmapsCallback`;script.onerror=()=>reject(new Error('Failed to load Google Maps'));});return gmapsLoadPromise;}
-
-// ═══════════════════ PIN LOGIN ════════════════════════════════════════════════
-let pinEntry='';
-function pinPress(digit){if(pinEntry.length>=4)return;pinEntry+=digit;updateDots();if(pinEntry.length===4)setTimeout(checkPin,150);}
-function pinDelete(){pinEntry=pinEntry.slice(0,-1);updateDots();document.getElementById('pinError').textContent='';document.querySelectorAll('.pin-dot').forEach(d=>d.classList.remove('error'));}
-function updateDots(){for(let i=0;i<4;i++)document.getElementById('dot'+i).classList.toggle('filled',i<pinEntry.length);}
-function checkPin(){if(pinEntry===appPin){document.getElementById('loginScreen').classList.add('hidden');document.getElementById('appShell').style.display='block';document.getElementById('userBadge')&&(document.getElementById('userBadge').textContent='');initApp();setTimeout(()=>document.getElementById('loginScreen').style.display='none',400);}else{document.querySelectorAll('.pin-dot').forEach(d=>{d.classList.remove('filled');d.classList.add('error');});document.getElementById('pinError').textContent='Incorrect PIN. Try again.';pinEntry='';setTimeout(()=>document.querySelectorAll('.pin-dot').forEach(d=>d.classList.remove('error')),800);}}
-function logout(){currentUser=null;pinEntry='';updateDots();document.getElementById('pinError').textContent='';document.getElementById('pinStep').classList.remove('hidden');document.getElementById('loginScreen').style.display='flex';document.getElementById('loginScreen').classList.remove('hidden');document.getElementById('appShell').style.display='none';}
-function changePin(){const val=document.getElementById('newPin').value.trim();if(!/^\d{4}$/.test(val)){showToast('PIN must be exactly 4 digits');return;}appPin=val;document.getElementById('newPin').value='';saveState();showToast('✓ PIN updated');}
-
-// ═══════════════════ APP INIT ═════════════════════════════════════════════════
-async function initApp() {
+// ─── TOKEN REFRESH ────────────────────────────────────────────────────────────
+async function doTokenRefresh() {
+  if (!tokenStore.refreshToken || !tokenStore.clientId || !tokenStore.clientSecret) {
+    console.log('Missing credentials — cannot refresh token');
+    return false;
+  }
   try {
-    const base=(document.getElementById('serverUrl')?.value.trim())||serverUrl;
-    const cfg=await fetch(base+'/api/config').then(r=>r.json()).catch(()=>({}));
-    if(cfg.googleMapsKey){GOOGLE_MAPS_KEY=cfg.googleMapsKey;loadGoogleMaps(GOOGLE_MAPS_KEY).catch(()=>{});}
-  } catch(e){console.warn('Could not load config from server');}
-  const now=new Date();
-  document.getElementById('todayDate').textContent=now.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
-  const saved=sessionStorage.getItem('cellarRouteState');
-  if(saved){
-    const s=JSON.parse(saved);
-    invoices=s.invoices||[];assignments=s.assignments||{};completed=s.completed||{};
-    drivers=s.drivers||drivers;serverUrl=s.serverUrl||serverUrl;clusters=s.clusters||[];
-    if(s.appPin)appPin=s.appPin;
-    if(s.selectedInvoiceIds)selectedInvoiceIds=new Set(s.selectedInvoiceIds);
-    else selectedInvoiceIds=new Set(invoices.map(i=>i.id));
-    if(s.overdueByCustomer)overdueByCustomer=s.overdueByCustomer;
-  }
-  document.getElementById('serverUrl').value=serverUrl;
-  checkTokenStatus();
-  if(invoices.length>0){
-    document.getElementById('connectCard').style.display='none';
-    document.getElementById('plannerSection').style.display='block';
-    updateStats();renderInvoiceSelectionList();renderOverdueSummary();
-    if(clusters.length>0)renderClusters();
-  }
-}
-function saveState(){sessionStorage.setItem('cellarRouteState',JSON.stringify({invoices,assignments,completed,drivers,serverUrl,clusters,appPin,selectedInvoiceIds:[...selectedInvoiceIds],overdueByCustomer}));}
-
-// ═══════════════════ TABS ════════════════════════════════════════════════════
-function showTab(tab){activeTab=tab;document.querySelectorAll('.tab').forEach((t,i)=>{t.classList.toggle('active',['route','map','settings'][i]===tab);});document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));document.getElementById('view-'+tab).classList.add('active');if(tab==='map')setTimeout(()=>initOrRefreshMap(),80);}
-
-// ═══════════════════ FETCH INVOICES ══════════════════════════════════════════
-async function fetchInvoices() {
-  document.getElementById('fetchBtn').disabled=true;
-  document.getElementById('fetchBtn').textContent='Connecting...';
-  document.getElementById('connectCard').style.display='none';
-  document.getElementById('routeLoading').style.display='block';
-  try {
-    const base=document.getElementById('serverUrl').value.trim()||serverUrl;
-
-    // Fire invoices + overdue in parallel for speed
-    const [invRes, overdueRes] = await Promise.all([
-      fetch(base+'/api/invoices'),
-      fetch(base+'/api/overdue').catch(() => null) // overdue is non-critical
-    ]);
-
-    const data = await invRes.json();
-    if(!invRes.ok) throw new Error(data.error||'Failed to fetch invoices');
-    invoices=(data.invoices||[]).map(inv=>({...inv,cases:extractCases(inv)}));
-    assignments={};completed={};clusters=[];
-    selectedInvoiceIds=new Set(invoices.map(i=>i.id));
-
-    // Process overdue results
-    overdueByCustomer = {};
-    if(overdueRes && overdueRes.ok) {
-      const overdueData = await overdueRes.json();
-      (overdueData.overdueCustomers||[]).forEach(c => {
-        overdueByCustomer[c.customerId] = {
-          overdueBalance: c.overdueBalance,
-          invoiceCount: c.invoiceCount,
-          customerName: c.customerName
-        };
-      });
-    }
-
-    saveState();
-    document.getElementById('routeLoading').style.display='none';
-    document.getElementById('plannerSection').style.display='block';
-    updateStats();renderInvoiceSelectionList();renderOverdueSummary();
-
-    const overdueCount = Object.keys(overdueByCustomer).length;
-    const overdueOnRoute = invoices.filter(inv => overdueByCustomer[inv.customerId]).length;
-    let toastMsg = `✓ ${invoices.length} invoices loaded`;
-    if(overdueCount > 0) toastMsg += ` · ${overdueCount} overdue`;
-    showToast(toastMsg);
-  } catch(err) {
-    document.getElementById('routeLoading').style.display='none';
-    document.getElementById('connectCard').style.display='block';
-    document.getElementById('fetchBtn').disabled=false;
-    document.getElementById('fetchBtn').textContent="Pull Today's Deliveries";
-    showToast('❌ '+err.message);
-  }
-}
-
-function extractCases(inv){if(inv.lineItems&&Array.isArray(inv.lineItems)){const t=inv.lineItems.reduce((s,l)=>s+(Number(l.qty)||0),0);if(t>0)return t;}if(inv.totalAmount)return Math.max(1,Math.round(Number(inv.totalAmount)/120));return 1;}
-
-function refreshInvoices(){
-  invoices=[];assignments={};completed={};clusters=[];selectedInvoiceIds=new Set();overdueByCustomer={};
-  clearMapObjects();gMap=null;saveState();
-  document.getElementById('connectCard').style.display='block';
-  document.getElementById('plannerSection').style.display='none';
-  document.getElementById('fetchBtn').disabled=false;
-  document.getElementById('fetchBtn').textContent="Pull Today's Deliveries";
-  document.getElementById('clusterList').innerHTML='';
-  document.getElementById('warningBanners').innerHTML='';
-  document.getElementById('invoiceStateGroups').innerHTML='';
-  document.getElementById('overdueSummary').style.display='none';
-  showTab('route');
-}
-
-// ═══════════════════ OVERDUE SUMMARY BANNER ══════════════════════════════════
-function renderOverdueSummary() {
-  const banner = document.getElementById('overdueSummary');
-  const overdueCustomerIds = Object.keys(overdueByCustomer);
-  if(!overdueCustomerIds.length){ banner.style.display='none'; return; }
-
-  // Only count customers who appear on today's route
-  const overdueOnRoute = invoices.filter(inv => overdueByCustomer[inv.customerId]);
-  const uniqueOnRoute  = [...new Set(overdueOnRoute.map(inv => inv.customerId))];
-
-  if(!uniqueOnRoute.length){ banner.style.display='none'; return; }
-
-  const totalOwed = uniqueOnRoute.reduce((s, cid) => s + (overdueByCustomer[cid]?.overdueBalance || 0), 0);
-  document.getElementById('overdueSummaryTitle').textContent =
-    `${uniqueOnRoute.length} customer${uniqueOnRoute.length!==1?'s':''} on today's route have past-due balances totalling $${totalOwed.toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
-  banner.style.display='flex';
-}
-
-// ═══════════════════ INVOICE SELECTION LIST ══════════════════════════════════
-function renderInvoiceSelectionList() {
-  const byState={};
-  invoices.forEach(inv=>{const s=getStateLabel(inv);if(!byState[s])byState[s]=[];byState[s].push(inv);});
-  const sorted=Object.keys(byState).sort((a,b)=>a.localeCompare(b));
-  const container=document.getElementById('invoiceStateGroups');
-  container.innerHTML='';
-  sorted.forEach(state=>{
-    const group=byState[state];
-    const allChecked=group.every(inv=>selectedInvoiceIds.has(inv.id));
-    const someChecked=group.some(inv=>selectedInvoiceIds.has(inv.id));
-    const groupEl=document.createElement('div');
-    groupEl.className='state-group';groupEl.id=`state-group-${state.replace(/\W/g,'_')}`;
-    const totalCases=group.reduce((s,i)=>s+(i.cases||0),0);
-    groupEl.innerHTML=`
-      <div class="state-group-header" onclick="toggleStateGroup('${state}')">
-        <input type="checkbox" class="state-toggle-check" id="state-check-${state.replace(/\W/g,'_')}"
-          ${allChecked?'checked':''} onclick="event.stopPropagation();toggleStateCheck('${state}',this.checked)" />
-        <span class="state-name">${state}</span>
-        <span class="state-count">${group.length} stop${group.length!==1?'s':''} · ${totalCases} cases</span>
-        <span class="state-chevron open" id="chevron-${state.replace(/\W/g,'_')}">▼</span>
-      </div>
-      <div class="invoice-rows" id="rows-${state.replace(/\W/g,'_')}">
-        ${group.map(inv=>{
-          const addr=(inv.shipAddress?.zip?inv.shipAddress:null)||(inv.billAddress?.zip?inv.billAddress:null)||inv.shipAddress||inv.billAddress;
-          const city=addr?(addr.city||addr.line2||''):'';
-          const checked=selectedInvoiceIds.has(inv.id);
-          const isOverdue=!!overdueByCustomer[inv.customerId];
-          const overdueInfo=isOverdue?overdueByCustomer[inv.customerId]:null;
-          return `<div class="invoice-row ${checked?'':'unchecked'}" id="inv-row-${inv.id}">
-            <input type="checkbox" class="inv-check" ${checked?'checked':''}
-              onchange="toggleInvoiceCheck('${inv.id}',this.checked,'${state}')" />
-            <span class="inv-customer">${inv.customerName}</span>
-            <span class="inv-city">${city}</span>
-            <span class="inv-cases">📦 ${inv.cases}</span>
-            <span class="inv-amount">$${Number(inv.totalAmount||0).toFixed(0)}</span>
-            ${isOverdue?`<span class="inv-overdue" title="Overdue balance: $${overdueInfo.overdueBalance.toFixed(2)}">⚠ OVERDUE</span>`:''}
-          </div>`;
-        }).join('')}
-      </div>`;
-    container.appendChild(groupEl);
-    const cb=groupEl.querySelector(`#state-check-${state.replace(/\W/g,'_')}`);
-    if(!allChecked&&someChecked)cb.indeterminate=true;
-  });
-  updateSelectionSummary();
-}
-function toggleStateGroup(state){const key=state.replace(/\W/g,'_');const rows=document.getElementById(`rows-${key}`);const chev=document.getElementById(`chevron-${key}`);if(!rows)return;const isOpen=chev.classList.contains('open');rows.style.display=isOpen?'none':'block';chev.classList.toggle('open',!isOpen);}
-function toggleStateCheck(state,checked){const byState={};invoices.forEach(inv=>{const s=getStateLabel(inv);if(!byState[s])byState[s]=[];byState[s].push(inv);});(byState[state]||[]).forEach(inv=>{if(checked)selectedInvoiceIds.add(inv.id);else selectedInvoiceIds.delete(inv.id);const row=document.getElementById(`inv-row-${inv.id}`);if(row){row.classList.toggle('unchecked',!checked);const cb=row.querySelector('.inv-check');if(cb)cb.checked=checked;}});updateSelectionSummary();saveState();}
-function toggleInvoiceCheck(id,checked,state){if(checked)selectedInvoiceIds.add(id);else selectedInvoiceIds.delete(id);const row=document.getElementById(`inv-row-${id}`);if(row)row.classList.toggle('unchecked',!checked);const key=state.replace(/\W/g,'_');const stateInvs=invoices.filter(inv=>getStateLabel(inv)===state);const allChecked=stateInvs.every(inv=>selectedInvoiceIds.has(inv.id));const someChecked=stateInvs.some(inv=>selectedInvoiceIds.has(inv.id));const stateCb=document.getElementById(`state-check-${key}`);if(stateCb){stateCb.checked=allChecked;stateCb.indeterminate=!allChecked&&someChecked;}updateSelectionSummary();saveState();}
-function selectAllInvoices(){invoices.forEach(inv=>selectedInvoiceIds.add(inv.id));renderInvoiceSelectionList();saveState();}
-function deselectAllInvoices(){selectedInvoiceIds.clear();renderInvoiceSelectionList();saveState();}
-function updateSelectionSummary(){const sel=invoices.filter(inv=>selectedInvoiceIds.has(inv.id));const totalCases=sel.reduce((s,i)=>s+(i.cases||0),0);document.getElementById('selectionSummaryText').textContent=`${sel.length} of ${invoices.length} invoices selected`;document.getElementById('selectionCasesText').textContent=`${totalCases} cases`;}
-
-// ═══════════════════ AUTO ROUTE ═══════════════════════════════════════════════
-function runAutoRoute(){
-  const driverCount=parseInt(document.getElementById('driverCount').value)||0;
-  const caseLimit=parseInt(document.getElementById('caseLimit').value)||250;
-  if(!driverCount){showToast('Enter how many drivers you have today');return;}
-  const selectedInvoices=invoices.filter(inv=>selectedInvoiceIds.has(inv.id));
-  if(!selectedInvoices.length){showToast('No invoices selected');return;}
-  selectedInvoices.forEach(inv=>{if(!inv._coords)inv._coords=getCoords(inv);if(!inv._zone)inv._zone=getZone(inv);});
-  const geoVans=buildDistanceRoutes(selectedInvoices,driverCount,caseLimit);
-  clusters=geoVans.map((van,i)=>{const zones=[...new Set(van.stops.map(s=>s._zone||'').filter(Boolean))];const zoneLabel=zones.length<=3?zones.join(' + '):`${zones.slice(0,2).join(' + ')} +${zones.length-2} more`;return{id:i,stops:van.stops,cases:van.cases,distance:van.distance,zone:zoneLabel,territory:zoneLabel,overLimit:van.overLimit,color:ROUTE_COLORS[i%ROUTE_COLORS.length]};});
-  const warns=[];
-  clusters.filter(c=>c.overLimit).forEach(c=>warns.push(`⚠️ Route ${clusters.indexOf(c)+1} has ${c.cases} cases — over ${caseLimit} limit.`));
-  saveState();updateStats();
-  document.getElementById('warningBanners').innerHTML=warns.map(w=>`<div class="warn-banner"><span>${w.startsWith('⚠️')?'🟠':'ℹ️'}</span><span>${w}</span></div>`).join('');
-  renderClusters();
-  showToast(`✓ ${clusters.length} routes generated`);
-}
-
-// ═══════════════════ RENDER CLUSTERS ═════════════════════════════════════════
-function renderClusters(){
-  const list=document.getElementById('clusterList');
-  list.innerHTML='';
-  if(!clusters.length){list.innerHTML=`<div class="empty-state"><div class="empty-icon">🗺️</div><div class="empty-title">No routes yet</div><div class="empty-text">Enter your driver count and hit Generate.</div></div>`;return;}
-  const hdr=document.createElement('div');hdr.className='section-header';
-  hdr.innerHTML=`<div class="section-title">Route Assignments</div><span class="badge">${clusters.length} routes</span>`;
-  list.appendChild(hdr);
-  const mapBtn=document.createElement('button');mapBtn.className='btn-gold';mapBtn.style.marginBottom='16px';
-  mapBtn.textContent='🗺 View All Routes on Map';mapBtn.onclick=()=>showTab('map');
-  list.appendChild(mapBtn);
-  renderPdfPanel();
-  clusters.forEach((cluster,ci)=>{
-    const card=document.createElement('div');card.className='cluster-card';card.id=`cluster-${ci}`;
-    const mapsUrl=buildGoogleMapsUrl(cluster.stops);
-    const colorDot=`<span class="cluster-color-dot" style="background:${cluster.color}"></span>`;
-    card.innerHTML=`
-      <div class="cluster-header">
-        <div class="cluster-title">${colorDot}Route ${ci+1}</div>
-        <div class="cluster-meta">
-          <span class="meta-pill meta-stops">${cluster.stops.length} stops</span>
-          <span class="meta-pill meta-cases ${cluster.overLimit?'over':''}">${cluster.cases} cases</span>
-        </div>
-      </div>
-      <div class="stop-list">
-        ${cluster.stops.map((inv,si)=>{
-          const addr=inv.shipAddress||inv.billAddress;const isDone=completed[inv.id];
-          const isOverdue=!!overdueByCustomer[inv.customerId];
-          return `<div class="stop-row" style="${isDone?'opacity:0.5':''}">
-            <div class="stop-num" style="background:${isDone?'var(--green)':cluster.color}">${isDone?'✓':si+1}</div>
-            <div class="stop-details">
-              <div class="stop-customer">
-                ${inv.customerName}
-                ${isOverdue?`<span class="stop-overdue-badge">⚠ STMT</span>`:''}
-              </div>
-              <div class="stop-address">${addr?([addr.line1,addr.line2].filter(Boolean).join(', ')||'No address'):'No address'}</div>
-              <div class="stop-cases">📦 ${inv.cases} case${inv.cases!==1?'s':''}</div>
-              <div class="stop-inv">INV #${inv.invoiceNumber} · $${Number(inv.totalAmount||0).toFixed(2)}</div>
-            </div>
-            ${addr?`<button class="btn-map-sm" onclick="openMap('${encodeURIComponent([addr.line1,addr.line2].filter(Boolean).join(' '))}')">🗺</button>`:''}
-          </div>`;
-        }).join('')}
-      </div>
-      ${mapsUrl?`<button class="btn-gmaps" onclick="window.open('${mapsUrl}','_blank')">🗺 Open Full Route in Google Maps</button>`:''}`;
-    list.appendChild(card);
-  });
-}
-
-function buildGoogleMapsUrl(stops){const addrs=stops.map(inv=>{const a=inv.shipAddress||inv.billAddress;return a?(a.full||a.line1):null;}).filter(Boolean);if(!addrs.length)return null;const warehouseAddr=encodeURIComponent('52 Poplar St, Stamford, CT 06902');if(addrs.length===1)return `https://www.google.com/maps/dir/?api=1&origin=${warehouseAddr}&destination=${encodeURIComponent(addrs[0])}&travelmode=driving`;const dest=encodeURIComponent(addrs[addrs.length-1]);const wp=addrs.slice(0,-1).map(a=>encodeURIComponent(a)).join('|');return `https://www.google.com/maps/dir/?api=1&origin=${warehouseAddr}&destination=${dest}&waypoints=${wp}&travelmode=driving`;}
-
-// ═══════════════════ GOOGLE MAPS ══════════════════════════════════════════════
-function clearMapObjects(){gMapMarkers.forEach(m=>m.setMap(null));gMapPolylines.forEach(p=>p.setMap(null));gMapMarkers=[];gMapPolylines=[];if(gInfoWindow)gInfoWindow.close();}
-
-async function initOrRefreshMap(){
-  if(!clusters.length){document.getElementById('mapEmptyState').style.display='block';document.getElementById('mapContent').style.display='none';return;}
-  if(!GOOGLE_MAPS_KEY){try{const base=document.getElementById('serverUrl')?.value.trim()||serverUrl;const cfg=await fetch(base+'/api/config').then(r=>r.json()).catch(()=>({}));if(cfg.googleMapsKey)GOOGLE_MAPS_KEY=cfg.googleMapsKey;}catch(e){}}
-  if(!GOOGLE_MAPS_KEY){document.getElementById('mapEmptyState').style.display='block';document.getElementById('mapEmptyState').innerHTML=`<div class="empty-icon">⚠️</div><div class="empty-title">Map key not loaded</div><div class="empty-text">Set GOOGLE_MAPS_KEY in Railway environment variables.</div>`;document.getElementById('mapContent').style.display='none';return;}
-  document.getElementById('mapEmptyState').style.display='none';document.getElementById('mapContent').style.display='block';
-  const wrapper=document.getElementById('routeMapWrapper');
-  let loadingOverlay=document.getElementById('mapLoadingOverlay');
-  if(!loadingOverlay){loadingOverlay=document.createElement('div');loadingOverlay.id='mapLoadingOverlay';loadingOverlay.className='map-loading-overlay';loadingOverlay.innerHTML='<div class="spinner"></div><p>Loading map…</p>';wrapper.appendChild(loadingOverlay);}
-  loadingOverlay.style.display='flex';
-  document.getElementById('routeLegend').innerHTML=clusters.map((c,i)=>`<div class="legend-item"><div class="legend-dot" style="background:${c.color}"></div>Route ${i+1}</div>`).join('');
-  try{await loadGoogleMaps(GOOGLE_MAPS_KEY);}catch(e){loadingOverlay.style.display='none';showToast('❌ Could not load Google Maps');return;}
-  const allStops=[];
-  clusters.forEach((cluster,ci)=>{cluster.stops.forEach((inv,si)=>{const coords=inv._coords||getCoords(inv);if(coords)allStops.push({inv,ci,si,coords,color:cluster.color});});});
-  if(!allStops.length){loadingOverlay.style.display='none';document.getElementById('mapEmptyState').style.display='block';document.getElementById('mapEmptyState').innerHTML=`<div class="empty-icon">📍</div><div class="empty-title">No mappable stops</div><div class="empty-text">Check that your QuickBooks addresses include ZIP codes.</div>`;document.getElementById('mapContent').style.display='none';return;}
-  clearMapObjects();
-  visibleRoutes=new Set(clusters.map((_,i)=>i));
-  renderMapRouteToggles();
-  const mapEl=document.getElementById('routeMap');
-  mapEl.style.height='520px';
-  if(!gMap){gMap=new google.maps.Map(mapEl,{zoom:10,center:{lat:41.0534,lng:-73.5387},mapTypeId:'roadmap',mapTypeControl:true,mapTypeControlOptions:{style:google.maps.MapTypeControlStyle.HORIZONTAL_BAR,position:google.maps.ControlPosition.TOP_LEFT},fullscreenControl:true,streetViewControl:false,styles:[{featureType:'poi',elementType:'labels',stylers:[{visibility:'off'}]},{featureType:'transit',elementType:'labels',stylers:[{visibility:'off'}]}]});gInfoWindow=new google.maps.InfoWindow();}
-  const bounds=new google.maps.LatLngBounds();
-  const warehousePos={lat:41.0534,lng:-73.5387};bounds.extend(warehousePos);
-  const warehouseMarker=new google.maps.Marker({position:warehousePos,map:gMap,title:'Warehouse',icon:{path:google.maps.SymbolPath.CIRCLE,scale:14,fillColor:'#4A1320',fillOpacity:1,strokeColor:'#C9A84C',strokeWeight:3},label:{text:'🏭',fontSize:'14px'},zIndex:1000});
-  warehouseMarker.addListener('click',()=>{gInfoWindow.setContent(`<div class="gm-popup"><div class="popup-inv">WAREHOUSE</div><div class="popup-customer">52 Poplar St</div><div class="popup-address">Stamford, CT 06902</div></div>`);gInfoWindow.open(gMap,warehouseMarker);});
-  gMapMarkers.push(warehouseMarker);
-  const routeMapObjects={};
-  clusters.forEach((cluster,ci)=>{
-    const clusterStops=allStops.filter(s=>s.ci===ci);if(!clusterStops.length)return;
-    routeMapObjects[ci]={markers:[],polyline:null};
-    const pathCoords=[{lat:WAREHOUSE.lat,lng:WAREHOUSE.lng},...clusterStops.map(s=>({lat:s.coords.lat,lng:s.coords.lng})),{lat:WAREHOUSE.lat,lng:WAREHOUSE.lng}];
-    const polyline=new google.maps.Polyline({path:pathCoords,geodesic:true,strokeColor:cluster.color,strokeOpacity:0.75,strokeWeight:3,map:gMap});
-    gMapPolylines.push(polyline);routeMapObjects[ci].polyline=polyline;
-    clusterStops.forEach(({inv,si,coords,color})=>{
-      bounds.extend({lat:coords.lat,lng:coords.lng});
-      const isOverdue=!!overdueByCustomer[inv.customerId];
-      // Overdue stops get an orange ring around the marker
-      const svgIcon={url:`data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="32" height="38" viewBox="0 0 32 38"><path d="M16 0C7.163 0 0 7.163 0 16c0 10.627 14 22 16 22s16-11.373 16-22C32 7.163 24.837 0 16 0z" fill="${color}"/>${isOverdue?`<circle cx="16" cy="15" r="12" fill="none" stroke="#C4621D" stroke-width="2.5"/>`:'<circle cx="16" cy="15" r="10" fill="white" opacity="0.2"/>'}<text x="16" y="20" text-anchor="middle" font-family="DM Sans,sans-serif" font-size="11" font-weight="700" fill="white">${si+1}</text></svg>`)}`,scaledSize:new google.maps.Size(32,38),anchor:new google.maps.Point(16,38)};
-      const marker=new google.maps.Marker({position:{lat:coords.lat,lng:coords.lng},map:gMap,icon:svgIcon,title:inv.customerName,zIndex:100+si});
-      const addr=(inv.shipAddress?.zip?inv.shipAddress:null)||(inv.billAddress?.zip?inv.billAddress:null)||inv.shipAddress||inv.billAddress;
-      const addrText=addr?(addr.full||addr.line1||'No address'):'No address';
-      const overdueInfo=isOverdue?overdueByCustomer[inv.customerId]:null;
-      marker.addListener('click',()=>{
-        gInfoWindow.setContent(`<div class="gm-popup"><div class="popup-inv">INV #${inv.invoiceNumber} · Route ${ci+1}</div><div class="popup-customer">${inv.customerName}</div><div class="popup-address">📍 ${addrText}</div><div class="popup-meta"><span class="popup-cases">📦 ${inv.cases} cases</span><span class="popup-route" style="background:${color}">Route ${ci+1}</span>${isOverdue?`<span class="popup-overdue">⚠ $${overdueInfo.overdueBalance.toFixed(2)} overdue</span>`:''}</div><button class="popup-reassign-btn" onclick="openReassignPanel('${inv.id}',${ci})">↔ Move to Different Route</button></div>`);
-        gInfoWindow.open(gMap,marker);
-      });
-      gMapMarkers.push(marker);routeMapObjects[ci].markers.push(marker);
+    console.log('Refreshing access token...');
+    const credentials = Buffer.from(`${tokenStore.clientId}:${tokenStore.clientSecret}`).toString('base64');
+    const response = await fetch('https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${credentials}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept': 'application/json'
+      },
+      body: `grant_type=refresh_token&refresh_token=${encodeURIComponent(tokenStore.refreshToken)}`
     });
-  });
-  window._routeMapObjects=routeMapObjects;
-  gMap.fitBounds(bounds,{top:60,right:40,bottom:40,left:40});
-  loadingOverlay.style.display='none';
+    const data = await response.json();
+    if (!response.ok) {
+      console.error('Token refresh failed:', data.error);
+      return false;
+    }
+    tokenStore.accessToken = data.access_token;
+    tokenStore.refreshToken = data.refresh_token;
+    tokenStore.expiresAt = Date.now() + (data.expires_in - 300) * 1000;
+    tokenStore.refreshTokenExpiresAt = Date.now() + (101 * 24 * 60 * 60 * 1000);
+    console.log('✓ Access token refreshed successfully');
+    if (data.refresh_token !== process.env.QB_REFRESH_TOKEN) await saveRefreshTokenToRailway(data.refresh_token);
+    return true;
+  } catch (err) {
+    console.error('Token refresh error:', err);
+    return false;
+  }
 }
 
-// ═══════════════════ MAP ROUTE TOGGLES ═══════════════════════════════════════
-function renderMapRouteToggles(){const container=document.getElementById('mapRouteToggles');if(!container||!clusters.length)return;const allVisible=visibleRoutes.size===clusters.length;container.innerHTML=`<button class="route-toggle-btn route-toggle-all ${allVisible?'active':'inactive'}" onclick="toggleAllRoutes()">${allVisible?'👁 All Routes':'👁 Show All'}</button>${clusters.map((c,i)=>`<button class="route-toggle-btn ${visibleRoutes.has(i)?'active':'inactive'}" style="${visibleRoutes.has(i)?`background:${c.color};border-color:${c.color}`:'border-color:'+c.color}" onclick="toggleMapRoute(${i})"><span class="toggle-dot" style="background:${visibleRoutes.has(i)?'white':c.color}"></span>Route ${i+1}</button>`).join('')}`;}
-function toggleMapRoute(ci){if(visibleRoutes.has(ci)){if(visibleRoutes.size===1)return;visibleRoutes.delete(ci);}else{visibleRoutes.add(ci);}applyRouteVisibility();renderMapRouteToggles();}
-function toggleAllRoutes(){if(visibleRoutes.size===clusters.length){visibleRoutes=new Set([0]);}else{visibleRoutes=new Set(clusters.map((_,i)=>i));}applyRouteVisibility();renderMapRouteToggles();}
-function applyRouteVisibility(){const objs=window._routeMapObjects||{};clusters.forEach((_,ci)=>{const show=visibleRoutes.has(ci);const routeObj=objs[ci];if(!routeObj)return;routeObj.markers.forEach(m=>m.setVisible(show));if(routeObj.polyline)routeObj.polyline.setVisible(show);});}
+async function getValidAccessToken() {
+  if (!tokenStore.accessToken || (tokenStore.expiresAt && Date.now() >= tokenStore.expiresAt)) {
+    const success = await doTokenRefresh();
+    if (!success) return null;
+  }
+  return tokenStore.accessToken;
+}
 
-// ═══════════════════ REASSIGN STOP ═══════════════════════════════════════════
-function openReassignPanel(invId,currentClusterIdx){selectedStopForReassign={invId,currentClusterIdx};const inv=invoices.find(i=>i.id==invId);if(gInfoWindow)gInfoWindow.close();const panel=document.getElementById('reassignPanel');document.getElementById('reassignTitle').textContent=`Move "${inv?inv.customerName:invId}" to a different route`;const sel=document.getElementById('reassignSelect');sel.innerHTML=clusters.filter((_,i)=>i!==currentClusterIdx).map(c=>{const ri=clusters.indexOf(c);return `<option value="${ri}">Route ${ri+1} · ${c.stops.length} stops</option>`;}).join('');panel.classList.add('visible');}
-function confirmReassign(){if(!selectedStopForReassign)return;const{invId,currentClusterIdx}=selectedStopForReassign;const targetIdx=parseInt(document.getElementById('reassignSelect').value);if(isNaN(targetIdx))return;const fromCluster=clusters[currentClusterIdx],toCluster=clusters[targetIdx];const inv=fromCluster.stops.find(i=>i.id==invId);if(!inv)return;fromCluster.stops=fromCluster.stops.filter(i=>i.id!=invId);fromCluster.cases=fromCluster.stops.reduce((s,i)=>s+(i.cases||0),0);fromCluster.stops=nearestNeighborTSP(fromCluster.stops.filter(s=>s._coords));fromCluster.distance=Math.round(routeDistance(fromCluster.stops));toCluster.stops=nearestNeighborTSP([...toCluster.stops,inv].filter(s=>s._coords));toCluster.cases=toCluster.stops.reduce((s,i)=>s+(i.cases||0),0);toCluster.distance=Math.round(routeDistance(toCluster.stops));[fromCluster,toCluster].forEach(c=>{const zs=[...new Set(c.stops.map(s=>s._zone||'').filter(Boolean))];c.zone=zs.length<=3?zs.join(' + '):`${zs.slice(0,2).join(' + ')} +${zs.length-2} more`;c.territory=c.zone;});if(toCluster.driver)assignments[inv.id]=toCluster.driver;else delete assignments[inv.id];saveState();cancelReassign();renderClusters();initOrRefreshMap();showToast(`✓ Moved to Route ${targetIdx+1}`);}
-function cancelReassign(){selectedStopForReassign=null;document.getElementById('reassignPanel').classList.remove('visible');}
+// ─── SAVE REFRESH TOKEN BACK TO RAILWAY ──────────────────────────────────────
+async function saveRefreshTokenToRailway(newRefreshToken) {
+  const railwayToken  = process.env.RAILWAY_TOKEN;
+  const projectId     = process.env.RAILWAY_PROJECT_ID;
+  const serviceId     = process.env.RAILWAY_SERVICE_ID;
+  const environmentId = process.env.RAILWAY_ENVIRONMENT_ID;
+  if (!railwayToken || !projectId || !serviceId || !environmentId) {
+    console.log("Railway credentials not set — skipping auto-save of refresh token");
+    return;
+  }
+  try {
+    const mutation = `mutation UpsertVariables($input: VariableCollectionUpsertInput!) { variableCollectionUpsert(input: $input) }`;
+    const variables = { input: { projectId, serviceId, environmentId, variables: { QB_REFRESH_TOKEN: newRefreshToken } } };
+    const response = await fetch("https://backboard.railway.app/graphql/v2", {
+      method: "POST",
+      headers: { "Authorization": `Bearer ${railwayToken}`, "Content-Type": "application/json" },
+      body: JSON.stringify({ query: mutation, variables })
+    });
+    const data = await response.json();
+    if (data.errors) { console.error("Failed to save refresh token to Railway:", JSON.stringify(data.errors)); }
+    else { console.log("✓ Refresh token auto-saved to Railway successfully"); }
+  } catch (err) {
+    console.error("Error saving refresh token to Railway:", err.message);
+  }
+}
 
-// ═══════════════════ STATS ════════════════════════════════════════════════════
-function updateStats(){const sel=invoices.filter(i=>selectedInvoiceIds.has(i.id));const tc=sel.reduce((s,i)=>s+(i.cases||0),0);const cl=parseInt(document.getElementById('caseLimit')?.value)||250;const mv=Math.ceil(tc/cl);document.getElementById('stat-total').textContent=sel.length;document.getElementById('stat-cases').textContent=tc;document.getElementById('stat-vans').textContent=mv||'—';document.getElementById('stat-done').textContent=Object.keys(completed).length;document.getElementById('stat-vans').classList.toggle('warn',mv>(parseInt(document.getElementById('driverCount')?.value)||0));}
+// Auto-refresh every 50 minutes
+setInterval(async () => { await doTokenRefresh(); }, 50 * 60 * 1000);
 
-// ═══════════════════ SETTINGS ═════════════════════════════════════════════════
-function saveSettings(){serverUrl=document.getElementById('serverUrl').value.trim()||serverUrl;saveState();showToast('Settings saved');}
-function clearAll(){if(!confirm('Clear all delivery data?'))return;invoices=[];assignments={};completed={};clusters=[];selectedInvoiceIds=new Set();overdueByCustomer={};clearMapObjects();gMap=null;saveState();document.getElementById('connectCard').style.display='block';document.getElementById('plannerSection').style.display='none';document.getElementById('clusterList').innerHTML='';document.getElementById('warningBanners').innerHTML='';document.getElementById('invoiceStateGroups').innerHTML='';document.getElementById('overdueSummary').style.display='none';document.getElementById('fetchBtn').disabled=false;document.getElementById('fetchBtn').textContent="Pull Today's Deliveries";showToast('Data cleared');showTab('route');}
-function openMap(a){if(!a||a.trim()===''){showToast('No address available');return;}window.open('https://maps.google.com/?q='+a,'_blank');}
-
-// ═══════════════════ TOKEN STATUS ════════════════════════════════════════════
-async function checkTokenStatus(){try{const base=document.getElementById('serverUrl')?.value.trim()||serverUrl;const res=await fetch(base+'/api/token-status');if(!res.ok)return;const data=await res.json();const banner=document.getElementById('tokenBanner');if(!banner)return;if(!data.connected){banner.style.display='flex';banner.style.background='#FDF0E8';banner.style.border='1.5px solid var(--orange)';banner.style.color='var(--orange)';banner.innerHTML=`<span style="font-size:20px">⚠️</span><div><strong>QuickBooks token expired</strong><br><span style="font-weight:400">Update QB_REFRESH_TOKEN in Railway.</span></div>`;}else if(data.connected){banner.style.display='flex';banner.style.background='var(--green-light)';banner.style.border='1.5px solid var(--green)';banner.style.color='var(--green)';banner.innerHTML=`<span style="font-size:20px">✓</span><div><strong>QuickBooks connected</strong><br><span style="font-weight:400">Auto-refresh active · ${data.environment}</span></div>`;setTimeout(()=>{banner.style.display='none';},4000);}}catch(e){}}
-
-// ═══════════════════ PDF INVOICE DOWNLOAD ════════════════════════════════════
-
-function renderPdfPanel(){
-  const panel=document.getElementById('pdfPanel');if(!panel)return;
-  panel.style.display=clusters.length?'block':'none';
-  const btn=document.getElementById('btnAllPdf');
-  if(btn){btn.disabled=false;btn.textContent='⬇ Download Combined PDF — All Routes';}
-  setPdfStatus('');hidePdfProgress();
-
-  // Show note about statements if any overdue customers are on today's route
-  const noteEl = document.getElementById('pdfOverdueNote');
-  if(!noteEl)return;
-  const overdueOnRoute = clusters.flatMap(c=>c.stops).filter(inv=>overdueByCustomer[inv.customerId]);
-  const uniqueOverdue  = [...new Set(overdueOnRoute.map(inv=>inv.customerId))];
-  if(uniqueOverdue.length){
-    noteEl.textContent=`📋 Statements will be appended after invoices for ${uniqueOverdue.length} overdue customer${uniqueOverdue.length!==1?'s':''}: ${uniqueOverdue.map(cid=>overdueByCustomer[cid].customerName).join(', ')}`;
-    noteEl.classList.add('visible');
+// ─── STARTUP ─────────────────────────────────────────────────────────────────
+async function startup() {
+  console.log('Cellar Route Server starting...');
+  console.log(`Environment: ${tokenStore.environment}`);
+  console.log(`Company ID: ${tokenStore.companyId}`);
+  if (tokenStore.refreshToken && tokenStore.clientId && tokenStore.clientSecret) {
+    console.log('Credentials found — fetching initial access token...');
+    const success = await doTokenRefresh();
+    if (success) { console.log('✓ Ready! Auto-refresh is active.'); }
+    else { console.log('⚠️ Could not get initial token — check Railway environment variables.'); }
   } else {
-    noteEl.classList.remove('visible');
+    console.log('⚠️ No credentials in environment variables. Manual connection required.');
   }
 }
 
-async function fetchInvoicePdf(invoiceId){const base=document.getElementById('serverUrl')?.value.trim()||serverUrl;const res=await fetch(`${base}/api/invoice-pdf/${invoiceId}`);if(!res.ok)throw new Error(`PDF fetch failed for invoice ${invoiceId}: ${res.status}`);return res.arrayBuffer();}
+// ─── CLIENT CONFIG ────────────────────────────────────────────────────────────
+app.get('/api/config', (req, res) => {
+  res.json({
+    googleMapsKey: process.env.GOOGLE_MAPS_KEY || '',
+    mapboxToken: process.env.MAPBOX_TOKEN || ''
+  });
+});
 
-// NEW: Fetch statement PDF for a customer
-async function fetchStatementPdf(customerId){
-  const base=document.getElementById('serverUrl')?.value.trim()||serverUrl;
-  const res=await fetch(`${base}/api/customer-statement/${customerId}`);
-  if(!res.ok)throw new Error(`Statement fetch failed for customer ${customerId}: ${res.status}`);
-  return res.arrayBuffer();
-}
+// ─── SAVE CREDENTIALS ────────────────────────────────────────────────────────
+app.post('/api/connect', async (req, res) => {
+  const { accessToken, refreshToken, clientId, clientSecret, companyId, environment, expiresIn } = req.body;
+  if (!accessToken || !companyId) return res.status(400).json({ error: 'Missing required fields' });
+  if (refreshToken) tokenStore.refreshToken = refreshToken;
+  if (clientId) tokenStore.clientId = clientId;
+  if (clientSecret) tokenStore.clientSecret = clientSecret;
+  tokenStore.accessToken = accessToken;
+  tokenStore.companyId = companyId;
+  tokenStore.environment = environment || tokenStore.environment;
+  tokenStore.expiresAt = Date.now() + ((expiresIn || 3600) - 300) * 1000;
+  console.log(`Credentials updated manually for company ${companyId}`);
+  res.json({ success: true, message: 'Credentials saved. Token will auto-refresh.' });
+});
 
-async function makeDividerPage(pdfDoc,routeNum,stops,cases,dist,date){
-  const{rgb,StandardFonts}=PDFLib;
-  const page=pdfDoc.addPage([612,792]);
-  const boldFont=await pdfDoc.embedFont(StandardFonts.HelveticaBold);
-  const regFont=await pdfDoc.embedFont(StandardFonts.Helvetica);
-  page.drawRectangle({x:0,y:692,width:612,height:100,color:rgb(0.29,0.075,0.176)});
-  page.drawText(`ROUTE ${routeNum}`,{x:40,y:755,size:30,font:boldFont,color:rgb(0.788,0.659,0.298)});
-  const meta=`${stops.length} stops  ·  ${cases} cases  ·  ${date}`;
-  page.drawText(meta,{x:40,y:670,size:11,font:regFont,color:rgb(0.42,0.42,0.42)});
-  page.drawLine({start:{x:40,y:655},end:{x:572,y:655},thickness:1.5,color:rgb(0.83,0.71,0.74)});
-  page.drawText('STOP ORDER',{x:40,y:638,size:8,font:boldFont,color:rgb(0.55,0.55,0.55)});
-
-  // Count overdue stops on this route for the divider
-  const overdueStops = stops.filter(s => overdueByCustomer[s.customerId]);
-  if(overdueStops.length){
-    page.drawText(`⚠ ${overdueStops.length} overdue customer${overdueStops.length!==1?'s':''} — statements included`,{x:40,y:620,size:9,font:boldFont,color:rgb(0.769,0.384,0.114)});
+// ─── REFRESH TOKEN (manual) ───────────────────────────────────────────────────
+app.post('/api/refresh-token', async (req, res) => {
+  const { refreshToken, clientId, clientSecret } = req.body;
+  if (!refreshToken || !clientId || !clientSecret) return res.status(400).json({ error: 'Missing required fields' });
+  try {
+    const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+    const response = await fetch('https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Basic ${credentials}`,
+        'Content-Type': 'application/x-www-form-urlencoded',
+        'Accept': 'application/json'
+      },
+      body: `grant_type=refresh_token&refresh_token=${encodeURIComponent(refreshToken)}`
+    });
+    const data = await response.json();
+    if (!response.ok) return res.status(response.status).json({ error: data.error || 'Token refresh failed', details: data });
+    tokenStore.accessToken = data.access_token;
+    tokenStore.refreshToken = data.refresh_token;
+    tokenStore.expiresAt = Date.now() + (data.expires_in - 300) * 1000;
+    res.json({ accessToken: data.access_token, refreshToken: data.refresh_token, expiresIn: data.expires_in });
+  } catch (err) {
+    console.error('Token refresh error:', err);
+    res.status(500).json({ error: 'Server error during token refresh' });
   }
+});
 
-  const col1X=40,col2X=326,rowH=19,startY=overdueStops.length?600:618;
-  const useTwo=stops.length>14;
-  const col1Stops=useTwo?stops.slice(0,Math.ceil(stops.length/2)):stops;
-  const col2Stops=useTwo?stops.slice(Math.ceil(stops.length/2)):[];
-  const drawStopRow=(stop,idx,x,y)=>{
-    const hasStmt=!!overdueByCustomer[stop.customerId];
-    page.drawRectangle({x:x,y:y-3,width:20,height:16,borderRadius:4,color:rgb(0.29,0.075,0.176)});
-    page.drawText(String(idx+1),{x:x+(idx+1<10?7:3),y:y+1,size:9,font:boldFont,color:rgb(1,1,1)});
-    const name=stop.customerName||'Unknown';
-    const truncated=name.length>28?name.slice(0,26)+'…':name;
-    page.drawText(truncated,{x:x+26,y:y+1,size:10,font:boldFont,color:rgb(0.15,0.15,0.15)});
-    const addr=(stop.shipAddress?.zip?stop.shipAddress:null)||(stop.billAddress?.zip?stop.billAddress:null)||stop.shipAddress||stop.billAddress;
-    const cityState=addr?[addr.city,addr.state].filter(Boolean).join(', '):'';
-    if(cityState)page.drawText(cityState,{x:x+26,y:y-9,size:8,font:regFont,color:rgb(0.5,0.5,0.5)});
-    page.drawText(`${stop.cases||0} cs`,{x:x+220,y:y+1,size:9,font:regFont,color:rgb(0.18,0.49,0.36)});
-    // Small "STMT" indicator for overdue stops
-    if(hasStmt)page.drawText('STMT',{x:x+250,y:y+1,size:7,font:boldFont,color:rgb(0.769,0.384,0.114)});
-  };
-  col1Stops.forEach((stop,i)=>{const y=startY-(i*rowH);if(y<40)return;drawStopRow(stop,i,col1X,y);});
-  col2Stops.forEach((stop,i)=>{const actualIdx=Math.ceil(stops.length/2)+i;const y=startY-(i*rowH);if(y<40)return;drawStopRow(stop,actualIdx,col2X,y);});
-  if(useTwo)page.drawLine({start:{x:312,y:startY+10},end:{x:312,y:Math.max(40,startY-(col1Stops.length*rowH))},thickness:0.5,color:rgb(0.85,0.85,0.85)});
-}
+// ─── FETCH INVOICES ───────────────────────────────────────────────────────────
+app.get('/api/invoices', async (req, res) => {
+  let accessToken = await getValidAccessToken();
+  const companyId = tokenStore.companyId;
+  const environment = tokenStore.environment;
+  if (!accessToken || !companyId) return res.status(400).json({ error: 'Not connected to QuickBooks. Check Railway environment variables.' });
 
-// Download one combined PDF — invoices in stop order, with statements
-// inserted immediately after the invoice for any overdue customer.
-async function downloadAllRoutesPdf(){
-  if(!clusters.length){showToast('No routes to download');return;}
-  const btn=document.getElementById('btnAllPdf');
-  btn.disabled=true;btn.textContent='⏳ Building…';
+  const baseUrls = environment === 'production'
+    ? ['https://quickbooks.api.intuit.com', 'https://qbo.api.intuit.com', 'https://c1.qbo.intuit.com', 'https://c3.qbo.intuit.com', 'https://c5.qbo.intuit.com']
+    : ['https://sandbox-quickbooks.api.intuit.com'];
 
-  // Count total pages to fetch (invoices + statements)
-  const allStops=clusters.flatMap(c=>c.stops);
-  const overdueOnRoute=[...new Set(allStops.filter(inv=>overdueByCustomer[inv.customerId]).map(inv=>inv.customerId))];
-  const totalDocs=allStops.length+overdueOnRoute.length; // invoices + one statement per unique overdue customer
-  // Track which customer statements have already been fetched & merged so we
-  // don't duplicate a statement if a customer appears on multiple routes
-  const fetchedStatements=new Set();
-  let fetched=0;
-  showPdfProgress(0);
+  const today = new Date();
+  const todayStr = today.toISOString().split('T')[0];
+  const query = environment === 'production'
+    ? `SELECT * FROM Invoice WHERE TxnDate = '${todayStr}' ORDERBY TxnDate ASC MAXRESULTS 100`
+    : `SELECT * FROM Invoice ORDERBY TxnDate DESC MAXRESULTS 100`;
 
-  try{
-    const{PDFDocument}=PDFLib;
-    const merged=await PDFDocument.create();
-    const date=new Date().toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+  try {
+    const qbHeaders = { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' };
+    let response = null, data = null;
+    for (const tryUrl of baseUrls) {
+      try {
+        const qbUrl = `${tryUrl}/v3/company/${companyId}/query?query=${encodeURIComponent(query)}&minorversion=65`;
+        console.log(`Trying QB endpoint: ${tryUrl}`);
+        response = await fetch(qbUrl, { method: 'GET', headers: qbHeaders });
+        data = await response.json();
+        if (response.ok) { console.log(`✓ Success with: ${tryUrl}`); break; }
+        if (data?.Fault?.Error?.[0]?.code !== '130') break;
+        console.log(`Wrong cluster, trying next...`);
+      } catch (urlErr) {
+        console.log(`Failed to connect to ${tryUrl}: ${urlErr.message}`);
+      }
+    }
+    if (!response || !response.ok) return res.status(500).json({ error: 'QuickBooks API error', details: data });
 
-    for(let ci=0;ci<clusters.length;ci++){
-      const cluster=clusters[ci];
-      setPdfStatus(`Route ${ci+1} of ${clusters.length}: fetching ${cluster.stops.length} invoices…`);
-
-      // Divider page
-      await makeDividerPage(merged,ci+1,cluster.stops,cluster.cases,cluster.distance,date);
-
-      // Invoices + optional statement per stop
-      for(let i=0;i<cluster.stops.length;i++){
-        const inv=cluster.stops[i];
-        showPdfProgress(Math.round((fetched/totalDocs)*95));
-        setPdfStatus(`Fetching ${fetched+1} of ${totalDocs}: ${inv.customerName}…`);
-
-        // Invoice PDF
-        try{
-          const buf=await fetchInvoicePdf(inv.id);
-          const src=await PDFDocument.load(buf);
-          const pages=await merged.copyPages(src,src.getPageIndices());
-          pages.forEach(p=>merged.addPage(p));
-        }catch(e){console.warn(`Skipped invoice ${inv.invoiceNumber}:`,e.message);}
-        fetched++;
-
-        // Statement PDF — only if this customer is overdue AND we haven't
-        // already included their statement earlier in this PDF
-        const custId=inv.customerId;
-        if(custId&&overdueByCustomer[custId]&&!fetchedStatements.has(custId)){
-          showPdfProgress(Math.round((fetched/totalDocs)*95));
-          setPdfStatus(`Fetching statement: ${inv.customerName}…`);
-          try{
-            const stmtBuf=await fetchStatementPdf(custId);
-            const stmtSrc=await PDFDocument.load(stmtBuf);
-            const stmtPages=await merged.copyPages(stmtSrc,stmtSrc.getPageIndices());
-            stmtPages.forEach(p=>merged.addPage(p));
-            fetchedStatements.add(custId);
-          }catch(e){console.warn(`Skipped statement for ${inv.customerName}:`,e.message);}
-          fetched++;
+    const invoices = data.QueryResponse?.Invoice || [];
+    const formatAddress = (addr) => {
+      if (!addr) return null;
+      const line1 = addr.Line1 || '', line2 = addr.Line2 || '', line3 = addr.Line3 || '',
+            line4 = addr.Line4 || '', line5 = addr.Line5 || '';
+      let city = addr.City || '', state = addr.CountrySubDivisionCode || '', zip = addr.PostalCode || '';
+      if (!zip) {
+        const allLines = [line3, line4, line5].join(' ');
+        const zipMatch = allLines.match(/\b(\d{5})(?:-\d{4})?\b/);
+        if (zipMatch) zip = zipMatch[1];
+      }
+      if (!city || !state) {
+        const candidates = [line3, line4, line5].filter(Boolean);
+        for (const line of candidates) {
+          const match = line.match(/^([^,]+),?\s+([A-Z]{2})\s+\d{5}/);
+          if (match) { if (!city) city = match[1].trim(); if (!state) state = match[2].trim(); break; }
         }
+      }
+      const full = [line2, city, state, zip].filter(Boolean).join(', ') || [line1, line2].filter(Boolean).join(' ') || line1;
+      return { line1, line2, line3, city, state, zip, full };
+    };
+
+    const formatted = invoices.map(inv => ({
+      id: inv.Id,
+      invoiceNumber: inv.DocNumber || 'N/A',
+      customerName: inv.CustomerRef?.name || 'Unknown',
+      customerId: inv.CustomerRef?.value,
+      invoiceDate: inv.TxnDate,
+      dueDate: inv.DueDate,
+      balance: inv.Balance,
+      totalAmount: inv.TotalAmt,
+      status: inv.EmailStatus,
+      lineItems: (inv.Line || []).map(l => ({ qty: l.SalesItemLineDetail?.Qty || 0, description: l.Description || '' })),
+      shipAddress: formatAddress(inv.ShipAddr),
+      billAddress: formatAddress(inv.BillAddr)
+    }));
+
+    res.json({ count: formatted.length, invoices: formatted, environment, autoRefresh: true, queriedAt: new Date().toISOString() });
+  } catch (err) {
+    console.error('Invoice fetch error:', err);
+    res.status(500).json({ error: 'Server error fetching invoices' });
+  }
+});
+
+// ─── OVERDUE CUSTOMERS ────────────────────────────────────────────────────────
+// Dual-source check that matches what you see on the QuickBooks customer page:
+//
+//  SOURCE 1 — Invoice table:  find every open invoice whose DueDate is before
+//    today.  This tells us WHICH customers are past due and gives us the oldest
+//    due date and a per-invoice breakdown.
+//
+//  SOURCE 2 — Customer table: pull the customer's actual account Balance field.
+//    This is the same number QB shows on the customer page and includes any
+//    charges/credits that aren't individual invoices (statement charges, etc.).
+//
+//  We only flag a customer as overdue when BOTH sources agree — i.e. they have
+//  at least one past-due invoice AND a non-zero customer Balance.  The balance
+//  we report back to the frontend is always the Customer.Balance figure so it
+//  matches what your team sees in QB.
+app.get('/api/overdue', async (req, res) => {
+  const accessToken = await getValidAccessToken();
+  const companyId   = tokenStore.companyId;
+  const environment = tokenStore.environment;
+  if (!accessToken || !companyId) return res.status(400).json({ error: 'Not connected to QuickBooks.' });
+
+  const baseUrls = environment === 'production'
+    ? ['https://quickbooks.api.intuit.com', 'https://qbo.api.intuit.com', 'https://c1.qbo.intuit.com', 'https://c3.qbo.intuit.com', 'https://c5.qbo.intuit.com']
+    : ['https://sandbox-quickbooks.api.intuit.com'];
+
+  const today    = new Date().toISOString().split('T')[0];
+  const qbHeaders = { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' };
+
+  // Helper: run a QB query against the first working cluster URL
+  async function qbQuery(query) {
+    for (const tryUrl of baseUrls) {
+      try {
+        const url  = `${tryUrl}/v3/company/${companyId}/query?query=${encodeURIComponent(query)}&minorversion=65`;
+        const res  = await fetch(url, { method: 'GET', headers: qbHeaders });
+        const data = await res.json();
+        if (res.ok) return data;
+        if (data?.Fault?.Error?.[0]?.code !== '130') throw new Error(JSON.stringify(data?.Fault || data));
+        // code 130 = wrong cluster, try next
+      } catch (err) {
+        console.log(`QB query failed on ${tryUrl}: ${err.message}`);
+      }
+    }
+    throw new Error('All QB cluster URLs failed');
+  }
+
+  try {
+    // ── SOURCE 1: past-due open invoices ──────────────────────────────────────
+    const invoiceQuery = environment === 'production'
+      ? `SELECT * FROM Invoice WHERE Balance > '0' AND DueDate < '${today}' ORDERBY CustomerRef ASC MAXRESULTS 1000`
+      : `SELECT * FROM Invoice WHERE Balance > '0' ORDERBY DueDate ASC MAXRESULTS 1000`;
+
+    const invoiceData = await qbQuery(invoiceQuery);
+    const rawInvoices = invoiceData.QueryResponse?.Invoice || [];
+
+    // Build a set of customer IDs that have at least one genuinely past-due invoice
+    // (in sandbox we can't filter by DueDate in the query itself, so we do it here)
+    const pastDueByCustomer = {}; // custId → { customerName, overdueInvoiceBalance, invoiceCount, oldestDueDate }
+    rawInvoices.forEach(inv => {
+      const custId   = inv.CustomerRef?.value;
+      const custName = inv.CustomerRef?.name || 'Unknown';
+      if (!custId) return;
+
+      const due = inv.DueDate ? new Date(inv.DueDate) : null;
+      const now = new Date(today);
+      if (!due || due >= now) return; // not yet past due
+
+      if (!pastDueByCustomer[custId]) {
+        pastDueByCustomer[custId] = {
+          customerName: custName,
+          overdueInvoiceBalance: 0,
+          invoiceCount: 0,
+          oldestDueDate: inv.DueDate
+        };
+      }
+      pastDueByCustomer[custId].overdueInvoiceBalance += Number(inv.Balance || 0);
+      pastDueByCustomer[custId].invoiceCount++;
+      // Track the oldest unpaid due date for context
+      if (inv.DueDate < pastDueByCustomer[custId].oldestDueDate) {
+        pastDueByCustomer[custId].oldestDueDate = inv.DueDate;
+      }
+    });
+
+    const pastDueCustomerIds = Object.keys(pastDueByCustomer);
+    console.log(`SOURCE 1 — ${pastDueCustomerIds.length} customers with past-due invoices`);
+
+    if (!pastDueCustomerIds.length) {
+      return res.json({ count: 0, overdueCustomers: [] });
+    }
+
+    // ── SOURCE 2: customer account balances from the Customer table ────────────
+    // QB's Customer.Balance is the authoritative total-owed figure shown on the
+    // customer page. We fetch it in batches of 30 (QB IN clause limit is ~30).
+    const BATCH = 30;
+    const customerBalances = {}; // custId → { balance, displayName }
+
+    for (let i = 0; i < pastDueCustomerIds.length; i += BATCH) {
+      const batch   = pastDueCustomerIds.slice(i, i + BATCH);
+      const idList  = batch.map(id => `'${id}'`).join(', ');
+      const custQuery = `SELECT Id, DisplayName, Balance FROM Customer WHERE Id IN (${idList}) MAXRESULTS ${BATCH}`;
+
+      try {
+        const custData = await qbQuery(custQuery);
+        (custData.QueryResponse?.Customer || []).forEach(c => {
+          customerBalances[c.Id] = {
+            balance:     Number(c.Balance || 0),
+            displayName: c.DisplayName || pastDueByCustomer[c.Id]?.customerName || 'Unknown'
+          };
+        });
+      } catch (err) {
+        console.warn(`Customer balance batch ${i}–${i+BATCH} failed:`, err.message);
+        // Fall back to invoice-derived balance for this batch
+        batch.forEach(id => {
+          if (!customerBalances[id]) {
+            customerBalances[id] = {
+              balance:     pastDueByCustomer[id]?.overdueInvoiceBalance || 0,
+              displayName: pastDueByCustomer[id]?.customerName || 'Unknown'
+            };
+          }
+        });
       }
     }
 
-    showPdfProgress(100);
-    const bytes=await merged.save();
-    const blob=new Blob([bytes],{type:'application/pdf'});
-    const url=URL.createObjectURL(blob);
-    const a=document.createElement('a');
-    a.href=url;a.download=`Cellar_Route_All_${new Date().toISOString().slice(0,10)}.pdf`;
-    a.click();URL.revokeObjectURL(url);
+    console.log(`SOURCE 2 — fetched balances for ${Object.keys(customerBalances).length} customers`);
 
-    const stmtCount=fetchedStatements.size;
-    setPdfStatus(`✓ Downloaded — ${allStops.length} invoices${stmtCount?` + ${stmtCount} statement${stmtCount!==1?'s':''}`:''} across ${clusters.length} routes`);
-    showToast(`✓ PDF ready${stmtCount?` · ${stmtCount} statements included`:''}`);
-  }catch(err){
-    setPdfStatus(`❌ Error: ${err.message}`);
-    showToast('❌ PDF download failed');
-    console.error(err);
-  }finally{
-    btn.disabled=false;btn.textContent='⬇ Download All Routes (Combined PDF)';
-    setTimeout(()=>{hidePdfProgress();},4000);
+    // ── MERGE: only flag customers where both sources agree ───────────────────
+    // Use Customer.Balance as the reported figure (matches QB customer page).
+    // Fall back to invoice-derived balance if Customer query failed for that ID.
+    const overdueCustomers = pastDueCustomerIds
+      .map(custId => {
+        const invInfo  = pastDueByCustomer[custId];
+        const custInfo = customerBalances[custId];
+        const accountBalance = custInfo?.balance ?? invInfo.overdueInvoiceBalance;
+
+        // Skip if QB customer page shows $0 (fully paid / credit memo applied)
+        if (accountBalance <= 0) return null;
+
+        return {
+          customerId:            custId,
+          customerName:          custInfo?.displayName || invInfo.customerName,
+          // accountBalance = Customer.Balance (what QB customer page shows)
+          overdueBalance:        accountBalance,
+          // overdueInvoiceBalance = sum of individual past-due invoice balances
+          overdueInvoiceBalance: invInfo.overdueInvoiceBalance,
+          invoiceCount:          invInfo.invoiceCount,
+          oldestDueDate:         invInfo.oldestDueDate,
+          // daysOverdue based on oldest unpaid invoice
+          daysOverdue:           Math.floor((new Date(today) - new Date(invInfo.oldestDueDate)) / (1000 * 60 * 60 * 24))
+        };
+      })
+      .filter(Boolean)
+      .sort((a, b) => b.daysOverdue - a.daysOverdue); // worst offenders first
+
+    console.log(`MERGED — ${overdueCustomers.length} customers confirmed overdue (both sources)`);
+    res.json({ count: overdueCustomers.length, overdueCustomers });
+
+  } catch (err) {
+    console.error('Overdue fetch error:', err);
+    res.status(500).json({ error: 'Server error fetching overdue data' });
   }
-}
+});
 
-function showPdfProgress(pct){document.getElementById('pdfProgress').style.display='block';document.getElementById('pdfProgressBar').style.width=pct+'%';}
-function hidePdfProgress(){document.getElementById('pdfProgress').style.display='none';document.getElementById('pdfProgressBar').style.width='0%';}
-function setPdfStatus(msg){document.getElementById('pdfStatus').textContent=msg;}
-function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500);}
-</script>
-</body>
-</html>
+// ─── INVOICE PDF PROXY ────────────────────────────────────────────────────────
+app.get('/api/invoice-pdf/:invoiceId', async (req, res) => {
+  const accessToken = await getValidAccessToken();
+  const companyId   = tokenStore.companyId;
+  const environment = tokenStore.environment;
+  const { invoiceId } = req.params;
+
+  console.log(`PDF request received for invoice ${invoiceId}, env=${environment}, company=${companyId}`);
+
+  if (!accessToken || !companyId) {
+    console.error('PDF endpoint: missing accessToken or companyId');
+    return res.status(400).json({ error: 'Not connected to QuickBooks.' });
+  }
+
+  const baseUrls = environment === 'production'
+    ? ['https://quickbooks.api.intuit.com', 'https://qbo.api.intuit.com', 'https://c1.qbo.intuit.com', 'https://c3.qbo.intuit.com', 'https://c5.qbo.intuit.com']
+    : ['https://sandbox-quickbooks.api.intuit.com'];
+
+  const headers = { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/pdf' };
+
+  for (const baseUrl of baseUrls) {
+    const pdfUrl = `${baseUrl}/v3/company/${companyId}/invoice/${invoiceId}/pdf?minorversion=65`;
+    try {
+      console.log(`Trying PDF URL: ${pdfUrl}`);
+      const qbRes = await fetch(pdfUrl, { method: 'GET', headers });
+      if (qbRes.ok) {
+        console.log(`✓ PDF success for invoice ${invoiceId} via ${baseUrl}`);
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Cache-Control', 'no-store');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        qbRes.body.pipe(res);
+        return;
+      }
+      const errText = await qbRes.text();
+      console.error(`QB PDF ${qbRes.status} from ${baseUrl} for invoice ${invoiceId}:`, errText.slice(0, 300));
+      if (qbRes.status === 401 || qbRes.status === 403) {
+        return res.status(qbRes.status).json({ error: `QB auth error ${qbRes.status}` });
+      }
+      if (qbRes.status !== 404) {
+        return res.status(qbRes.status).json({ error: `QB returned ${qbRes.status} for invoice ${invoiceId}` });
+      }
+    } catch (err) {
+      console.error(`Network error fetching PDF from ${baseUrl}:`, err.message);
+    }
+  }
+
+  res.status(404).json({ error: `Invoice ${invoiceId} PDF not found in QuickBooks` });
+});
+
+// ─── CUSTOMER STATEMENT PDF PROXY ─────────────────────────────────────────────
+// Fetches the QB statement PDF for a customer (year-to-date) and streams it.
+// Called by the frontend during PDF build for any stop with overdue balance.
+app.get('/api/customer-statement/:customerId', async (req, res) => {
+  const accessToken = await getValidAccessToken();
+  const companyId   = tokenStore.companyId;
+  const environment = tokenStore.environment;
+  const { customerId } = req.params;
+
+  console.log(`Statement request for customer ${customerId}, env=${environment}`);
+
+  if (!accessToken || !companyId) {
+    return res.status(400).json({ error: 'Not connected to QuickBooks.' });
+  }
+
+  // Year-to-date statement
+  const today     = new Date();
+  const startDate = new Date(today.getFullYear(), 0, 1).toISOString().split('T')[0];
+  const endDate   = today.toISOString().split('T')[0];
+
+  const baseUrls = environment === 'production'
+    ? ['https://quickbooks.api.intuit.com', 'https://qbo.api.intuit.com', 'https://c1.qbo.intuit.com', 'https://c3.qbo.intuit.com', 'https://c5.qbo.intuit.com']
+    : ['https://sandbox-quickbooks.api.intuit.com'];
+
+  const headers = { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/pdf' };
+
+  for (const baseUrl of baseUrls) {
+    const stmtUrl = `${baseUrl}/v3/company/${companyId}/customer/${customerId}/statement?startDate=${startDate}&endDate=${endDate}&minorversion=65`;
+    try {
+      console.log(`Trying statement URL: ${stmtUrl}`);
+      const qbRes = await fetch(stmtUrl, { method: 'GET', headers });
+
+      if (qbRes.ok) {
+        console.log(`✓ Statement success for customer ${customerId} via ${baseUrl}`);
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Cache-Control', 'no-store');
+        res.setHeader('Access-Control-Allow-Origin', '*');
+        qbRes.body.pipe(res);
+        return;
+      }
+
+      const errText = await qbRes.text();
+      console.error(`QB Statement ${qbRes.status} from ${baseUrl}:`, errText.slice(0, 300));
+
+      if (qbRes.status === 401 || qbRes.status === 403) {
+        return res.status(qbRes.status).json({ error: `QB auth error ${qbRes.status}` });
+      }
+      if (qbRes.status !== 404) {
+        return res.status(qbRes.status).json({ error: `QB returned ${qbRes.status} for statement` });
+      }
+    } catch (err) {
+      console.error(`Network error fetching statement from ${baseUrl}:`, err.message);
+    }
+  }
+
+  res.status(404).json({ error: `Statement not found for customer ${customerId}` });
+});
+
+// ─── FETCH CUSTOMERS ──────────────────────────────────────────────────────────
+app.get('/api/customers', async (req, res) => {
+  let accessToken = await getValidAccessToken();
+  const companyId = tokenStore.companyId;
+  const environment = tokenStore.environment;
+  if (!accessToken || !companyId) return res.status(400).json({ error: 'Not connected to QuickBooks.' });
+
+  const baseUrl = environment === 'production'
+    ? 'https://quickbooks.api.intuit.com'
+    : 'https://sandbox-quickbooks.api.intuit.com';
+
+  try {
+    const custHeaders = { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' };
+    const custUrl = `${baseUrl}/v3/company/${companyId}/query?query=${encodeURIComponent('SELECT * FROM Customer WHERE Active = true ORDERBY DisplayName ASC MAXRESULTS 200')}&minorversion=65`;
+    let response = await fetch(custUrl, { method: 'GET', headers: custHeaders, redirect: 'manual' });
+    if ([301, 302, 307, 308].includes(response.status)) {
+      const redirectUrl = response.headers.get('location');
+      response = await fetch(redirectUrl, { method: 'GET', headers: custHeaders });
+    }
+    const data = await response.json();
+    if (!response.ok) return res.status(response.status).json({ error: 'QuickBooks API error', details: data });
+
+    const formatAddress = (addr) => {
+      if (!addr) return null;
+      const line1 = addr.Line1||'', line2 = addr.Line2||'', line3 = addr.Line3||'',
+            line4 = addr.Line4||'', line5 = addr.Line5||'';
+      let city = addr.City||'', state = addr.CountrySubDivisionCode||'', zip = addr.PostalCode||'';
+      if (!zip) { const m = [line3,line4,line5].join(' ').match(/\b(\d{5})(?:-\d{4})?\b/); if(m) zip=m[1]; }
+      if (!city||!state) { for(const l of [line3,line4,line5].filter(Boolean)) { const m=l.match(/^([^,]+),?\s+([A-Z]{2})\s+\d{5}/); if(m){if(!city)city=m[1].trim();if(!state)state=m[2].trim();break;} } }
+      const full = [line2,city,state,zip].filter(Boolean).join(', ') || [line1,line2].filter(Boolean).join(' ') || line1;
+      return { line1, line2, line3, city, state, zip, full };
+    };
+
+    const formatted = (data.QueryResponse?.Customer || []).map(c => ({
+      id: c.Id, displayName: c.DisplayName, companyName: c.CompanyName||null,
+      email: c.PrimaryEmailAddr?.Address||null, phone: c.PrimaryPhone?.FreeFormNumber||null,
+      balance: c.Balance, shipAddress: formatAddress(c.ShipAddr), billAddress: formatAddress(c.BillAddr)
+    }));
+
+    res.json({ count: formatted.length, customers: formatted, environment, queriedAt: new Date().toISOString() });
+  } catch (err) {
+    console.error('Customer fetch error:', err);
+    res.status(500).json({ error: 'Server error fetching customers' });
+  }
+});
+
+// ─── TOKEN STATUS ─────────────────────────────────────────────────────────────
+app.get('/api/token-status', (req, res) => {
+  const refreshTokenExpiresInDays = tokenStore.refreshTokenExpiresAt
+    ? Math.round((tokenStore.refreshTokenExpiresAt - Date.now()) / (1000 * 60 * 60 * 24))
+    : null;
+  res.json({
+    connected: !!tokenStore.accessToken,
+    expiresInSeconds: tokenStore.expiresAt ? Math.round((tokenStore.expiresAt - Date.now()) / 1000) : null,
+    refreshTokenExpiresInDays,
+    refreshTokenExpiringSoon: refreshTokenExpiresInDays !== null && refreshTokenExpiresInDays <= 14,
+    refreshTokenExpired: refreshTokenExpiresInDays !== null && refreshTokenExpiresInDays <= 0,
+    environment: tokenStore.environment,
+    companyId: tokenStore.companyId
+  });
+});
+
+// ─── OAUTH AUTHORIZE ─────────────────────────────────────────────────────────
+app.get('/authorize', (req, res) => {
+  const clientId = tokenStore.clientId || process.env.QB_CLIENT_ID;
+  const redirectUri = `https://cellar-route-server-production.up.railway.app/callback`;
+  const scope = 'com.intuit.quickbooks.accounting';
+  const state = 'cellarroute_' + Date.now();
+  const url = `https://appcenter.intuit.com/connect/oauth2?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent(scope)}&state=${state}`;
+  res.redirect(url);
+});
+
+// ─── OAUTH CALLBACK ───────────────────────────────────────────────────────────
+app.get('/callback', async (req, res) => {
+  const { code, realmId, error } = req.query;
+  if (error) return res.send(`<h2>Authorization failed: ${error}</h2>`);
+  if (!code || !realmId) return res.send('<h2>Missing code or realmId</h2>');
+  try {
+    const clientId = tokenStore.clientId || process.env.QB_CLIENT_ID;
+    const clientSecret = tokenStore.clientSecret || process.env.QB_CLIENT_SECRET;
+    const redirectUri = 'https://cellar-route-server-production.up.railway.app/callback';
+    const credentials = Buffer.from(`${clientId}:${clientSecret}`).toString('base64');
+    const response = await fetch('https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer', {
+      method: 'POST',
+      headers: { 'Authorization': `Basic ${credentials}`, 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json' },
+      body: `grant_type=authorization_code&code=${encodeURIComponent(code)}&redirect_uri=${encodeURIComponent(redirectUri)}`
+    });
+    const data = await response.json();
+    if (!response.ok) return res.send(`<h2>Token exchange failed</h2><pre>${JSON.stringify(data, null, 2)}</pre>`);
+    tokenStore.accessToken = data.access_token;
+    tokenStore.refreshToken = data.refresh_token;
+    tokenStore.companyId = realmId;
+    tokenStore.expiresAt = Date.now() + (data.expires_in - 300) * 1000;
+    tokenStore.refreshTokenExpiresAt = Date.now() + (101 * 24 * 60 * 60 * 1000);
+    console.log(`✓ OAuth complete! Company ID: ${realmId}`);
+    res.send(`<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><style>body{font-family:sans-serif;background:#4A1320;color:#F7F2EA;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:20px;box-sizing:border-box}.card{background:#6B1E2E;border-radius:16px;padding:32px;max-width:500px;width:100%}h2{color:#E8C97A;font-size:22px;margin-bottom:16px}.token{background:rgba(0,0,0,0.3);border-radius:8px;padding:12px;font-size:12px;word-break:break-all;margin:12px 0}.label{font-size:11px;color:#C9A84C;font-weight:bold;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px}.btn{display:block;background:#C9A84C;color:#4A1320;padding:14px;border-radius:10px;text-align:center;font-weight:bold;text-decoration:none;margin-top:20px;font-size:15px}</style></head><body><div class="card"><h2>✓ QuickBooks Connected!</h2><p>Your app is now connected to your real QuickBooks company.</p><div class="label">Company (Realm) ID</div><div class="token">${realmId}</div><div class="label">Refresh Token — Save this in Railway as QB_REFRESH_TOKEN</div><div class="token">${data.refresh_token}</div><p style="color:#E8C97A;font-size:13px">⚠️ Copy the Refresh Token above and update QB_REFRESH_TOKEN in your Railway variables.</p><a class="btn" href="/">Go to Cellar Route App →</a></div></body></html>`);
+  } catch (err) {
+    console.error('Callback error:', err);
+    res.send(`<h2>Server error</h2><pre>${err.message}</pre>`);
+  }
+});
+
+// ─── START ────────────────────────────────────────────────────────────────────
+app.listen(PORT, async () => {
+  console.log(`Cellar Route Server running on port ${PORT}`);
+  await startup();
+});
