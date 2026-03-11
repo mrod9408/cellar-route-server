@@ -6,6 +6,7 @@
   <title>Cellar Route</title>
   <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet" />
   <script id="gmaps-script"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
   <style>
     :root {
       --burgundy: #6B1E2E; --burgundy-dark: #4A1320; --burgundy-light: #8B2E42;
@@ -249,6 +250,14 @@
     .gm-popup .popup-route { font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 6px; color: white; }
     .gm-popup .popup-reassign-btn { width: 100%; padding: 7px; background: var(--burgundy); color: var(--cream); border: none; border-radius: 8px; font-family: 'DM Sans', sans-serif; font-size: 12px; font-weight: 600; cursor: pointer; margin-top: 4px; }
     .gm-popup .popup-reassign-btn:hover { background: var(--burgundy-light); }
+
+    /* ── PDF DOWNLOAD ─────────────────────────────────────────────────────── */
+    .pdf-panel { background: var(--white); border-radius: var(--radius); padding: 18px; margin-bottom: 16px; box-shadow: var(--shadow); border-left: 4px solid var(--burgundy); }
+    .pdf-panel h3 { font-family: 'Playfair Display', serif; font-size: 15px; color: var(--burgundy-dark); margin-bottom: 12px; }
+
+    .pdf-progress { background: var(--cream-dark); border-radius: 8px; overflow: hidden; height: 6px; margin: 8px 0 4px; display: none; }
+    .pdf-progress-bar { height: 100%; background: var(--burgundy); border-radius: 8px; transition: width 0.3s; width: 0%; }
+    .pdf-status { font-size: 12px; color: var(--gray); min-height: 16px; }
   </style>
 </head>
 <body>
@@ -367,6 +376,17 @@
 
         <div id="warningBanners"></div>
         <div id="clusterList"></div>
+
+        <!-- PDF DOWNLOAD PANEL — shown after routes are generated -->
+        <div class="pdf-panel" id="pdfPanel" style="display:none">
+          <h3>📄 Print-Ready Invoice PDF</h3>
+          <p style="font-size:13px;color:var(--gray);margin-bottom:14px">Downloads all invoices in delivery order, grouped by route with a divider page between each driver's stack.</p>
+          <button class="btn-gold" id="btnAllPdf" onclick="downloadAllRoutesPdf()" style="font-size:14px;padding:13px">
+            ⬇ Download Combined PDF — All Routes
+          </button>
+          <div class="pdf-progress" id="pdfProgress"><div class="pdf-progress-bar" id="pdfProgressBar"></div></div>
+          <div class="pdf-status" id="pdfStatus"></div>
+        </div>
       </div>
 
       <div id="routeLoading" style="display:none" class="loading">
@@ -1309,6 +1329,7 @@ function renderClusters() {
   mapBtn.textContent='🗺 View All Routes on Map';
   mapBtn.onclick=()=>showTab('map');
   list.appendChild(mapBtn);
+  renderPdfPanel();
   clusters.forEach((cluster,ci)=>{
     const card=document.createElement('div');card.className='cluster-card';card.id=`cluster-${ci}`;
     const mapsUrl=buildGoogleMapsUrl(cluster.stops);
@@ -1530,6 +1551,135 @@ async function checkTokenStatus(){
     else if(data.connected){banner.style.display='flex';banner.style.background='var(--green-light)';banner.style.border='1.5px solid var(--green)';banner.style.color='var(--green)';banner.innerHTML=`<span style="font-size:20px">✓</span><div><strong>QuickBooks connected</strong><br><span style="font-weight:400">Auto-refresh active · ${data.environment}</span></div>`;setTimeout(()=>{banner.style.display='none';},4000);}
   }catch(e){}
 }
+
+
+// ═══════════════════ PDF INVOICE DOWNLOAD ════════════════════════════════════
+
+function renderPdfPanel() {
+  const panel = document.getElementById('pdfPanel');
+  if (!panel) return;
+  panel.style.display = clusters.length ? 'block' : 'none';
+  // Reset button state and status on re-render
+  const btn = document.getElementById('btnAllPdf');
+  if (btn) { btn.disabled = false; btn.textContent = '⬇ Download Combined PDF — All Routes'; }
+  setPdfStatus('');
+  hidePdfProgress();
+}
+
+// Fetch a single invoice PDF as ArrayBuffer via the server proxy
+async function fetchInvoicePdf(invoiceId) {
+  const base = document.getElementById('serverUrl')?.value.trim() || serverUrl;
+  const res  = await fetch(`${base}/api/invoice-pdf/${invoiceId}`);
+  if (!res.ok) throw new Error(`PDF fetch failed for invoice ${invoiceId}: ${res.status}`);
+  return res.arrayBuffer();
+}
+
+// Build a simple divider page using pdf-lib
+async function makeDividerPage(pdfDoc, routeNum, driverName, stopCount, cases, dist, date) {
+  const page = pdfDoc.addPage([612, 792]); // US Letter
+  const { rgb } = PDFLib;
+  // Dark burgundy header bar
+  page.drawRectangle({ x:0, y:692, width:612, height:100, color: rgb(0.29,0.075,0.176) });
+  // Route title
+  page.drawText(`ROUTE ${routeNum}`, { x:40, y:755, size:32, color: rgb(0.788,0.659,0.298) });
+  if (driverName) page.drawText(driverName, { x:40, y:724, size:16, color: rgb(0.969,0.949,0.918) });
+  // Meta line
+  const meta = `${stopCount} stops  ·  ${cases} cases  ·  ~${dist||'?'} mi  ·  ${date}`;
+  page.drawText(meta, { x:40, y:670, size:12, color: rgb(0.42,0.42,0.42) });
+  // Divider line
+  page.drawLine({ start:{x:40,y:655}, end:{x:572,y:655}, thickness:1.5, color:rgb(0.83,0.71,0.74) });
+  // Stop list
+  let y = 630;
+  page.drawText('STOP ORDER', { x:40, y, size:9, color:rgb(0.42,0.42,0.42) });
+  y -= 18;
+  return page;
+}
+
+// Merge multiple ArrayBuffers (individual invoice PDFs) into one pdf-lib doc
+async function mergeInvoicePdfs(pdfBuffers) {
+  const { PDFDocument } = PDFLib;
+  const merged = await PDFDocument.create();
+  for (const buf of pdfBuffers) {
+    try {
+      const src   = await PDFDocument.load(buf);
+      const pages = await merged.copyPages(src, src.getPageIndices());
+      pages.forEach(p => merged.addPage(p));
+    } catch(e) {
+      console.warn('Could not load one invoice PDF, skipping:', e.message);
+    }
+  }
+  return merged;
+}
+
+// Download one combined PDF with all routes, each separated by a divider page
+async function downloadAllRoutesPdf() {
+  if (!clusters.length) { showToast('No routes to download'); return; }
+  const btn = document.getElementById('btnAllPdf');
+  btn.disabled = true; btn.textContent = '⏳ Building…';
+
+  const totalStops = clusters.reduce((s,c) => s + c.stops.length, 0);
+  let fetched = 0;
+  showPdfProgress(0);
+
+  try {
+    const { PDFDocument } = PDFLib;
+    const merged = await PDFDocument.create();
+    const date   = new Date().toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
+
+    for (let ci = 0; ci < clusters.length; ci++) {
+      const cluster = clusters[ci];
+      setPdfStatus(`Route ${ci+1} of ${clusters.length}: fetching ${cluster.stops.length} invoices…`);
+
+      // Divider page
+      await makeDividerPage(merged, ci+1, cluster.driver, cluster.stops.length, cluster.cases, cluster.distance, date);
+
+      // Invoices in stop order
+      for (let i = 0; i < cluster.stops.length; i++) {
+        const inv = cluster.stops[i];
+        showPdfProgress(Math.round((fetched / totalStops) * 95));
+        setPdfStatus(`Fetching stop ${fetched+1} of ${totalStops}: ${inv.customerName}…`);
+        try {
+          const buf  = await fetchInvoicePdf(inv.id);
+          const src  = await PDFDocument.load(buf);
+          const pages = await merged.copyPages(src, src.getPageIndices());
+          pages.forEach(p => merged.addPage(p));
+        } catch(e) {
+          console.warn(`Skipped invoice ${inv.invoiceNumber}:`, e.message);
+        }
+        fetched++;
+      }
+    }
+
+    showPdfProgress(100);
+    const bytes = await merged.save();
+    const blob  = new Blob([bytes], { type:'application/pdf' });
+    const url   = URL.createObjectURL(blob);
+    const a     = document.createElement('a');
+    a.href      = url;
+    a.download  = `Cellar_Route_All_${new Date().toISOString().slice(0,10)}.pdf`;
+    a.click();
+    URL.revokeObjectURL(url);
+    setPdfStatus(`✓ All routes PDF downloaded — ${totalStops} invoices across ${clusters.length} routes`);
+    showToast(`✓ All routes PDF ready`);
+  } catch(err) {
+    setPdfStatus(`❌ Error: ${err.message}`);
+    showToast('❌ PDF download failed');
+    console.error(err);
+  } finally {
+    btn.disabled = false; btn.textContent = '⬇ Download All Routes (Combined PDF)';
+    setTimeout(() => { hidePdfProgress(); }, 4000);
+  }
+}
+
+function showPdfProgress(pct) {
+  document.getElementById('pdfProgress').style.display = 'block';
+  document.getElementById('pdfProgressBar').style.width = pct + '%';
+}
+function hidePdfProgress() {
+  document.getElementById('pdfProgress').style.display = 'none';
+  document.getElementById('pdfProgressBar').style.width = '0%';
+}
+function setPdfStatus(msg) { document.getElementById('pdfStatus').textContent = msg; }
 
 function showToast(msg){const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');setTimeout(()=>t.classList.remove('show'),2500);}
 document.getElementById('newDriverName')?.addEventListener('keydown',e=>{if(e.key==='Enter')addDriver();});
