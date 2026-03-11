@@ -530,6 +530,50 @@ app.get('/api/customer-statement/:customerId', async (req, res) => {
 });
 
 
+
+// ─── STATEMENT DEBUG ENDPOINT ────────────────────────────────────────────────
+// Visit /api/debug-statement/CUSTOMER_ID in your browser to see exactly what
+// QB returns for each statement URL attempt. Remove once working.
+app.get('/api/debug-statement/:customerId', async (req, res) => {
+  const accessToken = await getValidAccessToken();
+  const companyId   = tokenStore.companyId;
+  const environment = tokenStore.environment;
+  const { customerId } = req.params;
+
+  if (!accessToken || !companyId) {
+    return res.json({ error: 'Not connected', hasToken: !!accessToken, companyId });
+  }
+
+  const today     = new Date();
+  const startDate = new Date(today.getFullYear(), 0, 1).toISOString().split('T')[0];
+  const endDate   = today.toISOString().split('T')[0];
+
+  const baseUrl = environment === 'production'
+    ? 'https://quickbooks.api.intuit.com'
+    : 'https://sandbox-quickbooks.api.intuit.com';
+
+  const urlsToTry = [
+    { label: 'CustomerBalanceDetail (PDF)', url: `${baseUrl}/v3/company/${companyId}/reports/CustomerBalanceDetail?customer=${customerId}&start_date=${startDate}&end_date=${endDate}&minorversion=65`, accept: 'application/pdf' },
+    { label: 'CustomerBalanceDetail (JSON)', url: `${baseUrl}/v3/company/${companyId}/reports/CustomerBalanceDetail?customer=${customerId}&start_date=${startDate}&end_date=${endDate}&minorversion=65`, accept: 'application/json' },
+    { label: 'AgedReceivableDetail (PDF)',  url: `${baseUrl}/v3/company/${companyId}/reports/AgedReceivableDetail?customer=${customerId}&report_date=${endDate}&minorversion=65`, accept: 'application/pdf' },
+    { label: 'AgedReceivableDetail (JSON)', url: `${baseUrl}/v3/company/${companyId}/reports/AgedReceivableDetail?customer=${customerId}&report_date=${endDate}&minorversion=65`, accept: 'application/json' },
+    { label: 'Legacy entity URL (PDF)',     url: `${baseUrl}/v3/company/${companyId}/customer/${customerId}/statement?startDate=${startDate}&endDate=${endDate}&minorversion=65`, accept: 'application/pdf' },
+  ];
+
+  const results = [];
+  for (const { label, url, accept } of urlsToTry) {
+    try {
+      const r    = await fetch(url, { method: 'GET', headers: { 'Authorization': `Bearer ${accessToken}`, 'Accept': accept } });
+      const body = await r.text();
+      results.push({ label, status: r.status, contentType: r.headers.get('content-type'), bodyPreview: body.slice(0, 400) });
+    } catch (err) {
+      results.push({ label, error: err.message });
+    }
+  }
+
+  res.json({ customerId, environment, companyId: 'REDACTED', dateRange: { startDate, endDate }, results });
+});
+
 // ─── FETCH CUSTOMERS ──────────────────────────────────────────────────────────
 app.get('/api/customers', async (req, res) => {
   let accessToken = await getValidAccessToken();
