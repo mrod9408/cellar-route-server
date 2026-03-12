@@ -291,8 +291,8 @@ app.get('/api/overdue', async (req, res) => {
   try {
     // ── SOURCE 1: past-due open invoices ─────────────────────────────────────
     const invoiceQuery = environment === 'production'
-      ? `SELECT * FROM Invoice WHERE Balance > '0' AND DueDate < '${today}' ORDERBY CustomerRef ASC MAXRESULTS 1000`
-      : `SELECT * FROM Invoice WHERE Balance > '0' ORDERBY DueDate ASC MAXRESULTS 1000`;
+      ? `SELECT * FROM Invoice WHERE Balance > '0' AND DueDate < '${today}' MAXRESULTS 1000`
+      : `SELECT * FROM Invoice WHERE Balance > '0' MAXRESULTS 1000`;
 
     console.log('[OVERDUE] Running invoice query...');
     const invoiceData = await runQbQuery(invoiceQuery);
