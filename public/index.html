@@ -544,6 +544,56 @@ function getCoords(inv) {
   };
 }
 
+// ── GEOCODING ────────────────────────────────────────────────────────────────
+// Cache geocoded results so we don't hit the API twice for the same address.
+// Falls back to ZIP_MAP centroid if geocoding fails.
+const _geocodeCache = {};
+
+async function geocodeAddress(inv) {
+  const addr = (inv.shipAddress?.zip ? inv.shipAddress : null)
+    || (inv.billAddress?.zip ? inv.billAddress : null)
+    || inv.shipAddress || inv.billAddress;
+  if (!addr) return getCoords(inv); // fallback
+
+  // Build the best address string we can from what QB gave us
+  const parts = [
+    addr.line1 || addr.Line1 || '',
+    addr.city  || addr.City  || '',
+    addr.state || addr.CountrySubDivisionCode || '',
+    addr.zip   || addr.PostalCode || ''
+  ].map(s => (s||'').trim()).filter(Boolean);
+
+  if (!parts.length) return getCoords(inv);
+
+  // If we only have a zip, just use ZIP_MAP — no need to call API
+  if (parts.length === 1 && /^\d{5}$/.test(parts[0])) return getCoords(inv);
+
+  const addressStr = parts.join(', ');
+  if (_geocodeCache[addressStr] !== undefined) return _geocodeCache[addressStr];
+
+  if (!GOOGLE_MAPS_KEY) {
+    _geocodeCache[addressStr] = getCoords(inv);
+    return _geocodeCache[addressStr];
+  }
+
+  try {
+    const url = `https://maps.googleapis.com/maps/api/geocode/json?address=${encodeURIComponent(addressStr)}&key=${GOOGLE_MAPS_KEY}`;
+    const res  = await fetch(url);
+    const data = await res.json();
+    if (data.status === 'OK' && data.results?.[0]?.geometry?.location) {
+      const { lat, lng } = data.results[0].geometry.location;
+      _geocodeCache[addressStr] = { lat, lng };
+    } else {
+      console.warn(`Geocode failed for "${addressStr}": ${data.status}`);
+      _geocodeCache[addressStr] = getCoords(inv); // fallback to ZIP centroid
+    }
+  } catch (err) {
+    console.warn(`Geocode error for "${addressStr}":`, err.message);
+    _geocodeCache[addressStr] = getCoords(inv);
+  }
+  return _geocodeCache[addressStr];
+}
+
 function getStateLabel(inv) {
   const addr = (inv.shipAddress?.zip ? inv.shipAddress : null)
     || (inv.billAddress?.zip ? inv.billAddress : null)
@@ -984,8 +1034,27 @@ async function initOrRefreshMap(){
   loadingOverlay.style.display='flex';
   document.getElementById('routeLegend').innerHTML=clusters.map((c,i)=>`<div class="legend-item"><div class="legend-dot" style="background:${c.color}"></div>Route ${i+1}</div>`).join('');
   try{await loadGoogleMaps(GOOGLE_MAPS_KEY);}catch(e){loadingOverlay.style.display='none';showToast('❌ Could not load Google Maps');return;}
+  // Geocode all stops using real addresses via Google Maps Geocoding API.
+  // We batch all requests in parallel and fall back to ZIP centroid on failure.
   const allStops=[];
-  clusters.forEach((cluster,ci)=>{cluster.stops.forEach((inv,si)=>{const coords=inv._coords||getCoords(inv);if(coords)allStops.push({inv,ci,si,coords,color:cluster.color});});});
+  loadingOverlay.innerHTML='<div class="spinner"></div><p>Geocoding addresses…</p>';
+  const geocodeJobs=[];
+  clusters.forEach((cluster,ci)=>{
+    cluster.stops.forEach((inv,si)=>{
+      geocodeJobs.push(
+        geocodeAddress(inv).then(coords=>{
+          if(coords){ inv._coords=coords; allStops.push({inv,ci,si,coords,color:cluster.color}); }
+        }).catch(()=>{
+          const fb=getCoords(inv);
+          if(fb){ inv._coords=fb; allStops.push({inv,ci,si,coords:fb,color:cluster.color}); }
+        })
+      );
+    });
+  });
+  await Promise.all(geocodeJobs);
+  // Restore stop order within each cluster after async geocoding
+  allStops.sort((a,b)=>a.ci-b.ci||a.si-b.si);
+  loadingOverlay.innerHTML='<div class="spinner"></div><p>Loading map…</p>';
   if(!allStops.length){loadingOverlay.style.display='none';document.getElementById('mapEmptyState').style.display='block';document.getElementById('mapEmptyState').innerHTML=`<div class="empty-icon">📍</div><div class="empty-title">No mappable stops</div><div class="empty-text">Check that your QuickBooks addresses include ZIP codes.</div>`;document.getElementById('mapContent').style.display='none';return;}
   clearMapObjects();
   visibleRoutes=new Set(clusters.map((_,i)=>i));
