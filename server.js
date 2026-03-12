@@ -247,62 +247,59 @@ app.get('/api/invoices', async (req, res) => {
 });
 
 // ─── OVERDUE CUSTOMERS ────────────────────────────────────────────────────────
-// Dual-source check that matches what you see on the QuickBooks customer page:
-//
-//  SOURCE 1 — Invoice table:  find every open invoice whose DueDate is before
-//    today.  This tells us WHICH customers are past due and gives us the oldest
-//    due date and a per-invoice breakdown.
-//
-//  SOURCE 2 — Customer table: pull the customer's actual account Balance field.
-//    This is the same number QB shows on the customer page and includes any
-//    charges/credits that aren't individual invoices (statement charges, etc.).
-//
-//  We only flag a customer as overdue when BOTH sources agree — i.e. they have
-//  at least one past-due invoice AND a non-zero customer Balance.  The balance
-//  we report back to the frontend is always the Customer.Balance figure so it
-//  matches what your team sees in QB.
 app.get('/api/overdue', async (req, res) => {
   const accessToken = await getValidAccessToken();
   const companyId   = tokenStore.companyId;
   const environment = tokenStore.environment;
-  if (!accessToken || !companyId) return res.status(400).json({ error: 'Not connected to QuickBooks.' });
+
+  console.log('[OVERDUE] Request received, env=' + environment + ', company=' + companyId);
+
+  if (!accessToken || !companyId) {
+    console.error('[OVERDUE] Missing credentials');
+    return res.status(400).json({ error: 'Not connected to QuickBooks.' });
+  }
 
   const baseUrls = environment === 'production'
     ? ['https://quickbooks.api.intuit.com', 'https://qbo.api.intuit.com', 'https://c1.qbo.intuit.com', 'https://c3.qbo.intuit.com', 'https://c5.qbo.intuit.com']
     : ['https://sandbox-quickbooks.api.intuit.com'];
 
-  const today    = new Date().toISOString().split('T')[0];
+  const today     = new Date().toISOString().split('T')[0];
   const qbHeaders = { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' };
 
-  // Helper: run a QB query against the first working cluster URL
-  async function qbQuery(query) {
+  // Run a QB query, trying each cluster URL in order
+  const runQbQuery = async (query) => {
     for (const tryUrl of baseUrls) {
       try {
         const url  = `${tryUrl}/v3/company/${companyId}/query?query=${encodeURIComponent(query)}&minorversion=65`;
-        const res  = await fetch(url, { method: 'GET', headers: qbHeaders });
-        const data = await res.json();
-        if (res.ok) return data;
-        if (data?.Fault?.Error?.[0]?.code !== '130') throw new Error(JSON.stringify(data?.Fault || data));
-        // code 130 = wrong cluster, try next
+        const r    = await fetch(url, { method: 'GET', headers: qbHeaders });
+        const data = await r.json();
+        if (r.ok) return data;
+        const errCode = data?.Fault?.Error?.[0]?.code;
+        if (errCode !== '130') {
+          console.error('[OVERDUE] QB query error:', JSON.stringify(data?.Fault || data).slice(0, 300));
+          throw new Error('QB query failed: ' + JSON.stringify(data?.Fault || data).slice(0, 200));
+        }
+        console.log('[OVERDUE] Wrong cluster (' + tryUrl + '), trying next...');
       } catch (err) {
-        console.log(`QB query failed on ${tryUrl}: ${err.message}`);
+        console.error('[OVERDUE] Fetch error on ' + tryUrl + ':', err.message);
+        if (tryUrl === baseUrls[baseUrls.length - 1]) throw err;
       }
     }
     throw new Error('All QB cluster URLs failed');
-  }
+  };
 
   try {
-    // ── SOURCE 1: past-due open invoices ──────────────────────────────────────
+    // ── SOURCE 1: past-due open invoices ─────────────────────────────────────
     const invoiceQuery = environment === 'production'
       ? `SELECT * FROM Invoice WHERE Balance > '0' AND DueDate < '${today}' ORDERBY CustomerRef ASC MAXRESULTS 1000`
       : `SELECT * FROM Invoice WHERE Balance > '0' ORDERBY DueDate ASC MAXRESULTS 1000`;
 
-    const invoiceData = await qbQuery(invoiceQuery);
+    console.log('[OVERDUE] Running invoice query...');
+    const invoiceData = await runQbQuery(invoiceQuery);
     const rawInvoices = invoiceData.QueryResponse?.Invoice || [];
+    console.log('[OVERDUE] SOURCE 1 raw invoices returned:', rawInvoices.length);
 
-    // Build a set of customer IDs that have at least one genuinely past-due invoice
-    // (in sandbox we can't filter by DueDate in the query itself, so we do it here)
-    const pastDueByCustomer = {}; // custId → { customerName, overdueInvoiceBalance, invoiceCount, oldestDueDate }
+    const pastDueByCustomer = {};
     rawInvoices.forEach(inv => {
       const custId   = inv.CustomerRef?.value ? String(inv.CustomerRef.value) : null;
       const custName = inv.CustomerRef?.name || 'Unknown';
@@ -310,55 +307,46 @@ app.get('/api/overdue', async (req, res) => {
 
       const due = inv.DueDate ? new Date(inv.DueDate) : null;
       const now = new Date(today);
-      if (!due || due >= now) return; // not yet past due
+      if (!due || due >= now) return;
 
       if (!pastDueByCustomer[custId]) {
-        pastDueByCustomer[custId] = {
-          customerName: custName,
-          overdueInvoiceBalance: 0,
-          invoiceCount: 0,
-          oldestDueDate: inv.DueDate
-        };
+        pastDueByCustomer[custId] = { customerName: custName, overdueInvoiceBalance: 0, invoiceCount: 0, oldestDueDate: inv.DueDate };
       }
       pastDueByCustomer[custId].overdueInvoiceBalance += Number(inv.Balance || 0);
       pastDueByCustomer[custId].invoiceCount++;
-      // Track the oldest unpaid due date for context
       if (inv.DueDate < pastDueByCustomer[custId].oldestDueDate) {
         pastDueByCustomer[custId].oldestDueDate = inv.DueDate;
       }
     });
 
-    // Ensure all customer IDs are strings — QB returns them as strings
-    // and we need consistent types for the cross-reference lookup
-    const pastDueCustomerIds = Object.keys(pastDueByCustomer).map(String);
-    console.log(`SOURCE 1 — ${pastDueCustomerIds.length} customers with past-due invoices`);
+    const pastDueCustomerIds = Object.keys(pastDueByCustomer);
+    console.log('[OVERDUE] SOURCE 1 — customers with past-due invoices:', pastDueCustomerIds.length);
 
     if (!pastDueCustomerIds.length) {
       return res.json({ count: 0, overdueCustomers: [] });
     }
 
-    // ── SOURCE 2: customer account balances from the Customer table ────────────
-    // QB's Customer.Balance is the authoritative total-owed figure shown on the
-    // customer page. We fetch it in batches of 30 (QB IN clause limit is ~30).
+    // ── SOURCE 2: Customer.Balance from QB customer page ─────────────────────
     const BATCH = 30;
-    const customerBalances = {}; // custId → { balance, displayName }
+    const customerBalances = {};
 
     for (let i = 0; i < pastDueCustomerIds.length; i += BATCH) {
-      const batch   = pastDueCustomerIds.slice(i, i + BATCH);
-      const idList  = batch.map(id => `'${id}'`).join(', ');
+      const batch  = pastDueCustomerIds.slice(i, i + BATCH);
+      const idList = batch.map(id => `'${id}'`).join(', ');
       const custQuery = `SELECT Id, DisplayName, Balance FROM Customer WHERE Id IN (${idList}) MAXRESULTS ${BATCH}`;
-
+      console.log('[OVERDUE] SOURCE 2 batch query for', batch.length, 'customers...');
       try {
-        const custData = await qbQuery(custQuery);
-        (custData.QueryResponse?.Customer || []).forEach(c => {
-          customerBalances[c.Id] = {
+        const custData = await runQbQuery(custQuery);
+        const customers = custData.QueryResponse?.Customer || [];
+        console.log('[OVERDUE] SOURCE 2 returned', customers.length, 'customers for batch');
+        customers.forEach(c => {
+          customerBalances[String(c.Id)] = {
             balance:     Number(c.Balance || 0),
-            displayName: c.DisplayName || pastDueByCustomer[c.Id]?.customerName || 'Unknown'
+            displayName: c.DisplayName || pastDueByCustomer[String(c.Id)]?.customerName || 'Unknown'
           };
         });
       } catch (err) {
-        console.warn(`Customer balance batch ${i}–${i+BATCH} failed:`, err.message);
-        // Fall back to invoice-derived balance for this batch
+        console.warn('[OVERDUE] SOURCE 2 batch failed, falling back to invoice balance:', err.message);
         batch.forEach(id => {
           if (!customerBalances[id]) {
             customerBalances[id] = {
@@ -370,42 +358,34 @@ app.get('/api/overdue', async (req, res) => {
       }
     }
 
-    console.log(`SOURCE 2 — fetched balances for ${Object.keys(customerBalances).length} customers`);
+    console.log('[OVERDUE] SOURCE 2 — balances fetched for', Object.keys(customerBalances).length, 'customers');
 
-    // ── MERGE: only flag customers where both sources agree ───────────────────
-    // Use Customer.Balance as the reported figure (matches QB customer page).
-    // Fall back to invoice-derived balance if Customer query failed for that ID.
+    // ── MERGE ─────────────────────────────────────────────────────────────────
     const overdueCustomers = pastDueCustomerIds
       .map(custId => {
         const invInfo  = pastDueByCustomer[custId];
         const custInfo = customerBalances[custId];
-        const accountBalance = custInfo?.balance ?? invInfo.overdueInvoiceBalance;
-
-        // Skip if QB customer page shows $0 (fully paid / credit memo applied)
+        const accountBalance = custInfo !== undefined ? custInfo.balance : invInfo.overdueInvoiceBalance;
         if (accountBalance <= 0) return null;
-
         return {
           customerId:            custId,
           customerName:          custInfo?.displayName || invInfo.customerName,
-          // accountBalance = Customer.Balance (what QB customer page shows)
           overdueBalance:        accountBalance,
-          // overdueInvoiceBalance = sum of individual past-due invoice balances
           overdueInvoiceBalance: invInfo.overdueInvoiceBalance,
           invoiceCount:          invInfo.invoiceCount,
           oldestDueDate:         invInfo.oldestDueDate,
-          // daysOverdue based on oldest unpaid invoice
           daysOverdue:           Math.floor((new Date(today) - new Date(invInfo.oldestDueDate)) / (1000 * 60 * 60 * 24))
         };
       })
       .filter(Boolean)
-      .sort((a, b) => b.daysOverdue - a.daysOverdue); // worst offenders first
+      .sort((a, b) => b.daysOverdue - a.daysOverdue);
 
-    console.log(`MERGED — ${overdueCustomers.length} customers confirmed overdue (both sources)`);
+    console.log('[OVERDUE] MERGED — confirmed overdue customers:', overdueCustomers.length);
     res.json({ count: overdueCustomers.length, overdueCustomers });
 
   } catch (err) {
-    console.error('Overdue fetch error:', err);
-    res.status(500).json({ error: 'Server error fetching overdue data' });
+    console.error('[OVERDUE] Fatal error:', err.message, err.stack);
+    res.status(500).json({ error: 'Server error fetching overdue data', detail: err.message });
   }
 });
 
