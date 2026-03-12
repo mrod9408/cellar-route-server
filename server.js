@@ -234,7 +234,16 @@ app.get('/api/invoices', async (req, res) => {
       balance: inv.Balance,
       totalAmount: inv.TotalAmt,
       status: inv.EmailStatus,
-      lineItems: (inv.Line || []).map(l => ({ qty: l.SalesItemLineDetail?.Qty || 0, description: l.Description || '' })),
+      lineItems: (inv.Line || [])
+        .filter(l => l.DetailType === 'SalesItemLineDetail' && l.SalesItemLineDetail?.ItemRef)
+        .map(l => ({
+          qty:         Number(l.SalesItemLineDetail?.Qty || 0),
+          unitPrice:   Number(l.SalesItemLineDetail?.UnitPrice || 0),
+          amount:      Number(l.Amount || 0),
+          description: l.Description || '',
+          itemId:      l.SalesItemLineDetail?.ItemRef?.value || '',
+          itemName:    l.SalesItemLineDetail?.ItemRef?.name  || l.Description || '',
+        })),
       shipAddress: formatAddress(inv.ShipAddr),
       billAddress: formatAddress(inv.BillAddr)
     }));
