@@ -1208,7 +1208,7 @@ function renderPickingList() {
     ? clusters.flatMap(c => c.stops)
     : (clusters[parseInt(routeFilter)]?.stops || []);
   document.getElementById('pickingSummary').textContent =
-    `${items.length} products · ${totalQty} total units · ${selectedInv.length} stops`;
+    `${items.length} products · ${totalQty} total units`;
 
   // Search filter
   const searchVal = (document.getElementById('pickingSearch')?.value || '').toLowerCase();
@@ -1274,10 +1274,8 @@ async function downloadPickingListPdf() {
     p.drawText(`${today}  -  ${routeLabel}`, { x:MARGIN, y:PAGE_H-62, size:8, font:reg, color:rgb(0.75,0.75,0.75) });
     // Column headers
     p.drawRectangle({ x:MARGIN, y:PAGE_H-88, width:PAGE_W-MARGIN*2, height:16, color:LGRAY });
-    p.drawText('QTY',     { x:MARGIN+4,   y:PAGE_H-83, size:7, font:bold, color:GRAY });
-    p.drawText('PRODUCT', { x:MARGIN+60,  y:PAGE_H-83, size:7, font:bold, color:GRAY });
-    p.drawText('STOPS',   { x:PAGE_W-MARGIN-80, y:PAGE_H-83, size:7, font:bold, color:GRAY });
-    p.drawText('ROUTES',  { x:PAGE_W-MARGIN-30, y:PAGE_H-83, size:7, font:bold, color:GRAY });
+    p.drawText('QTY',     { x:MARGIN+4,  y:PAGE_H-83, size:7, font:bold, color:GRAY });
+    p.drawText('PRODUCT', { x:MARGIN+80, y:PAGE_H-83, size:7, font:bold, color:GRAY });
     return { page: p, y: PAGE_H - 88 - ROW_H };
   };
 
@@ -1295,11 +1293,8 @@ async function downloadPickingListPdf() {
 
     const qtyStr = item.qty % 1 === 0 ? String(item.qty) : item.qty.toFixed(1);
     page.drawText(qtyStr, { x:MARGIN+4, y, size:11, font:bold, color:WINE });
-    // Truncate long product names
-    const nameStr = item.name.length > 55 ? item.name.slice(0,53)+'..' : item.name;
-    page.drawText(nameStr, { x:MARGIN+60, y, size:9, font:reg, color:BLACK });
-    page.drawText(String(item.stopCount), { x:PAGE_W-MARGIN-72, y, size:9, font:reg, color:GRAY });
-    page.drawText(item.routes.join(','), { x:PAGE_W-MARGIN-28, y, size:9, font:reg, color:GRAY });
+    const nameStr = item.name.length > 65 ? item.name.slice(0,63)+'..' : item.name;
+    page.drawText(nameStr, { x:MARGIN+80, y, size:9, font:reg, color:BLACK });
     y -= ROW_H;
   });
 
