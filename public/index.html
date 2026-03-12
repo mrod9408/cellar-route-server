@@ -1122,15 +1122,17 @@ async function fetchStatementPdf(customerId, customerName, overdueInfo){
     p.drawText(customerName || `Customer #${customerId}`, { x: MARGIN, y: PAGE_H - 65, size: 11, font: bold, color: WHITE });
     p.drawText(`Period: ${startDate} - ${endDate}`, { x: MARGIN, y: PAGE_H - 80, size: 8, font: reg, color: rgb(0.75, 0.75, 0.75) });
 
-    // Overdue badge
+    // Balance summary bar — two figures side by side
     if (overdueInfo?.overdueBalance > 0) {
-      const badgeText = `OVERDUE BALANCE: $${overdueInfo.overdueBalance.toLocaleString('en-US', {minimumFractionDigits:2})}  -  ${overdueInfo.daysOverdue} days past due`;
-      p.drawRectangle({ x: MARGIN, y: PAGE_H - HEADER_H - 22, width: COL_W, height: 18, color: ORANGE });
-      p.drawText(badgeText, { x: MARGIN + 6, y: PAGE_H - HEADER_H - 14, size: 8, font: bold, color: WHITE });
+      p.drawRectangle({ x: MARGIN, y: PAGE_H - HEADER_H - 26, width: COL_W, height: 22, color: ORANGE });
+      const totalBal = `TOTAL BALANCE: $${overdueInfo.overdueBalance.toLocaleString('en-US', {minimumFractionDigits:2})}`;
+      // overdueInvoiceBalance is calculated below per-row; show placeholder label here
+      p.drawText(totalBal, { x: MARGIN + 6, y: PAGE_H - HEADER_H - 11, size: 8, font: bold, color: WHITE });
+      p.drawText('Past-due rows highlighted in red below', { x: MARGIN + 6, y: PAGE_H - HEADER_H - 20, size: 7, font: reg, color: rgb(1,0.85,0.85) });
     }
 
     // Column headers
-    const colY = PAGE_H - HEADER_H - (overdueInfo?.overdueBalance > 0 ? 44 : 30);
+    const colY = PAGE_H - HEADER_H - (overdueInfo?.overdueBalance > 0 ? 50 : 30);
     p.drawText('DATE',      { x: MARGIN,       y: colY, size: 7, font: bold, color: GRAY });
     p.drawText('TYPE',      { x: MARGIN + 65,  y: colY, size: 7, font: bold, color: GRAY });
     p.drawText('NUM',       { x: MARGIN + 145, y: colY, size: 7, font: bold, color: GRAY });
@@ -1146,6 +1148,9 @@ async function fetchStatementPdf(customerId, customerName, overdueInfo){
   let pageNum = 1;
   const totalPages = Math.ceil(txRows.length / ROWS_PER_PAGE) || 1;
 
+  const today = new Date(); today.setHours(0,0,0,0);
+  let calcOverdueBalance = 0;
+
   for (let i = 0; i < txRows.length; i++) {
     if (y < 50) {
       page.drawText(`Page ${pageNum} of ${totalPages}`, { x: PAGE_W - MARGIN - 60, y: 20, size: 7, font: reg, color: GRAY });
@@ -1153,21 +1158,52 @@ async function fetchStatementPdf(customerId, customerName, overdueInfo){
       pageNum++;
     }
     const [date, type, num, dueDate, amount, openBal] = txRows[i];
-    const rowColor = i % 2 === 0 ? rgb(0.97, 0.97, 0.97) : WHITE;
-    page.drawRectangle({ x: MARGIN, y: y - 2, width: COL_W, height: ROW_H, color: rowColor });
-    const opts = { size: 7.5, font: reg, color: BLACK };
-    page.drawText((date||'').slice(0,10),     { x: MARGIN,       y, ...opts });
+
+    // A row is past due if it has a due date that is before today and an open balance
+    const dueDateObj = dueDate ? new Date(dueDate) : null;
+    const openBalNum = parseFloat((openBal||'0').replace(/[^0-9.\-]/g,'')) || 0;
+    const isPastDue = dueDateObj && dueDateObj < today && openBalNum > 0 && type === 'Invoice';
+    if (isPastDue) calcOverdueBalance += openBalNum;
+
+    // Row background: light red for past due, alternating light gray otherwise
+    const rowBg = isPastDue ? rgb(1, 0.9, 0.9) : (i % 2 === 0 ? rgb(0.97, 0.97, 0.97) : WHITE);
+    page.drawRectangle({ x: MARGIN, y: y - 2, width: COL_W, height: ROW_H, color: rowBg });
+
+    // Left red accent bar for past-due rows
+    if (isPastDue) {
+      page.drawRectangle({ x: MARGIN, y: y - 2, width: 3, height: ROW_H, color: rgb(0.8, 0.1, 0.1) });
+    }
+
+    const textColor = isPastDue ? rgb(0.6, 0.05, 0.05) : BLACK;
+    const rowFont   = isPastDue ? bold : reg;
+    const opts = { size: 7.5, font: rowFont, color: textColor };
+    page.drawText((date||'').slice(0,10),     { x: MARGIN + 5,   y, ...opts });
     page.drawText((type||'').slice(0,16),     { x: MARGIN + 65,  y, ...opts });
     page.drawText((num||'').slice(0,10),      { x: MARGIN + 145, y, ...opts });
     page.drawText((dueDate||'').slice(0,10),  { x: MARGIN + 210, y, ...opts });
     page.drawText((amount||'').slice(0,12),   { x: MARGIN + 295, y, ...opts });
     page.drawText((openBal||'').slice(0,12),  { x: MARGIN + 375, y, ...opts });
+
+    // PAST DUE label on the right for overdue rows
+    if (isPastDue) {
+      page.drawText('PAST DUE', { x: MARGIN + 455, y, size: 6.5, font: bold, color: rgb(0.8, 0.1, 0.1) });
+    }
     y -= ROW_H;
   }
 
-  // Total row
+  // Summary totals row at the bottom
+  y -= 4;
+  page.drawLine({ start: { x: MARGIN, y }, end: { x: PAGE_W - MARGIN, y }, thickness: 0.5, color: GRAY });
+  y -= 14;
   if (txRows.length === 0) {
     page.drawText('No transactions found for this period.', { x: MARGIN, y, size: 9, font: reg, color: GRAY });
+  } else {
+    const totalBalStr  = `Total Balance:  $${(overdueInfo?.overdueBalance||0).toLocaleString('en-US',{minimumFractionDigits:2})}`;
+    const overdueStr   = `Overdue Balance:  $${calcOverdueBalance.toLocaleString('en-US',{minimumFractionDigits:2})}`;
+    page.drawText(totalBalStr, { x: MARGIN + 295, y, size: 8, font: bold, color: BLACK });
+    y -= 13;
+    page.drawRectangle({ x: MARGIN + 290, y: y - 3, width: COL_W - 250, height: 14, color: rgb(1, 0.9, 0.9) });
+    page.drawText(overdueStr, { x: MARGIN + 295, y, size: 8, font: bold, color: rgb(0.7, 0.05, 0.05) });
   }
   page.drawText(`Page ${pageNum} of ${totalPages}`, { x: PAGE_W - MARGIN - 60, y: 20, size: 7, font: reg, color: GRAY });
 
