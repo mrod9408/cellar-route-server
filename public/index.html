@@ -110,6 +110,19 @@
     .inv-overdue { font-size: 10px; font-weight: 700; color: var(--orange); background: var(--orange-light); padding: 2px 6px; border-radius: 6px; white-space: nowrap; flex-shrink: 0; }
     .selection-summary { background: var(--cream); border-radius: 10px; padding: 10px 14px; margin-top: 12px; font-size: 13px; color: var(--burgundy-dark); font-weight: 500; display: flex; justify-content: space-between; align-items: center; }
 
+    /* ── PICKING LIST ─────────────────────────────────────────────────────── */
+    .picking-product-row { display:flex; align-items:center; padding: 10px 14px; border-bottom: 1px solid #f0e8ec; gap: 12px; }
+    .picking-product-row:last-child { border-bottom: none; }
+    .picking-product-row:hover { background: #fdf8fa; }
+    .picking-qty { font-size: 22px; font-weight: 800; color: var(--wine); min-width: 52px; text-align:right; font-variant-numeric: tabular-nums; }
+    .picking-unit { font-size: 11px; color: var(--gray); font-weight: 500; min-width: 28px; }
+    .picking-name { font-size: 13px; font-weight: 600; color: var(--dark); flex: 1; }
+    .picking-stops { font-size: 11px; color: var(--gray); white-space:nowrap; }
+    .picking-card { background: var(--white); border-radius: var(--radius); box-shadow: var(--shadow); margin-bottom: 16px; overflow: hidden; }
+    .picking-card-header { background: var(--wine); color: var(--gold); padding: 10px 14px; font-size: 13px; font-weight: 700; display:flex; justify-content:space-between; align-items:center; }
+    .picking-card-header span { color: rgba(255,255,255,0.7); font-size:12px; font-weight:400; }
+    .picking-search { width:100%; padding:10px 14px; border:none; border-bottom:1px solid #f0e8ec; font-size:13px; outline:none; background:#fdf8fa; }
+
     /* ── OVERDUE SUMMARY BANNER ───────────────────────────────────────────── */
     .overdue-summary { background: var(--orange-light); border: 1.5px solid var(--orange); border-radius: 12px; padding: 12px 16px; margin-bottom: 14px; display: flex; align-items: flex-start; gap: 10px; }
     .overdue-summary-icon { font-size: 20px; flex-shrink: 0; }
@@ -314,6 +327,7 @@
   <div class="tabs">
     <div class="tab active" onclick="showTab('route')">Route Planner</div>
     <div class="tab" onclick="showTab('map')">Route Map</div>
+    <div class="tab" onclick="showTab('picking')">Picking List</div>
     <div class="tab" onclick="showTab('settings')">Settings</div>
   </div>
 
@@ -427,6 +441,30 @@
     </div>
 
     <!-- ══ SETTINGS ══ -->
+    <!-- ══ PICKING LIST ══ -->
+    <div class="view" id="view-picking">
+      <div id="pickingEmpty" style="text-align:center;padding:60px 20px;color:var(--gray);">
+        <div style="font-size:48px;margin-bottom:12px;">📦</div>
+        <div style="font-size:17px;font-weight:600;margin-bottom:8px;">No routes yet</div>
+        <div style="font-size:13px;">Generate routes first, then come back here to see your picking list.</div>
+      </div>
+      <div id="pickingContent" style="display:none;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
+          <div>
+            <div style="font-size:18px;font-weight:700;color:var(--dark);">Today's Picking List</div>
+            <div id="pickingSummary" style="font-size:13px;color:var(--gray);margin-top:2px;"></div>
+          </div>
+          <div style="display:flex;gap:8px;flex-wrap:wrap;">
+            <select id="pickingRouteFilter" class="form-input" style="width:auto;font-size:13px;" onchange="renderPickingList()">
+              <option value="all">All Routes</option>
+            </select>
+            <button class="btn-secondary" onclick="downloadPickingListPdf()" style="font-size:13px;">⬇ Download PDF</button>
+          </div>
+        </div>
+        <div id="pickingListContainer"></div>
+      </div>
+    </div>
+
     <div class="view" id="view-settings">
       <div class="settings-card">
         <h3>🔐 Change PIN</h3>
@@ -798,7 +836,7 @@ async function initApp() {
 function saveState(){sessionStorage.setItem('cellarRouteState',JSON.stringify({invoices,assignments,completed,drivers,serverUrl,clusters,appPin,selectedInvoiceIds:[...selectedInvoiceIds],overdueByCustomer}));}
 
 // ═══════════════════ TABS ════════════════════════════════════════════════════
-function showTab(tab){activeTab=tab;document.querySelectorAll('.tab').forEach((t,i)=>{t.classList.toggle('active',['route','map','settings'][i]===tab);});document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));document.getElementById('view-'+tab).classList.add('active');if(tab==='map')setTimeout(()=>initOrRefreshMap(),80);}
+function showTab(tab){activeTab=tab;document.querySelectorAll('.tab').forEach((t,i)=>{t.classList.toggle('active',['route','map','picking','settings'][i]===tab);});if(tab==='picking')setTimeout(renderPickingList,50);document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));document.getElementById('view-'+tab).classList.add('active');if(tab==='map')setTimeout(()=>initOrRefreshMap(),80);}
 
 // ═══════════════════ FETCH INVOICES ══════════════════════════════════════════
 async function fetchInvoices() {
@@ -868,7 +906,7 @@ function refreshInvoices(){
   document.getElementById('clusterList').innerHTML='';
   document.getElementById('warningBanners').innerHTML='';
   document.getElementById('invoiceStateGroups').innerHTML='';
-  document.getElementById('overdueSummary').style.display='none';
+  document.getElementById('overdueSummary').style.display='none';document.getElementById('pickingEmpty').style.display='block';document.getElementById('pickingContent').style.display='none';
   showTab('route');
 }
 
@@ -967,6 +1005,7 @@ function runAutoRoute(){
   saveState();updateStats();
   document.getElementById('warningBanners').innerHTML=warns.map(w=>`<div class="warn-banner"><span>${w.startsWith('!!️')?'🟠':'ℹ️'}</span><span>${w}</span></div>`).join('');
   renderClusters();
+  renderPickingList();
   showToast(`✓ ${clusters.length} routes generated`);
 }
 
@@ -1111,6 +1150,179 @@ function updateStats(){const sel=invoices.filter(i=>selectedInvoiceIds.has(i.id)
 
 // ═══════════════════ SETTINGS ═════════════════════════════════════════════════
 function saveSettings(){serverUrl=document.getElementById('serverUrl').value.trim()||serverUrl;saveState();showToast('Settings saved');}
+// ═══════════════════ PICKING LIST ════════════════════════════════════════════
+
+function buildPickingData(routeFilter) {
+  // Aggregate line items across all selected invoices (or just one route)
+  const source = clusters.length ? clusters : [];
+  if (!source.length) return null;
+
+  const products = {}; // itemName -> { qty, cases, stops: Set, routes: Set }
+  const routeSelect = document.getElementById('pickingRouteFilter');
+
+  source.forEach((cluster, ci) => {
+    if (routeFilter !== 'all' && ci !== parseInt(routeFilter)) return;
+    cluster.stops.forEach(inv => {
+      (inv.lineItems || []).forEach(item => {
+        if (!item.itemName || item.qty <= 0) return;
+        // Normalise name: strip leading SKU codes like "CW-1234 " if present
+        const name = item.itemName.trim();
+        if (!products[name]) {
+          products[name] = { qty: 0, stops: new Set(), routes: new Set() };
+        }
+        products[name].qty    += item.qty;
+        products[name].stops.add(inv.customerName);
+        products[name].routes.add(ci + 1);
+      });
+    });
+  });
+
+  // Sort alphabetically by product name
+  return Object.entries(products)
+    .map(([name, d]) => ({ name, qty: d.qty, stopCount: d.stops.size, routes: [...d.routes].sort((a,b)=>a-b) }))
+    .sort((a, b) => a.name.localeCompare(b.name));
+}
+
+function renderPickingList() {
+  if (!clusters.length) {
+    document.getElementById('pickingEmpty').style.display = 'block';
+    document.getElementById('pickingContent').style.display = 'none';
+    return;
+  }
+  document.getElementById('pickingEmpty').style.display = 'none';
+  document.getElementById('pickingContent').style.display = 'block';
+
+  // Populate route filter dropdown
+  const sel = document.getElementById('pickingRouteFilter');
+  const prev = sel.value;
+  sel.innerHTML = '<option value="all">All Routes</option>' +
+    clusters.map((_, i) => `<option value="${i}">Route ${i+1}</option>`).join('');
+  if ([...sel.options].some(o => o.value === prev)) sel.value = prev;
+
+  const routeFilter = sel.value;
+  const items = buildPickingData(routeFilter);
+
+  // Summary line
+  const totalQty = items.reduce((s, p) => s + p.qty, 0);
+  const selectedInv = routeFilter === 'all'
+    ? clusters.flatMap(c => c.stops)
+    : (clusters[parseInt(routeFilter)]?.stops || []);
+  document.getElementById('pickingSummary').textContent =
+    `${items.length} products · ${totalQty} total units · ${selectedInv.length} stops`;
+
+  // Search filter
+  const searchVal = (document.getElementById('pickingSearch')?.value || '').toLowerCase();
+  const filtered = searchVal ? items.filter(p => p.name.toLowerCase().includes(searchVal)) : items;
+
+  const container = document.getElementById('pickingListContainer');
+
+  // Group by first letter for readability
+  const groups = {};
+  filtered.forEach(item => {
+    const letter = item.name[0].toUpperCase();
+    if (!groups[letter]) groups[letter] = [];
+    groups[letter].push(item);
+  });
+
+  container.innerHTML = `
+    <input class="picking-search" id="pickingSearch" placeholder="Search products…"
+      oninput="renderPickingList()" value="${searchVal}" />
+  ` + Object.entries(groups).sort(([a],[b])=>a.localeCompare(b)).map(([letter, groupItems]) => `
+    <div class="picking-card">
+      <div class="picking-card-header">
+        ${letter}
+        <span>${groupItems.length} product${groupItems.length!==1?'s':''}</span>
+      </div>
+      ${groupItems.map(item => `
+        <div class="picking-product-row">
+          <div class="picking-qty">${item.qty % 1 === 0 ? item.qty : item.qty.toFixed(1)}</div>
+          <div class="picking-unit">units</div>
+          <div class="picking-name">${item.name}</div>
+          <div class="picking-stops">${item.stopCount} stop${item.stopCount!==1?'s':''} · Rt ${item.routes.join(', ')}</div>
+        </div>
+      `).join('')}
+    </div>
+  `).join('');
+}
+
+async function downloadPickingListPdf() {
+  const {PDFDocument, rgb, StandardFonts} = PDFLib;
+  const routeFilter = document.getElementById('pickingRouteFilter').value;
+  const items = buildPickingData(routeFilter);
+  if (!items?.length) { showToast('No picking data to export'); return; }
+
+  const doc   = await PDFDocument.create();
+  const bold  = await doc.embedFont(StandardFonts.HelveticaBold);
+  const reg   = await doc.embedFont(StandardFonts.Helvetica);
+
+  const PAGE_W = 612, PAGE_H = 792, MARGIN = 40;
+  const WINE  = rgb(0.29, 0.075, 0.176);
+  const GOLD  = rgb(0.788, 0.659, 0.298);
+  const GRAY  = rgb(0.42, 0.42, 0.42);
+  const LGRAY = rgb(0.96, 0.96, 0.96);
+  const BLACK = rgb(0, 0, 0);
+  const ROW_H = 20;
+  const today = new Date().toLocaleDateString('en-US', {weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  const routeLabel = routeFilter === 'all' ? 'All Routes' : `Route ${parseInt(routeFilter)+1}`;
+
+  const addPage = () => {
+    const p = doc.addPage([PAGE_W, PAGE_H]);
+    // Header
+    p.drawRectangle({ x:0, y:PAGE_H-70, width:PAGE_W, height:70, color:WINE });
+    p.drawText('PICKING LIST', { x:MARGIN, y:PAGE_H-30, size:20, font:bold, color:GOLD });
+    p.drawText('Classic Wines Inc.', { x:MARGIN, y:PAGE_H-48, size:9, font:reg, color:rgb(0.9,0.9,0.9) });
+    p.drawText(`${today}  -  ${routeLabel}`, { x:MARGIN, y:PAGE_H-62, size:8, font:reg, color:rgb(0.75,0.75,0.75) });
+    // Column headers
+    p.drawRectangle({ x:MARGIN, y:PAGE_H-88, width:PAGE_W-MARGIN*2, height:16, color:LGRAY });
+    p.drawText('QTY',     { x:MARGIN+4,   y:PAGE_H-83, size:7, font:bold, color:GRAY });
+    p.drawText('PRODUCT', { x:MARGIN+60,  y:PAGE_H-83, size:7, font:bold, color:GRAY });
+    p.drawText('STOPS',   { x:PAGE_W-MARGIN-80, y:PAGE_H-83, size:7, font:bold, color:GRAY });
+    p.drawText('ROUTES',  { x:PAGE_W-MARGIN-30, y:PAGE_H-83, size:7, font:bold, color:GRAY });
+    return { page: p, y: PAGE_H - 88 - ROW_H };
+  };
+
+  let { page, y } = addPage();
+  let pageNum = 1;
+  const totalPages = Math.ceil(items.length / Math.floor((PAGE_H - 110) / ROW_H)) || 1;
+
+  items.forEach((item, i) => {
+    if (y < 50) {
+      page.drawText(`Page ${pageNum} of ${totalPages}`, { x:PAGE_W-MARGIN-60, y:20, size:7, font:reg, color:GRAY });
+      ({ page, y } = addPage()); pageNum++;
+    }
+    const bg = i % 2 === 0 ? rgb(0.98,0.98,0.98) : rgb(1,1,1);
+    page.drawRectangle({ x:MARGIN, y:y-4, width:PAGE_W-MARGIN*2, height:ROW_H, color:bg });
+
+    const qtyStr = item.qty % 1 === 0 ? String(item.qty) : item.qty.toFixed(1);
+    page.drawText(qtyStr, { x:MARGIN+4, y, size:11, font:bold, color:WINE });
+    // Truncate long product names
+    const nameStr = item.name.length > 55 ? item.name.slice(0,53)+'..' : item.name;
+    page.drawText(nameStr, { x:MARGIN+60, y, size:9, font:reg, color:BLACK });
+    page.drawText(String(item.stopCount), { x:PAGE_W-MARGIN-72, y, size:9, font:reg, color:GRAY });
+    page.drawText(item.routes.join(','), { x:PAGE_W-MARGIN-28, y, size:9, font:reg, color:GRAY });
+    y -= ROW_H;
+  });
+
+  // Totals footer
+  y -= 4;
+  page.drawLine({ start:{x:MARGIN,y}, end:{x:PAGE_W-MARGIN,y}, thickness:0.5, color:GRAY });
+  y -= 14;
+  const totalQty = items.reduce((s,p)=>s+p.qty,0);
+  page.drawText(`${items.length} products  -  ${totalQty % 1 === 0 ? totalQty : totalQty.toFixed(1)} total units`, { x:MARGIN, y, size:9, font:bold, color:WINE });
+  page.drawText(`Page ${pageNum} of ${totalPages}`, { x:PAGE_W-MARGIN-60, y:20, size:7, font:reg, color:GRAY });
+
+  const bytes = await doc.save();
+  const blob  = new Blob([bytes], { type:'application/pdf' });
+  const url   = URL.createObjectURL(blob);
+  const a     = document.createElement('a');
+  a.href = url;
+  a.download = `PickingList_${new Date().toISOString().slice(0,10)}${routeFilter!=='all'?'_Route'+(parseInt(routeFilter)+1):''}.pdf`;
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('Picking list downloaded');
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 function clearAll(){if(!confirm('Clear all delivery data?'))return;invoices=[];assignments={};completed={};clusters=[];selectedInvoiceIds=new Set();overdueByCustomer={};clearMapObjects();gMap=null;saveState();document.getElementById('connectCard').style.display='block';document.getElementById('plannerSection').style.display='none';document.getElementById('clusterList').innerHTML='';document.getElementById('warningBanners').innerHTML='';document.getElementById('invoiceStateGroups').innerHTML='';document.getElementById('overdueSummary').style.display='none';document.getElementById('fetchBtn').disabled=false;document.getElementById('fetchBtn').textContent="Pull Today's Deliveries";showToast('Data cleared');showTab('route');}
 function openMap(a){if(!a||a.trim()===''){showToast('No address available');return;}window.open('https://maps.google.com/?q='+a,'_blank');}
 
