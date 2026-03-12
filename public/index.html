@@ -1073,11 +1073,106 @@ function renderPdfPanel(){
 async function fetchInvoicePdf(invoiceId){const base=document.getElementById('serverUrl')?.value.trim()||serverUrl;const res=await fetch(`${base}/api/invoice-pdf/${invoiceId}`);if(!res.ok)throw new Error(`PDF fetch failed for invoice ${invoiceId}: ${res.status}`);return res.arrayBuffer();}
 
 // NEW: Fetch statement PDF for a customer
-async function fetchStatementPdf(customerId){
-  const base=document.getElementById('serverUrl')?.value.trim()||serverUrl;
-  const res=await fetch(`${base}/api/customer-statement/${customerId}`);
-  if(!res.ok)throw new Error(`Statement fetch failed for customer ${customerId}: ${res.status}`);
-  return res.arrayBuffer();
+async function fetchStatementPdf(customerId, customerName, overdueInfo){
+  const {PDFDocument, rgb, StandardFonts} = PDFLib;
+  const base = document.getElementById('serverUrl')?.value.trim() || serverUrl;
+
+  // Fetch report data as JSON (QB Online does not support PDF output for reports)
+  const res = await fetch(`${base}/api/customer-statement/${customerId}`);
+  if (!res.ok) throw new Error(`Statement fetch failed for customer ${customerId}: ${res.status}`);
+  const { report, startDate, endDate } = await res.json();
+
+  // Extract transaction rows from QB CustomerBalanceDetail report structure
+  // Rows are nested: report.Rows.Row[] → section rows → ColData[]
+  const txRows = [];
+  const rows = report?.Rows?.Row || [];
+  const extractRows = (rowArr) => {
+    for (const row of rowArr) {
+      if (row.type === 'Data' && row.ColData) {
+        txRows.push(row.ColData.map(c => c.value || ''));
+      }
+      if (row.Rows?.Row) extractRows(row.Rows.Row);
+    }
+  };
+  extractRows(rows);
+
+  // Build a PDF page with the statement data
+  const doc  = await PDFDocument.create();
+  const bold = await doc.embedFont(StandardFonts.HelveticaBold);
+  const reg  = await doc.embedFont(StandardFonts.Helvetica);
+
+  const PAGE_W = 612, PAGE_H = 792;
+  const MARGIN = 40, COL_W = PAGE_W - MARGIN * 2;
+  const WINE_DARK = rgb(0.29, 0.075, 0.176);
+  const GOLD      = rgb(0.788, 0.659, 0.298);
+  const ORANGE    = rgb(0.769, 0.384, 0.114);
+  const GRAY      = rgb(0.42, 0.42, 0.42);
+  const BLACK     = rgb(0, 0, 0);
+  const WHITE     = rgb(1, 1, 1);
+
+  const ROW_H = 14, HEADER_H = 90;
+  const ROWS_PER_PAGE = Math.floor((PAGE_H - HEADER_H - 80) / ROW_H);
+
+  const addPage = () => {
+    const p = doc.addPage([PAGE_W, PAGE_H]);
+    // Header bar
+    p.drawRectangle({ x: 0, y: PAGE_H - HEADER_H, width: PAGE_W, height: HEADER_H, color: WINE_DARK });
+    p.drawText('ACCOUNT STATEMENT', { x: MARGIN, y: PAGE_H - 32, size: 16, font: bold, color: GOLD });
+    p.drawText('Classic Wines Inc.', { x: MARGIN, y: PAGE_H - 50, size: 9, font: reg, color: WHITE });
+    p.drawText(customerName || `Customer #${customerId}`, { x: MARGIN, y: PAGE_H - 65, size: 11, font: bold, color: WHITE });
+    p.drawText(`Period: ${startDate} – ${endDate}`, { x: MARGIN, y: PAGE_H - 80, size: 8, font: reg, color: rgb(0.75, 0.75, 0.75) });
+
+    // Overdue badge
+    if (overdueInfo?.overdueBalance > 0) {
+      const badgeText = `OVERDUE BALANCE: $${overdueInfo.overdueBalance.toLocaleString('en-US', {minimumFractionDigits:2})}  ·  ${overdueInfo.daysOverdue} days past due`;
+      p.drawRectangle({ x: MARGIN, y: PAGE_H - HEADER_H - 22, width: COL_W, height: 18, color: ORANGE });
+      p.drawText(badgeText, { x: MARGIN + 6, y: PAGE_H - HEADER_H - 14, size: 8, font: bold, color: WHITE });
+    }
+
+    // Column headers
+    const colY = PAGE_H - HEADER_H - (overdueInfo?.overdueBalance > 0 ? 44 : 30);
+    p.drawText('DATE',      { x: MARGIN,       y: colY, size: 7, font: bold, color: GRAY });
+    p.drawText('TYPE',      { x: MARGIN + 65,  y: colY, size: 7, font: bold, color: GRAY });
+    p.drawText('NUM',       { x: MARGIN + 145, y: colY, size: 7, font: bold, color: GRAY });
+    p.drawText('DUE DATE',  { x: MARGIN + 210, y: colY, size: 7, font: bold, color: GRAY });
+    p.drawText('AMOUNT',    { x: MARGIN + 295, y: colY, size: 7, font: bold, color: GRAY });
+    p.drawText('OPEN BAL',  { x: MARGIN + 375, y: colY, size: 7, font: bold, color: GRAY });
+    p.drawLine({ start: { x: MARGIN, y: colY - 3 }, end: { x: PAGE_W - MARGIN, y: colY - 3 }, thickness: 0.5, color: GRAY });
+
+    return { page: p, y: colY - ROW_H - 4 };
+  };
+
+  let { page, y } = addPage();
+  let pageNum = 1;
+  const totalPages = Math.ceil(txRows.length / ROWS_PER_PAGE) || 1;
+
+  for (let i = 0; i < txRows.length; i++) {
+    if (y < 50) {
+      page.drawText(`Page ${pageNum} of ${totalPages}`, { x: PAGE_W - MARGIN - 60, y: 20, size: 7, font: reg, color: GRAY });
+      ({ page, y } = addPage());
+      pageNum++;
+    }
+    const [date, type, num, dueDate, amount, openBal] = txRows[i];
+    const rowColor = i % 2 === 0 ? rgb(0.97, 0.97, 0.97) : WHITE;
+    page.drawRectangle({ x: MARGIN, y: y - 2, width: COL_W, height: ROW_H, color: rowColor });
+    const opts = { size: 7.5, font: reg, color: BLACK };
+    page.drawText((date||'').slice(0,10),     { x: MARGIN,       y, ...opts });
+    page.drawText((type||'').slice(0,16),     { x: MARGIN + 65,  y, ...opts });
+    page.drawText((num||'').slice(0,10),      { x: MARGIN + 145, y, ...opts });
+    page.drawText((dueDate||'').slice(0,10),  { x: MARGIN + 210, y, ...opts });
+    page.drawText((amount||'').slice(0,12),   { x: MARGIN + 295, y, ...opts });
+    page.drawText((openBal||'').slice(0,12),  { x: MARGIN + 375, y, ...opts });
+    y -= ROW_H;
+  }
+
+  // Total row
+  if (txRows.length === 0) {
+    page.drawText('No transactions found for this period.', { x: MARGIN, y, size: 9, font: reg, color: GRAY });
+  }
+  page.drawText(`Page ${pageNum} of ${totalPages}`, { x: PAGE_W - MARGIN - 60, y: 20, size: 7, font: reg, color: GRAY });
+
+  const pdfBytes = await doc.save();
+  return pdfBytes.buffer;
 }
 
 async function makeDividerPage(pdfDoc,routeNum,stops,cases,dist,date){
@@ -1172,7 +1267,7 @@ async function downloadAllRoutesPdf(){
           showPdfProgress(Math.round((fetched/totalDocs)*95));
           setPdfStatus(`Fetching statement: ${inv.customerName}…`);
           try{
-            const stmtBuf=await fetchStatementPdf(custId);
+            const stmtBuf=await fetchStatementPdf(custId, inv.customerName, overdueByCustomer[String(custId)]);
             const stmtSrc=await PDFDocument.load(stmtBuf);
             const stmtPages=await merged.copyPages(stmtSrc,stmtSrc.getPageIndices());
             stmtPages.forEach(p=>merged.addPage(p));
