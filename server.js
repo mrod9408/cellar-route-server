@@ -438,22 +438,19 @@ app.get('/api/invoice-pdf/:invoiceId', async (req, res) => {
   res.status(404).json({ error: `Invoice ${invoiceId} PDF not found in QuickBooks` });
 });
 
-// ─── CUSTOMER STATEMENT PDF PROXY ─────────────────────────────────────────────
-// QuickBooks Online does NOT have a /customer/:id/statement REST endpoint.
-// Statements are generated via the Reports API.  We try two report types:
-//   1. CustomerBalanceDetail  — closest to the QB "statement" you print
-//   2. AgedReceivableDetail   — fallback showing all open/overdue items
-// Both support Accept: application/pdf and filter by customer ID.
+// ─── CUSTOMER STATEMENT DATA ─────────────────────────────────────────────────
+// QB Online does not support PDF output for report endpoints.
+// Instead we return the CustomerBalanceDetail report as JSON.
+// The frontend uses pdf-lib to render it into a statement page.
 app.get('/api/customer-statement/:customerId', async (req, res) => {
   const accessToken = await getValidAccessToken();
   const companyId   = tokenStore.companyId;
   const environment = tokenStore.environment;
   const { customerId } = req.params;
 
-  console.log(`[STATEMENT] Request for customer ${customerId}, env=${environment}, company=${companyId}`);
+  console.log(`[STATEMENT] JSON request for customer ${customerId}`);
 
   if (!accessToken || !companyId) {
-    console.error('[STATEMENT] Missing accessToken or companyId');
     return res.status(400).json({ error: 'Not connected to QuickBooks.' });
   }
 
@@ -465,51 +462,37 @@ app.get('/api/customer-statement/:customerId', async (req, res) => {
     ? ['https://quickbooks.api.intuit.com', 'https://qbo.api.intuit.com', 'https://c1.qbo.intuit.com', 'https://c3.qbo.intuit.com', 'https://c5.qbo.intuit.com']
     : ['https://sandbox-quickbooks.api.intuit.com'];
 
-  const pdfHeaders = {
+  const jsonHeaders = {
     'Authorization': `Bearer ${accessToken}`,
-    'Accept': 'application/pdf'
+    'Accept': 'application/json'
   };
 
-  // Two report endpoints to try per cluster
-  const buildUrls = (base) => [
-    `${base}/v3/company/${companyId}/reports/CustomerBalanceDetail?customer=${customerId}&start_date=${startDate}&end_date=${endDate}&minorversion=65`,
-    `${base}/v3/company/${companyId}/reports/AgedReceivableDetail?customer=${customerId}&report_date=${endDate}&minorversion=65`,
-  ];
-
   for (const baseUrl of baseUrls) {
-    for (const stmtUrl of buildUrls(baseUrl)) {
-      try {
-        console.log(`[STATEMENT] Trying: ${stmtUrl}`);
-        const qbRes = await fetch(stmtUrl, { method: 'GET', headers: pdfHeaders });
+    const url = `${baseUrl}/v3/company/${companyId}/reports/CustomerBalanceDetail?customer=${customerId}&start_date=${startDate}&end_date=${endDate}&minorversion=65`;
+    try {
+      console.log(`[STATEMENT] Trying: ${baseUrl}`);
+      const qbRes = await fetch(url, { method: 'GET', headers: jsonHeaders });
+      const data  = await qbRes.json();
 
-        if (qbRes.ok) {
-          const ct = qbRes.headers.get('content-type') || '';
-          console.log(`[STATEMENT] ✓ Success for customer ${customerId} — content-type: ${ct}`);
-          res.setHeader('Content-Type', 'application/pdf');
-          res.setHeader('Cache-Control', 'no-store');
-          res.setHeader('Access-Control-Allow-Origin', '*');
-          qbRes.body.pipe(res);
-          return;
-        }
-
-        const errText = await qbRes.text();
-        console.error(`[STATEMENT] ${qbRes.status} from ${stmtUrl.split('?')[0]}:`, errText.slice(0, 400));
-
-        if (qbRes.status === 401 || qbRes.status === 403) {
-          return res.status(qbRes.status).json({ error: `QB auth error ${qbRes.status}` });
-        }
-        // 400/404 = try next URL
-      } catch (err) {
-        console.error(`[STATEMENT] Network error on ${baseUrl}:`, err.message);
+      if (qbRes.ok) {
+        console.log(`[STATEMENT] ✓ Got report data for customer ${customerId}`);
+        // Also get the customer name from the overdue data we already have
+        res.json({ ok: true, report: data, startDate, endDate });
+        return;
       }
+
+      const errCode = data?.Fault?.Error?.[0]?.code;
+      console.error(`[STATEMENT] ${qbRes.status} from ${baseUrl}, code=${errCode}`);
+      if (errCode !== '130') {
+        return res.status(qbRes.status).json({ error: 'QB report error', detail: JSON.stringify(data?.Fault) });
+      }
+    } catch (err) {
+      console.error(`[STATEMENT] Network error on ${baseUrl}:`, err.message);
     }
   }
 
-  console.error(`[STATEMENT] All URLs exhausted for customer ${customerId}`);
-  res.status(404).json({ error: `Statement not available for customer ${customerId} — check Railway logs` });
+  res.status(404).json({ error: `Statement data not available for customer ${customerId}` });
 });
-
-
 
 // ─── STATEMENT DEBUG ENDPOINT ────────────────────────────────────────────────
 // Visit /api/debug-statement/CUSTOMER_ID in your browser to see exactly what
