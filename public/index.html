@@ -326,7 +326,7 @@
       <div class="connect-card" id="connectCard">
         <h3>🔌 QuickBooks</h3>
         <p style="font-size:13px;color:var(--gray);margin-bottom:16px">Credentials are stored securely on the server. Hit the button below to pull today's deliveries.</p>
-        <p style="font-size:12px;color:var(--green);background:var(--green-light);padding:10px 14px;border-radius:10px;margin-bottom:14px">🔄 Auto-refresh is active — tokens renew automatically all day.</p>
+        <p style="font-size:12px;color:var(--green);background:var(--green-light);padding:10px 14px;border-radius:10px;margin-bottom:14px">🔄 Auto-refresh is active - tokens renew automatically all day.</p>
         <button class="btn-primary" id="fetchBtn" onclick="fetchInvoices()">Pull Today's Deliveries</button>
       </div>
 
@@ -338,9 +338,9 @@
           <div class="stat-card"><div class="stat-number" id="stat-done">0</div><div class="stat-label">Done</div></div>
         </div>
 
-        <!-- OVERDUE SUMMARY — shown after fetch if any overdue customers on today's route -->
+        <!-- OVERDUE SUMMARY - shown after fetch if any overdue customers on today's route -->
         <div class="overdue-summary" id="overdueSummary" style="display:none">
-          <div class="overdue-summary-icon">⚠️</div>
+          <div class="overdue-summary-icon">!!️</div>
           <div class="overdue-summary-text">
             <div class="overdue-summary-title" id="overdueSummaryTitle"></div>
             <div class="overdue-summary-detail" id="overdueSummaryDetail"></div>
@@ -387,7 +387,7 @@
           <p style="font-size:13px;color:var(--gray);margin-bottom:10px">Downloads all invoices in delivery order, grouped by route. Statements are automatically included after overdue customers' invoices.</p>
           <div class="pdf-overdue-note" id="pdfOverdueNote"></div>
           <button class="btn-gold" id="btnAllPdf" onclick="downloadAllRoutesPdf()" style="font-size:14px;padding:13px">
-            ⬇ Download Combined PDF — All Routes
+            ⬇ Download Combined PDF - All Routes
           </button>
           <div class="pdf-progress" id="pdfProgress"><div class="pdf-progress-bar" id="pdfProgressBar"></div></div>
           <div class="pdf-status" id="pdfStatus"></div>
@@ -555,22 +555,22 @@ function getStateLabel(inv) {
   const li3  = ['115','116','117','118','119'];
   const bk3  = ['112']; const qns3 = ['110','111','113','114'];
   const bx3  = ['104'];
-  if (nyc3.includes(prefix3)||bk3.includes(prefix3)||qns3.includes(prefix3)||bx3.includes(prefix3)) return 'NY — New York City';
-  if (li3.includes(prefix3)) return 'NY — Long Island';
+  if (nyc3.includes(prefix3)||bk3.includes(prefix3)||qns3.includes(prefix3)||bx3.includes(prefix3)) return 'NY - New York City';
+  if (li3.includes(prefix3)) return 'NY - Long Island';
   const wc3 = ['105','106','107','108','109'];
-  if (wc3.includes(prefix3)) return 'NY — Westchester';
+  if (wc3.includes(prefix3)) return 'NY - Westchester';
   const hv3 = ['125','126','127','128'];
-  if (hv3.includes(prefix3)) return 'NY — Hudson Valley';
+  if (hv3.includes(prefix3)) return 'NY - Hudson Valley';
   const nj2 = ['07','08'];
-  if (nj2.some(p => z.startsWith(p))) return 'NJ — New Jersey';
-  if (z.startsWith('06')) return 'CT — Connecticut';
+  if (nj2.some(p => z.startsWith(p))) return 'NJ - New Jersey';
+  if (z.startsWith('06')) return 'CT - Connecticut';
   const st = (addr.state||'').toUpperCase();
-  if (st === 'NJ') return 'NJ — New Jersey';
-  if (st === 'CT') return 'CT — Connecticut';
-  if (st === 'NY') return 'NY — New York';
-  if (st === 'PA') return 'PA — Pennsylvania';
-  if (st === 'DC') return 'DC — Washington DC';
-  if (st === 'DE') return 'DE — Delaware';
+  if (st === 'NJ') return 'NJ - New Jersey';
+  if (st === 'CT') return 'CT - Connecticut';
+  if (st === 'NY') return 'NY - New York';
+  if (st === 'PA') return 'PA - Pennsylvania';
+  if (st === 'DC') return 'DC - Washington DC';
+  if (st === 'DE') return 'DE - Delaware';
   return addr.state || 'Unknown';
 }
 
@@ -885,7 +885,7 @@ function renderInvoiceSelectionList() {
             <span class="inv-city">${city}</span>
             <span class="inv-cases">📦 ${inv.cases}</span>
             <span class="inv-amount">$${Number(inv.totalAmount||0).toFixed(0)}</span>
-            ${isOverdue?`<span class="inv-overdue" title="Account balance: $${overdueInfo.overdueBalance.toFixed(2)} · ${overdueInfo.daysOverdue||'?'} days overdue · ${overdueInfo.invoiceCount} open invoice${overdueInfo.invoiceCount!==1?'s':''}">⚠ ${overdueInfo.daysOverdue?overdueInfo.daysOverdue+'d ':''}OVERDUE</span>`:''}
+            ${isOverdue?`<span class="inv-overdue" title="Account balance: $${overdueInfo.overdueBalance.toFixed(2)} · ${overdueInfo.daysOverdue||'?'} days overdue · ${overdueInfo.invoiceCount} open invoice${overdueInfo.invoiceCount!==1?'s':''}">!! ${overdueInfo.daysOverdue?overdueInfo.daysOverdue+'d ':''}OVERDUE</span>`:''}
           </div>`;
         }).join('')}
       </div>`;
@@ -913,9 +913,9 @@ function runAutoRoute(){
   const geoVans=buildDistanceRoutes(selectedInvoices,driverCount,caseLimit);
   clusters=geoVans.map((van,i)=>{const zones=[...new Set(van.stops.map(s=>s._zone||'').filter(Boolean))];const zoneLabel=zones.length<=3?zones.join(' + '):`${zones.slice(0,2).join(' + ')} +${zones.length-2} more`;return{id:i,stops:van.stops,cases:van.cases,distance:van.distance,zone:zoneLabel,territory:zoneLabel,overLimit:van.overLimit,color:ROUTE_COLORS[i%ROUTE_COLORS.length]};});
   const warns=[];
-  clusters.filter(c=>c.overLimit).forEach(c=>warns.push(`⚠️ Route ${clusters.indexOf(c)+1} has ${c.cases} cases — over ${caseLimit} limit.`));
+  clusters.filter(c=>c.overLimit).forEach(c=>warns.push(`!!️ Route ${clusters.indexOf(c)+1} has ${c.cases} cases - over ${caseLimit} limit.`));
   saveState();updateStats();
-  document.getElementById('warningBanners').innerHTML=warns.map(w=>`<div class="warn-banner"><span>${w.startsWith('⚠️')?'🟠':'ℹ️'}</span><span>${w}</span></div>`).join('');
+  document.getElementById('warningBanners').innerHTML=warns.map(w=>`<div class="warn-banner"><span>${w.startsWith('!!️')?'🟠':'ℹ️'}</span><span>${w}</span></div>`).join('');
   renderClusters();
   showToast(`✓ ${clusters.length} routes generated`);
 }
@@ -953,7 +953,7 @@ function renderClusters(){
             <div class="stop-details">
               <div class="stop-customer">
                 ${inv.customerName}
-                ${isOverdue?`<span class="stop-overdue-badge">⚠ STMT</span>`:''}
+                ${isOverdue?`<span class="stop-overdue-badge">!! STMT</span>`:''}
               </div>
               <div class="stop-address">${addr?([addr.line1,addr.line2].filter(Boolean).join(', ')||'No address'):'No address'}</div>
               <div class="stop-cases">📦 ${inv.cases} case${inv.cases!==1?'s':''}</div>
@@ -976,7 +976,7 @@ function clearMapObjects(){gMapMarkers.forEach(m=>m.setMap(null));gMapPolylines.
 async function initOrRefreshMap(){
   if(!clusters.length){document.getElementById('mapEmptyState').style.display='block';document.getElementById('mapContent').style.display='none';return;}
   if(!GOOGLE_MAPS_KEY){try{const base=document.getElementById('serverUrl')?.value.trim()||serverUrl;const cfg=await fetch(base+'/api/config').then(r=>r.json()).catch(()=>({}));if(cfg.googleMapsKey)GOOGLE_MAPS_KEY=cfg.googleMapsKey;}catch(e){}}
-  if(!GOOGLE_MAPS_KEY){document.getElementById('mapEmptyState').style.display='block';document.getElementById('mapEmptyState').innerHTML=`<div class="empty-icon">⚠️</div><div class="empty-title">Map key not loaded</div><div class="empty-text">Set GOOGLE_MAPS_KEY in Railway environment variables.</div>`;document.getElementById('mapContent').style.display='none';return;}
+  if(!GOOGLE_MAPS_KEY){document.getElementById('mapEmptyState').style.display='block';document.getElementById('mapEmptyState').innerHTML=`<div class="empty-icon">!!️</div><div class="empty-title">Map key not loaded</div><div class="empty-text">Set GOOGLE_MAPS_KEY in Railway environment variables.</div>`;document.getElementById('mapContent').style.display='none';return;}
   document.getElementById('mapEmptyState').style.display='none';document.getElementById('mapContent').style.display='block';
   const wrapper=document.getElementById('routeMapWrapper');
   let loadingOverlay=document.getElementById('mapLoadingOverlay');
@@ -1015,7 +1015,7 @@ async function initOrRefreshMap(){
       const addrText=addr?(addr.full||addr.line1||'No address'):'No address';
       const overdueInfo=isOverdue?overdueByCustomer[String(inv.customerId)]:null;
       marker.addListener('click',()=>{
-        gInfoWindow.setContent(`<div class="gm-popup"><div class="popup-inv">INV #${inv.invoiceNumber} · Route ${ci+1}</div><div class="popup-customer">${inv.customerName}</div><div class="popup-address">📍 ${addrText}</div><div class="popup-meta"><span class="popup-cases">📦 ${inv.cases} cases</span><span class="popup-route" style="background:${color}">Route ${ci+1}</span>${isOverdue?`<span class="popup-overdue">⚠ $${overdueInfo.overdueBalance.toFixed(2)} · ${overdueInfo.daysOverdue||'?'} days overdue</span>`:''}</div><button class="popup-reassign-btn" onclick="openReassignPanel('${inv.id}',${ci})">↔ Move to Different Route</button></div>`);
+        gInfoWindow.setContent(`<div class="gm-popup"><div class="popup-inv">INV #${inv.invoiceNumber} · Route ${ci+1}</div><div class="popup-customer">${inv.customerName}</div><div class="popup-address">📍 ${addrText}</div><div class="popup-meta"><span class="popup-cases">📦 ${inv.cases} cases</span><span class="popup-route" style="background:${color}">Route ${ci+1}</span>${isOverdue?`<span class="popup-overdue">!! $${overdueInfo.overdueBalance.toFixed(2)} · ${overdueInfo.daysOverdue||'?'} days overdue</span>`:''}</div><button class="popup-reassign-btn" onclick="openReassignPanel('${inv.id}',${ci})">↔ Move to Different Route</button></div>`);
         gInfoWindow.open(gMap,marker);
       });
       gMapMarkers.push(marker);routeMapObjects[ci].markers.push(marker);
@@ -1038,7 +1038,7 @@ function confirmReassign(){if(!selectedStopForReassign)return;const{invId,curren
 function cancelReassign(){selectedStopForReassign=null;document.getElementById('reassignPanel').classList.remove('visible');}
 
 // ═══════════════════ STATS ════════════════════════════════════════════════════
-function updateStats(){const sel=invoices.filter(i=>selectedInvoiceIds.has(i.id));const tc=sel.reduce((s,i)=>s+(i.cases||0),0);const cl=parseInt(document.getElementById('caseLimit')?.value)||250;const mv=Math.ceil(tc/cl);document.getElementById('stat-total').textContent=sel.length;document.getElementById('stat-cases').textContent=tc;document.getElementById('stat-vans').textContent=mv||'—';document.getElementById('stat-done').textContent=Object.keys(completed).length;document.getElementById('stat-vans').classList.toggle('warn',mv>(parseInt(document.getElementById('driverCount')?.value)||0));}
+function updateStats(){const sel=invoices.filter(i=>selectedInvoiceIds.has(i.id));const tc=sel.reduce((s,i)=>s+(i.cases||0),0);const cl=parseInt(document.getElementById('caseLimit')?.value)||250;const mv=Math.ceil(tc/cl);document.getElementById('stat-total').textContent=sel.length;document.getElementById('stat-cases').textContent=tc;document.getElementById('stat-vans').textContent=mv||'-';document.getElementById('stat-done').textContent=Object.keys(completed).length;document.getElementById('stat-vans').classList.toggle('warn',mv>(parseInt(document.getElementById('driverCount')?.value)||0));}
 
 // ═══════════════════ SETTINGS ═════════════════════════════════════════════════
 function saveSettings(){serverUrl=document.getElementById('serverUrl').value.trim()||serverUrl;saveState();showToast('Settings saved');}
@@ -1046,7 +1046,7 @@ function clearAll(){if(!confirm('Clear all delivery data?'))return;invoices=[];a
 function openMap(a){if(!a||a.trim()===''){showToast('No address available');return;}window.open('https://maps.google.com/?q='+a,'_blank');}
 
 // ═══════════════════ TOKEN STATUS ════════════════════════════════════════════
-async function checkTokenStatus(){try{const base=document.getElementById('serverUrl')?.value.trim()||serverUrl;const res=await fetch(base+'/api/token-status');if(!res.ok)return;const data=await res.json();const banner=document.getElementById('tokenBanner');if(!banner)return;if(!data.connected){banner.style.display='flex';banner.style.background='#FDF0E8';banner.style.border='1.5px solid var(--orange)';banner.style.color='var(--orange)';banner.innerHTML=`<span style="font-size:20px">⚠️</span><div><strong>QuickBooks token expired</strong><br><span style="font-weight:400">Update QB_REFRESH_TOKEN in Railway.</span></div>`;}else if(data.connected){banner.style.display='flex';banner.style.background='var(--green-light)';banner.style.border='1.5px solid var(--green)';banner.style.color='var(--green)';banner.innerHTML=`<span style="font-size:20px">✓</span><div><strong>QuickBooks connected</strong><br><span style="font-weight:400">Auto-refresh active · ${data.environment}</span></div>`;setTimeout(()=>{banner.style.display='none';},4000);}}catch(e){}}
+async function checkTokenStatus(){try{const base=document.getElementById('serverUrl')?.value.trim()||serverUrl;const res=await fetch(base+'/api/token-status');if(!res.ok)return;const data=await res.json();const banner=document.getElementById('tokenBanner');if(!banner)return;if(!data.connected){banner.style.display='flex';banner.style.background='#FDF0E8';banner.style.border='1.5px solid var(--orange)';banner.style.color='var(--orange)';banner.innerHTML=`<span style="font-size:20px">!!️</span><div><strong>QuickBooks token expired</strong><br><span style="font-weight:400">Update QB_REFRESH_TOKEN in Railway.</span></div>`;}else if(data.connected){banner.style.display='flex';banner.style.background='var(--green-light)';banner.style.border='1.5px solid var(--green)';banner.style.color='var(--green)';banner.innerHTML=`<span style="font-size:20px">✓</span><div><strong>QuickBooks connected</strong><br><span style="font-weight:400">Auto-refresh active · ${data.environment}</span></div>`;setTimeout(()=>{banner.style.display='none';},4000);}}catch(e){}}
 
 // ═══════════════════ PDF INVOICE DOWNLOAD ════════════════════════════════════
 
@@ -1054,7 +1054,7 @@ function renderPdfPanel(){
   const panel=document.getElementById('pdfPanel');if(!panel)return;
   panel.style.display=clusters.length?'block':'none';
   const btn=document.getElementById('btnAllPdf');
-  if(btn){btn.disabled=false;btn.textContent='⬇ Download Combined PDF — All Routes';}
+  if(btn){btn.disabled=false;btn.textContent='⬇ Download Combined PDF - All Routes';}
   setPdfStatus('');hidePdfProgress();
 
   // Show note about statements if any overdue customers are on today's route
@@ -1120,7 +1120,7 @@ async function fetchStatementPdf(customerId, customerName, overdueInfo){
     p.drawText('ACCOUNT STATEMENT', { x: MARGIN, y: PAGE_H - 32, size: 16, font: bold, color: GOLD });
     p.drawText('Classic Wines Inc.', { x: MARGIN, y: PAGE_H - 50, size: 9, font: reg, color: WHITE });
     p.drawText(customerName || `Customer #${customerId}`, { x: MARGIN, y: PAGE_H - 65, size: 11, font: bold, color: WHITE });
-    p.drawText(`Period: ${startDate} – ${endDate}`, { x: MARGIN, y: PAGE_H - 80, size: 8, font: reg, color: rgb(0.75, 0.75, 0.75) });
+    p.drawText(`Period: ${startDate} - ${endDate}`, { x: MARGIN, y: PAGE_H - 80, size: 8, font: reg, color: rgb(0.75, 0.75, 0.75) });
 
     // Overdue badge
     if (overdueInfo?.overdueBalance > 0) {
@@ -1190,7 +1190,7 @@ async function makeDividerPage(pdfDoc,routeNum,stops,cases,dist,date){
   // Count overdue stops on this route for the divider
   const overdueStops = stops.filter(s => overdueByCustomer[s.customerId]);
   if(overdueStops.length){
-    page.drawText(`⚠ ${overdueStops.length} overdue customer${overdueStops.length!==1?'s':''} — statements included`,{x:40,y:620,size:9,font:boldFont,color:rgb(0.769,0.384,0.114)});
+    page.drawText(`!! ${overdueStops.length} overdue customer${overdueStops.length!==1?'s':''} - statements included`,{x:40,y:620,size:9,font:boldFont,color:rgb(0.769,0.384,0.114)});
   }
 
   const col1X=40,col2X=326,rowH=19,startY=overdueStops.length?600:618;
@@ -1216,7 +1216,7 @@ async function makeDividerPage(pdfDoc,routeNum,stops,cases,dist,date){
   if(useTwo)page.drawLine({start:{x:312,y:startY+10},end:{x:312,y:Math.max(40,startY-(col1Stops.length*rowH))},thickness:0.5,color:rgb(0.85,0.85,0.85)});
 }
 
-// Download one combined PDF — invoices in stop order, with statements
+// Download one combined PDF - invoices in stop order, with statements
 // inserted immediately after the invoice for any overdue customer.
 async function downloadAllRoutesPdf(){
   if(!clusters.length){showToast('No routes to download');return;}
@@ -1260,7 +1260,7 @@ async function downloadAllRoutesPdf(){
         }catch(e){console.warn(`Skipped invoice ${inv.invoiceNumber}:`,e.message);}
         fetched++;
 
-        // Statement PDF — only if this customer is overdue AND we haven't
+        // Statement PDF - only if this customer is overdue AND we haven't
         // already included their statement earlier in this PDF
         const custId=inv.customerId;
         if(custId&&overdueByCustomer[String(custId)]&&!fetchedStatements.has(custId)){
@@ -1287,7 +1287,7 @@ async function downloadAllRoutesPdf(){
     a.click();URL.revokeObjectURL(url);
 
     const stmtCount=fetchedStatements.size;
-    setPdfStatus(`✓ Downloaded — ${allStops.length} invoices${stmtCount?` + ${stmtCount} statement${stmtCount!==1?'s':''}`:''} across ${clusters.length} routes`);
+    setPdfStatus(`✓ Downloaded - ${allStops.length} invoices${stmtCount?` + ${stmtCount} statement${stmtCount!==1?'s':''}`:''} across ${clusters.length} routes`);
     showToast(`✓ PDF ready${stmtCount?` · ${stmtCount} statements included`:''}`);
   }catch(err){
     setPdfStatus(`❌ Error: ${err.message}`);
