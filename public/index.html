@@ -1124,7 +1124,7 @@ async function fetchStatementPdf(customerId, customerName, overdueInfo){
 
     // Overdue badge
     if (overdueInfo?.overdueBalance > 0) {
-      const badgeText = `OVERDUE BALANCE: $${overdueInfo.overdueBalance.toLocaleString('en-US', {minimumFractionDigits:2})}  ·  ${overdueInfo.daysOverdue} days past due`;
+      const badgeText = `OVERDUE BALANCE: $${overdueInfo.overdueBalance.toLocaleString('en-US', {minimumFractionDigits:2})}  -  ${overdueInfo.daysOverdue} days past due`;
       p.drawRectangle({ x: MARGIN, y: PAGE_H - HEADER_H - 22, width: COL_W, height: 18, color: ORANGE });
       p.drawText(badgeText, { x: MARGIN + 6, y: PAGE_H - HEADER_H - 14, size: 8, font: bold, color: WHITE });
     }
