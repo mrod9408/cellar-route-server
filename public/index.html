@@ -1235,7 +1235,7 @@ function renderPickingList() {
       </div>
       ${groupItems.map(item => `
         <div class="picking-product-row">
-          <div class="picking-qty">${item.qty % 1 === 0 ? item.qty : item.qty.toFixed(1)}</div>
+          <div class="picking-qty">${item.qty}</div>
           <div class="picking-unit">units</div>
           <div class="picking-name">${item.name}</div>
           <div class="picking-stops">${item.stopCount} stop${item.stopCount!==1?'s':''} · Rt ${item.routes.join(', ')}</div>
@@ -1291,7 +1291,7 @@ async function downloadPickingListPdf() {
     const bg = i % 2 === 0 ? rgb(0.98,0.98,0.98) : rgb(1,1,1);
     page.drawRectangle({ x:MARGIN, y:y-4, width:PAGE_W-MARGIN*2, height:ROW_H, color:bg });
 
-    const qtyStr = item.qty % 1 === 0 ? String(item.qty) : item.qty.toFixed(1);
+    const qtyStr = String(item.qty);
     page.drawText(qtyStr, { x:MARGIN+4, y, size:11, font:bold, color:WINE });
     const nameStr = item.name.length > 65 ? item.name.slice(0,63)+'..' : item.name;
     page.drawText(nameStr, { x:MARGIN+80, y, size:9, font:reg, color:BLACK });
