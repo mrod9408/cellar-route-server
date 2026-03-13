@@ -174,17 +174,13 @@
     .legend-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
     #routeMap { width: 100%; height: 520px; border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
     .map-reassign-panel { background: var(--white); border-radius: var(--radius); padding: 16px; margin-top: 12px; box-shadow: var(--shadow); display: none; border-left: 4px solid var(--gold); }
-    .reassign-stop-item { display:flex; align-items:center; gap:10px; padding:9px 12px; border-bottom:1px solid #f0e8ec; cursor:pointer; transition:background 0.1s; }
-    .reassign-stop-item:last-child { border-bottom:none; }
-    .reassign-stop-item:hover { background:#fdf8fa; }
-    .reassign-stop-item input[type=checkbox] { width:16px; height:16px; accent-color:var(--burgundy); cursor:pointer; flex-shrink:0; }
-    .reassign-stop-item .stop-label { flex:1; }
-    .reassign-stop-item .stop-name { font-size:13px; font-weight:600; color:var(--dark); }
-    .reassign-stop-item .stop-meta { font-size:11px; color:var(--gray); margin-top:1px; }
-    .reassign-route-header { padding:7px 12px; background:var(--cream); font-size:11px; font-weight:700; color:var(--burgundy); text-transform:uppercase; letter-spacing:0.5px; border-bottom:1px solid #f0e8ec; display:flex; align-items:center; justify-content:space-between; }
-    .reassign-select-all { font-size:11px; color:var(--burgundy); cursor:pointer; font-weight:600; text-decoration:underline; background:none; border:none; padding:0; }
     .map-reassign-panel.visible { display: block; }
-    .map-reassign-panel h4 { font-family: 'Playfair Display', serif; font-size: 15px; color: var(--burgundy-dark); margin-bottom: 10px; }
+    .reassign-queue-item { display:flex; align-items:center; justify-content:space-between; padding:8px 12px; border-bottom:1px solid #f0e8ec; gap:8px; }
+    .reassign-queue-item:last-child { border-bottom:none; }
+    .reassign-queue-name { font-size:13px; font-weight:600; color:var(--dark); flex:1; }
+    .reassign-queue-meta { font-size:11px; color:var(--gray); }
+    .reassign-queue-remove { background:none; border:none; color:var(--gray); font-size:16px; cursor:pointer; padding:0 4px; line-height:1; }
+    .reassign-queue-remove:hover { color:var(--burgundy); }
     .reassign-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
     .reassign-select { flex: 1; min-width: 140px; padding: 9px 12px; border: 1.5px solid var(--cream-dark); border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 13px; color: var(--charcoal); background: var(--cream); outline: none; }
     .btn-reassign { padding: 9px 18px; background: var(--burgundy); color: var(--cream); border: none; border-radius: 10px; font-family: 'DM Sans', sans-serif; font-size: 13px; font-weight: 600; cursor: pointer; }
@@ -439,18 +435,19 @@
           <div id="routeMap"></div>
         </div>
         <div class="map-reassign-panel" id="reassignPanel">
-          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
-            <h4 style="margin:0;">Move Stops to a Different Route</h4>
-            <button class="btn-cancel-reassign" onclick="cancelReassign()">✕ Close</button>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+            <div style="font-size:14px;font-weight:700;color:var(--dark);">Move Queue</div>
+            <button onclick="cancelReassign()" style="background:none;border:none;font-size:18px;color:var(--gray);cursor:pointer;line-height:1;">✕</button>
           </div>
-          <div style="font-size:12px;color:var(--gray);margin-bottom:10px;">Check the stops you want to move, then choose a destination route.</div>
-          <div id="reassignStopList" style="max-height:260px;overflow-y:auto;border:1.5px solid var(--cream-dark);border-radius:10px;margin-bottom:12px;"></div>
-          <div class="reassign-row">
-            <div style="font-size:13px;font-weight:600;color:var(--dark);white-space:nowrap;">Move to:</div>
+          <div style="font-size:12px;color:var(--gray);margin-bottom:10px;">Click stops on the map to add them here, then move them all at once.</div>
+          <div id="reassignQueue" style="min-height:48px;border:1.5px solid var(--cream-dark);border-radius:10px;margin-bottom:12px;overflow:hidden;">
+            <div id="reassignQueueEmpty" style="padding:14px;text-align:center;font-size:12px;color:var(--gray);">No stops queued yet</div>
+          </div>
+          <div class="reassign-row" style="margin-bottom:8px;">
             <select class="reassign-select" id="reassignSelect"></select>
-            <button class="btn-reassign" onclick="confirmReassign()" id="btnConfirmReassign">Move Selected</button>
+            <button class="btn-reassign" onclick="confirmReassign()">Move All</button>
           </div>
-          <div id="reassignCount" style="font-size:12px;color:var(--gray);margin-top:8px;"></div>
+          <button onclick="cancelReassign()" style="width:100%;padding:8px;background:var(--cream-dark);color:var(--gray);border:none;border-radius:10px;font-size:13px;cursor:pointer;">Clear &amp; Close</button>
         </div>
       </div>
     </div>
@@ -1138,7 +1135,7 @@ async function initOrRefreshMap(){
       const addrText=addr?(addr.full||addr.line1||'No address'):'No address';
       const overdueInfo=isOverdue?overdueByCustomer[String(inv.customerId)]:null;
       marker.addListener('click',()=>{
-        gInfoWindow.setContent(`<div class="gm-popup"><div class="popup-inv">INV #${inv.invoiceNumber} · Route ${ci+1}</div><div class="popup-customer">${inv.customerName}</div><div class="popup-address">📍 ${addrText}</div><div class="popup-meta"><span class="popup-cases">📦 ${inv.cases} cases</span><span class="popup-route" style="background:${color}">Route ${ci+1}</span>${isOverdue?`<span class="popup-overdue">!! $${overdueInfo.overdueBalance.toFixed(2)} · ${overdueInfo.daysOverdue||'?'} days overdue</span>`:''}</div><button class="popup-reassign-btn" onclick="openReassignPanel('${inv.id}',${ci})">↔ Move Stops</button></div>`);
+        gInfoWindow.setContent(`<div class="gm-popup"><div class="popup-inv">INV #${inv.invoiceNumber} · Route ${ci+1}</div><div class="popup-customer">${inv.customerName}</div><div class="popup-address">📍 ${addrText}</div><div class="popup-meta"><span class="popup-cases">📦 ${inv.cases} cases</span><span class="popup-route" style="background:${color}">Route ${ci+1}</span>${isOverdue?`<span class="popup-overdue">!! $${overdueInfo.overdueBalance.toFixed(2)} · ${overdueInfo.daysOverdue||'?'} days overdue</span>`:''}</div><button class="popup-reassign-btn" onclick="openReassignPanel('${inv.id}',${ci})">+ Add to Move Queue</button></div>`);
         gInfoWindow.open(gMap,marker);
       });
       gMapMarkers.push(marker);routeMapObjects[ci].markers.push(marker);
@@ -1156,97 +1153,83 @@ function toggleAllRoutes(){if(visibleRoutes.size===clusters.length){visibleRoute
 function applyRouteVisibility(){const objs=window._routeMapObjects||{};clusters.forEach((_,ci)=>{const show=visibleRoutes.has(ci);const routeObj=objs[ci];if(!routeObj)return;routeObj.markers.forEach(m=>m.setVisible(show));if(routeObj.polyline)routeObj.polyline.setVisible(show);});}
 
 // ═══════════════════ REASSIGN STOP ═══════════════════════════════════════════
-function openReassignPanel(invId, currentClusterIdx) {
-  // Pre-check the clicked stop, then open the full multi-select panel
+// ── Move Queue: stops staged here before moving to a target route ────────────
+let moveQueue = []; // [{invId, clusterIdx, customerName, invoiceNumber, cases}]
+
+function openReassignPanel(invId, clusterIdx) {
   if (gInfoWindow) gInfoWindow.close();
-  buildReassignPanel(invId);
+
+  // Add to queue if not already there
+  const already = moveQueue.some(q => q.invId == invId);
+  if (!already) {
+    const cluster = clusters[clusterIdx];
+    const inv = cluster?.stops.find(s => s.id == invId);
+    if (inv) {
+      moveQueue.push({ invId: inv.id, clusterIdx, customerName: inv.customerName, invoiceNumber: inv.invoiceNumber, cases: inv.cases || 0 });
+    }
+  }
+
+  renderReassignQueue();
+  document.getElementById('reassignPanel').classList.add('visible');
 }
 
-function buildReassignPanel(preCheckInvId) {
-  const panel = document.getElementById('reassignPanel');
+function renderReassignQueue() {
+  const queueEl  = document.getElementById('reassignQueue');
+  const emptyEl  = document.getElementById('reassignQueueEmpty');
+  const sel      = document.getElementById('reassignSelect');
 
-  // Build stop list grouped by route
-  const listEl = document.getElementById('reassignStopList');
-  listEl.innerHTML = clusters.map((cluster, ci) => {
-    const stopRows = cluster.stops.map(inv => {
-      const checked = inv.id == preCheckInvId ? 'checked' : '';
-      const addr = (inv.shipAddress?.city || inv.billAddress?.city || '');
-      return `<label class="reassign-stop-item">
-        <input type="checkbox" class="reassign-stop-cb" value="${inv.id}" data-cluster="${ci}" ${checked} onchange="updateReassignCount()">
-        <div class="stop-label">
-          <div class="stop-name">${inv.customerName}</div>
-          <div class="stop-meta">INV #${inv.invoiceNumber}${addr ? ' · ' + addr : ''} · ${inv.cases || 0} cases</div>
-        </div>
-      </label>`;
-    }).join('');
-    return `<div class="reassign-route-header">
-        Route ${ci + 1} <span style="color:var(--gray);font-weight:400">${cluster.stops.length} stops</span>
-        <button class="reassign-select-all" onclick="toggleRouteCheckboxes(${ci}, event)">Select all</button>
-      </div>${stopRows}`;
-  }).join('');
+  if (!moveQueue.length) {
+    emptyEl.style.display = 'block';
+    queueEl.querySelectorAll('.reassign-queue-item').forEach(el => el.remove());
+  } else {
+    emptyEl.style.display = 'none';
+    queueEl.querySelectorAll('.reassign-queue-item').forEach(el => el.remove());
+    moveQueue.forEach((q, i) => {
+      const div = document.createElement('div');
+      div.className = 'reassign-queue-item';
+      div.innerHTML = `
+        <div class="reassign-queue-name">${q.customerName}</div>
+        <div class="reassign-queue-meta">Rt ${q.clusterIdx + 1} · INV #${q.invoiceNumber}</div>
+        <button class="reassign-queue-remove" onclick="removeFromQueue(${i})" title="Remove">×</button>`;
+      queueEl.appendChild(div);
+    });
+  }
 
-  // Populate destination route dropdown (all routes — we'll filter at confirm time)
-  const sel = document.getElementById('reassignSelect');
+  // Populate destination dropdown — exclude routes that all queued stops already belong to
   sel.innerHTML = clusters.map((c, i) => `<option value="${i}">Route ${i+1} · ${c.stops.length} stops</option>`).join('');
-
-  panel.classList.add('visible');
-  updateReassignCount();
 }
 
-function toggleRouteCheckboxes(ci, e) {
-  e.preventDefault();
-  const cbs = document.querySelectorAll(`.reassign-stop-cb[data-cluster="${ci}"]`);
-  const allChecked = [...cbs].every(cb => cb.checked);
-  cbs.forEach(cb => cb.checked = !allChecked);
-  updateReassignCount();
-}
-
-function updateReassignCount() {
-  const checked = document.querySelectorAll('.reassign-stop-cb:checked');
-  const countEl = document.getElementById('reassignCount');
-  countEl.textContent = checked.length
-    ? `${checked.length} stop${checked.length !== 1 ? 's' : ''} selected`
-    : 'No stops selected';
+function removeFromQueue(idx) {
+  moveQueue.splice(idx, 1);
+  renderReassignQueue();
 }
 
 function confirmReassign() {
+  if (!moveQueue.length) { showToast('Queue is empty — click stops on the map to add them'); return; }
   const targetIdx = parseInt(document.getElementById('reassignSelect').value);
   if (isNaN(targetIdx)) return;
 
-  const checked = [...document.querySelectorAll('.reassign-stop-cb:checked')];
-  if (!checked.length) { showToast('Select at least one stop to move'); return; }
-
-  // Group selected stops by their source cluster
-  const moveMap = {}; // sourceClusterIdx -> [invIds]
-  checked.forEach(cb => {
-    const ci = parseInt(cb.dataset.cluster);
-    if (ci === targetIdx) return; // already on target route — skip
-    if (!moveMap[ci]) moveMap[ci] = [];
-    moveMap[ci].push(cb.value);
-  });
-
   const toCluster = clusters[targetIdx];
-  let totalMoved = 0;
+  const affected  = new Set([targetIdx]);
+  let moved = 0;
 
-  Object.entries(moveMap).forEach(([ciStr, invIds]) => {
-    const ci = parseInt(ciStr);
-    const fromCluster = clusters[ci];
-    invIds.forEach(invId => {
-      const inv = fromCluster.stops.find(i => i.id == invId);
-      if (!inv) return;
-      fromCluster.stops = fromCluster.stops.filter(i => i.id != invId);
-      toCluster.stops.push(inv);
-      if (toCluster.driver) assignments[inv.id] = toCluster.driver;
-      else delete assignments[inv.id];
-      totalMoved++;
-    });
+  moveQueue.forEach(q => {
+    if (q.clusterIdx === targetIdx) return; // already on this route
+    const fromCluster = clusters[q.clusterIdx];
+    const inv = fromCluster?.stops.find(s => s.id == q.invId);
+    if (!inv) return;
+    fromCluster.stops = fromCluster.stops.filter(s => s.id != q.invId);
+    toCluster.stops.push(inv);
+    if (toCluster.driver) assignments[inv.id] = toCluster.driver;
+    else delete assignments[inv.id];
+    affected.add(q.clusterIdx);
+    moved++;
   });
 
-  if (!totalMoved) { showToast('Selected stops are already on that route'); return; }
+  if (!moved) { showToast('Those stops are already on that route'); return; }
 
-  // Re-optimise affected clusters
-  const affectedClusters = [...new Set([targetIdx, ...Object.keys(moveMap).map(Number)])];
-  affectedClusters.forEach(ci => {
+  // Re-optimise all affected clusters
+  affected.forEach(ci => {
     const c = clusters[ci];
     c.stops = nearestNeighborTSP(c.stops.filter(s => s._coords));
     c.cases = c.stops.reduce((s, i) => s + (i.cases || 0), 0);
@@ -1256,18 +1239,20 @@ function confirmReassign() {
     c.territory = c.zone;
   });
 
+  moveQueue = [];
   saveState();
   cancelReassign();
   renderClusters();
   renderPickingList();
   initOrRefreshMap();
-  showToast(`✓ Moved ${totalMoved} stop${totalMoved !== 1 ? 's' : ''} to Route ${targetIdx + 1}`);
+  showToast(`✓ Moved ${moved} stop${moved !== 1 ? 's' : ''} to Route ${targetIdx + 1}`);
 }
 
 function cancelReassign() {
-  selectedStopForReassign = null;
+  moveQueue = [];
   document.getElementById('reassignPanel').classList.remove('visible');
 }
+
 
 // ═══════════════════ STATS ════════════════════════════════════════════════════
 function updateStats(){const sel=invoices.filter(i=>selectedInvoiceIds.has(i.id));const tc=sel.reduce((s,i)=>s+(i.cases||0),0);const cl=parseInt(document.getElementById('caseLimit')?.value)||250;const mv=Math.ceil(tc/cl);document.getElementById('stat-total').textContent=sel.length;document.getElementById('stat-cases').textContent=tc;document.getElementById('stat-vans').textContent=mv||'-';document.getElementById('stat-done').textContent=Object.keys(completed).length;document.getElementById('stat-vans').classList.toggle('warn',mv>(parseInt(document.getElementById('driverCount')?.value)||0));}
