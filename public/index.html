@@ -174,6 +174,15 @@
     .legend-dot { width: 12px; height: 12px; border-radius: 50%; flex-shrink: 0; }
     #routeMap { width: 100%; height: 520px; border-radius: var(--radius); overflow: hidden; box-shadow: var(--shadow); }
     .map-reassign-panel { background: var(--white); border-radius: var(--radius); padding: 16px; margin-top: 12px; box-shadow: var(--shadow); display: none; border-left: 4px solid var(--gold); }
+    .reassign-stop-item { display:flex; align-items:center; gap:10px; padding:9px 12px; border-bottom:1px solid #f0e8ec; cursor:pointer; transition:background 0.1s; }
+    .reassign-stop-item:last-child { border-bottom:none; }
+    .reassign-stop-item:hover { background:#fdf8fa; }
+    .reassign-stop-item input[type=checkbox] { width:16px; height:16px; accent-color:var(--burgundy); cursor:pointer; flex-shrink:0; }
+    .reassign-stop-item .stop-label { flex:1; }
+    .reassign-stop-item .stop-name { font-size:13px; font-weight:600; color:var(--dark); }
+    .reassign-stop-item .stop-meta { font-size:11px; color:var(--gray); margin-top:1px; }
+    .reassign-route-header { padding:7px 12px; background:var(--cream); font-size:11px; font-weight:700; color:var(--burgundy); text-transform:uppercase; letter-spacing:0.5px; border-bottom:1px solid #f0e8ec; display:flex; align-items:center; justify-content:space-between; }
+    .reassign-select-all { font-size:11px; color:var(--burgundy); cursor:pointer; font-weight:600; text-decoration:underline; background:none; border:none; padding:0; }
     .map-reassign-panel.visible { display: block; }
     .map-reassign-panel h4 { font-family: 'Playfair Display', serif; font-size: 15px; color: var(--burgundy-dark); margin-bottom: 10px; }
     .reassign-row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
@@ -430,12 +439,18 @@
           <div id="routeMap"></div>
         </div>
         <div class="map-reassign-panel" id="reassignPanel">
-          <h4 id="reassignTitle">Move stop to a different route</h4>
-          <div class="reassign-row">
-            <select class="reassign-select" id="reassignSelect"></select>
-            <button class="btn-reassign" onclick="confirmReassign()">Move Stop</button>
-            <button class="btn-cancel-reassign" onclick="cancelReassign()">Cancel</button>
+          <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;flex-wrap:wrap;gap:8px;">
+            <h4 style="margin:0;">Move Stops to a Different Route</h4>
+            <button class="btn-cancel-reassign" onclick="cancelReassign()">✕ Close</button>
           </div>
+          <div style="font-size:12px;color:var(--gray);margin-bottom:10px;">Check the stops you want to move, then choose a destination route.</div>
+          <div id="reassignStopList" style="max-height:260px;overflow-y:auto;border:1.5px solid var(--cream-dark);border-radius:10px;margin-bottom:12px;"></div>
+          <div class="reassign-row">
+            <div style="font-size:13px;font-weight:600;color:var(--dark);white-space:nowrap;">Move to:</div>
+            <select class="reassign-select" id="reassignSelect"></select>
+            <button class="btn-reassign" onclick="confirmReassign()" id="btnConfirmReassign">Move Selected</button>
+          </div>
+          <div id="reassignCount" style="font-size:12px;color:var(--gray);margin-top:8px;"></div>
         </div>
       </div>
     </div>
@@ -1123,7 +1138,7 @@ async function initOrRefreshMap(){
       const addrText=addr?(addr.full||addr.line1||'No address'):'No address';
       const overdueInfo=isOverdue?overdueByCustomer[String(inv.customerId)]:null;
       marker.addListener('click',()=>{
-        gInfoWindow.setContent(`<div class="gm-popup"><div class="popup-inv">INV #${inv.invoiceNumber} · Route ${ci+1}</div><div class="popup-customer">${inv.customerName}</div><div class="popup-address">📍 ${addrText}</div><div class="popup-meta"><span class="popup-cases">📦 ${inv.cases} cases</span><span class="popup-route" style="background:${color}">Route ${ci+1}</span>${isOverdue?`<span class="popup-overdue">!! $${overdueInfo.overdueBalance.toFixed(2)} · ${overdueInfo.daysOverdue||'?'} days overdue</span>`:''}</div><button class="popup-reassign-btn" onclick="openReassignPanel('${inv.id}',${ci})">↔ Move to Different Route</button></div>`);
+        gInfoWindow.setContent(`<div class="gm-popup"><div class="popup-inv">INV #${inv.invoiceNumber} · Route ${ci+1}</div><div class="popup-customer">${inv.customerName}</div><div class="popup-address">📍 ${addrText}</div><div class="popup-meta"><span class="popup-cases">📦 ${inv.cases} cases</span><span class="popup-route" style="background:${color}">Route ${ci+1}</span>${isOverdue?`<span class="popup-overdue">!! $${overdueInfo.overdueBalance.toFixed(2)} · ${overdueInfo.daysOverdue||'?'} days overdue</span>`:''}</div><button class="popup-reassign-btn" onclick="openReassignPanel('${inv.id}',${ci})">↔ Move Stops</button></div>`);
         gInfoWindow.open(gMap,marker);
       });
       gMapMarkers.push(marker);routeMapObjects[ci].markers.push(marker);
@@ -1141,9 +1156,118 @@ function toggleAllRoutes(){if(visibleRoutes.size===clusters.length){visibleRoute
 function applyRouteVisibility(){const objs=window._routeMapObjects||{};clusters.forEach((_,ci)=>{const show=visibleRoutes.has(ci);const routeObj=objs[ci];if(!routeObj)return;routeObj.markers.forEach(m=>m.setVisible(show));if(routeObj.polyline)routeObj.polyline.setVisible(show);});}
 
 // ═══════════════════ REASSIGN STOP ═══════════════════════════════════════════
-function openReassignPanel(invId,currentClusterIdx){selectedStopForReassign={invId,currentClusterIdx};const inv=invoices.find(i=>i.id==invId);if(gInfoWindow)gInfoWindow.close();const panel=document.getElementById('reassignPanel');document.getElementById('reassignTitle').textContent=`Move "${inv?inv.customerName:invId}" to a different route`;const sel=document.getElementById('reassignSelect');sel.innerHTML=clusters.filter((_,i)=>i!==currentClusterIdx).map(c=>{const ri=clusters.indexOf(c);return `<option value="${ri}">Route ${ri+1} · ${c.stops.length} stops</option>`;}).join('');panel.classList.add('visible');}
-function confirmReassign(){if(!selectedStopForReassign)return;const{invId,currentClusterIdx}=selectedStopForReassign;const targetIdx=parseInt(document.getElementById('reassignSelect').value);if(isNaN(targetIdx))return;const fromCluster=clusters[currentClusterIdx],toCluster=clusters[targetIdx];const inv=fromCluster.stops.find(i=>i.id==invId);if(!inv)return;fromCluster.stops=fromCluster.stops.filter(i=>i.id!=invId);fromCluster.cases=fromCluster.stops.reduce((s,i)=>s+(i.cases||0),0);fromCluster.stops=nearestNeighborTSP(fromCluster.stops.filter(s=>s._coords));fromCluster.distance=Math.round(routeDistance(fromCluster.stops));toCluster.stops=nearestNeighborTSP([...toCluster.stops,inv].filter(s=>s._coords));toCluster.cases=toCluster.stops.reduce((s,i)=>s+(i.cases||0),0);toCluster.distance=Math.round(routeDistance(toCluster.stops));[fromCluster,toCluster].forEach(c=>{const zs=[...new Set(c.stops.map(s=>s._zone||'').filter(Boolean))];c.zone=zs.length<=3?zs.join(' + '):`${zs.slice(0,2).join(' + ')} +${zs.length-2} more`;c.territory=c.zone;});if(toCluster.driver)assignments[inv.id]=toCluster.driver;else delete assignments[inv.id];saveState();cancelReassign();renderClusters();initOrRefreshMap();showToast(`✓ Moved to Route ${targetIdx+1}`);}
-function cancelReassign(){selectedStopForReassign=null;document.getElementById('reassignPanel').classList.remove('visible');}
+function openReassignPanel(invId, currentClusterIdx) {
+  // Pre-check the clicked stop, then open the full multi-select panel
+  if (gInfoWindow) gInfoWindow.close();
+  buildReassignPanel(invId);
+}
+
+function buildReassignPanel(preCheckInvId) {
+  const panel = document.getElementById('reassignPanel');
+
+  // Build stop list grouped by route
+  const listEl = document.getElementById('reassignStopList');
+  listEl.innerHTML = clusters.map((cluster, ci) => {
+    const stopRows = cluster.stops.map(inv => {
+      const checked = inv.id == preCheckInvId ? 'checked' : '';
+      const addr = (inv.shipAddress?.city || inv.billAddress?.city || '');
+      return `<label class="reassign-stop-item">
+        <input type="checkbox" class="reassign-stop-cb" value="${inv.id}" data-cluster="${ci}" ${checked} onchange="updateReassignCount()">
+        <div class="stop-label">
+          <div class="stop-name">${inv.customerName}</div>
+          <div class="stop-meta">INV #${inv.invoiceNumber}${addr ? ' · ' + addr : ''} · ${inv.cases || 0} cases</div>
+        </div>
+      </label>`;
+    }).join('');
+    return `<div class="reassign-route-header">
+        Route ${ci + 1} <span style="color:var(--gray);font-weight:400">${cluster.stops.length} stops</span>
+        <button class="reassign-select-all" onclick="toggleRouteCheckboxes(${ci}, event)">Select all</button>
+      </div>${stopRows}`;
+  }).join('');
+
+  // Populate destination route dropdown (all routes — we'll filter at confirm time)
+  const sel = document.getElementById('reassignSelect');
+  sel.innerHTML = clusters.map((c, i) => `<option value="${i}">Route ${i+1} · ${c.stops.length} stops</option>`).join('');
+
+  panel.classList.add('visible');
+  updateReassignCount();
+}
+
+function toggleRouteCheckboxes(ci, e) {
+  e.preventDefault();
+  const cbs = document.querySelectorAll(`.reassign-stop-cb[data-cluster="${ci}"]`);
+  const allChecked = [...cbs].every(cb => cb.checked);
+  cbs.forEach(cb => cb.checked = !allChecked);
+  updateReassignCount();
+}
+
+function updateReassignCount() {
+  const checked = document.querySelectorAll('.reassign-stop-cb:checked');
+  const countEl = document.getElementById('reassignCount');
+  countEl.textContent = checked.length
+    ? `${checked.length} stop${checked.length !== 1 ? 's' : ''} selected`
+    : 'No stops selected';
+}
+
+function confirmReassign() {
+  const targetIdx = parseInt(document.getElementById('reassignSelect').value);
+  if (isNaN(targetIdx)) return;
+
+  const checked = [...document.querySelectorAll('.reassign-stop-cb:checked')];
+  if (!checked.length) { showToast('Select at least one stop to move'); return; }
+
+  // Group selected stops by their source cluster
+  const moveMap = {}; // sourceClusterIdx -> [invIds]
+  checked.forEach(cb => {
+    const ci = parseInt(cb.dataset.cluster);
+    if (ci === targetIdx) return; // already on target route — skip
+    if (!moveMap[ci]) moveMap[ci] = [];
+    moveMap[ci].push(cb.value);
+  });
+
+  const toCluster = clusters[targetIdx];
+  let totalMoved = 0;
+
+  Object.entries(moveMap).forEach(([ciStr, invIds]) => {
+    const ci = parseInt(ciStr);
+    const fromCluster = clusters[ci];
+    invIds.forEach(invId => {
+      const inv = fromCluster.stops.find(i => i.id == invId);
+      if (!inv) return;
+      fromCluster.stops = fromCluster.stops.filter(i => i.id != invId);
+      toCluster.stops.push(inv);
+      if (toCluster.driver) assignments[inv.id] = toCluster.driver;
+      else delete assignments[inv.id];
+      totalMoved++;
+    });
+  });
+
+  if (!totalMoved) { showToast('Selected stops are already on that route'); return; }
+
+  // Re-optimise affected clusters
+  const affectedClusters = [...new Set([targetIdx, ...Object.keys(moveMap).map(Number)])];
+  affectedClusters.forEach(ci => {
+    const c = clusters[ci];
+    c.stops = nearestNeighborTSP(c.stops.filter(s => s._coords));
+    c.cases = c.stops.reduce((s, i) => s + (i.cases || 0), 0);
+    c.distance = Math.round(routeDistance(c.stops));
+    const zs = [...new Set(c.stops.map(s => s._zone || '').filter(Boolean))];
+    c.zone = zs.length <= 3 ? zs.join(' + ') : `${zs.slice(0,2).join(' + ')} +${zs.length-2} more`;
+    c.territory = c.zone;
+  });
+
+  saveState();
+  cancelReassign();
+  renderClusters();
+  renderPickingList();
+  initOrRefreshMap();
+  showToast(`✓ Moved ${totalMoved} stop${totalMoved !== 1 ? 's' : ''} to Route ${targetIdx + 1}`);
+}
+
+function cancelReassign() {
+  selectedStopForReassign = null;
+  document.getElementById('reassignPanel').classList.remove('visible');
+}
 
 // ═══════════════════ STATS ════════════════════════════════════════════════════
 function updateStats(){const sel=invoices.filter(i=>selectedInvoiceIds.has(i.id));const tc=sel.reduce((s,i)=>s+(i.cases||0),0);const cl=parseInt(document.getElementById('caseLimit')?.value)||250;const mv=Math.ceil(tc/cl);document.getElementById('stat-total').textContent=sel.length;document.getElementById('stat-cases').textContent=tc;document.getElementById('stat-vans').textContent=mv||'-';document.getElementById('stat-done').textContent=Object.keys(completed).length;document.getElementById('stat-vans').classList.toggle('warn',mv>(parseInt(document.getElementById('driverCount')?.value)||0));}
