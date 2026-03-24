@@ -373,56 +373,55 @@ app.get('/api/invoice-rep/:invoiceId', async (req, res) => {
     let rep = '';
     const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
 
-    // Your QB PDF merges LICENSE # and SALES REP headers onto one line,
-    // then the values immediately follow: "LICENSE #SALES REP LIP.15640KK - Kimberly..."
-    // or with a date: "LICENSE #SALES REP 03/17/2026LIP.15640KK - Kimberly..."
-    // We find the rep portion after the LIP.XXXXX license number.
+    // QB PDF layouts seen in the wild:
     //
-    // Format A (most invoices): "XX - Full Name"  → extract "XX"
-    // Format B (some invoices): "Full Name, Company" → extract initials from first word caps
-    // Format C (some invoices): "Full Name Company" → extract initials from first word caps
+    // Layout A (standard customer invoice):
+    //   One merged line: "LICENSE #SALES REP LIP.15640KK - Kimberly Kunzik Ungrafted SKU..."
+    //   or with injected date: "LICENSE #SALES REP 03/17/2026LIP.14175KK - Kimberly..."
+    //   or full name: "LICENSE #SALES REP LIP.14175Branden Hylwa, Premium Beverage Solutions SKU..."
+    //
+    // Layout B (logistics/winery invoices — no LICENSE # header):
+    //   "SALES REP 10157 - Mill CreekDR - Dominic SKU..."
+    //   Rep is the part matching XX - Name after the winery name
 
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
 
-      // Find the line containing LICENSE and SALES REP headers (they merge in pdf-parse)
-      if (!/LICENSE/i.test(line) || !/SALES.{0,4}REP/i.test(line)) continue;
+      // ── Layout A: line contains both LICENSE and SALES REP merged together ──
+      if (/LICENSE/i.test(line) && /SALES.{0,4}REP/i.test(line)) {
+        // Strip everything up to and including the last LIP.NNNNN (or date injections)
+        // The value portion starts after the license number
+        // e.g. "LICENSE #SALES REP 03/17/2026LIP.14175KK - Kimberly..."
+        //   → strip "LICENSE #SALES REP 03/17/2026LIP.14175" → "KK - Kimberly..."
+        const stripped = line
+          .replace(/LICENSE\s*#?\s*SALES\s*REP\s*/i, '')   // remove header labels
+          .replace(/\d{2}\/\d{2}\/\d{4}\s*/g, '')          // remove any injected dates
+          .replace(/[A-Z]{1,5}\.\d{4,6}\s*/i, '')            // remove license number LIP.XXXXX
+          .trim();
 
-      // The value line follows immediately — grab it and possibly the one after
-      // (sometimes a date like "03/17/2026" gets injected between header and value)
-      let valLine = '';
-      for (let j = i + 1; j <= i + 3; j++) {
-        const candidate = lines[j] || '';
-        // Skip if it looks like just a date
-        if (/^\d{2}\/\d{2}\/\d{4}$/.test(candidate)) continue;
-        valLine = candidate;
+        // Format A1: initials before dash "KK - Kimberly" / "TRANS - Transatlantic"
+        const mA1 = stripped.match(/^([A-Z]{1,6})\s*-\s*[A-Z]/);
+        if (mA1) { rep = mA1[1].trim(); break; }
+
+        // Format A2: full name no dash "Branden Hylwa, Premium Beverage Solutions"
+        const nameBeforeComma = stripped.split(',')[0].trim();
+        const nameParts = nameBeforeComma.split(/\s+/).filter(p => /^[A-Za-z]/.test(p));
+        if (nameParts.length >= 2) { rep = (nameParts[0][0] + nameParts[1][0]).toUpperCase(); break; }
+        if (nameParts.length === 1) { rep = nameParts[0].slice(0, 2).toUpperCase(); break; }
         break;
       }
 
-      if (!valLine) break;
-
-      // The value line looks like: "LIP.15640KK - Kimberly Kunzik Ungrafted"
-      // Strip the license number prefix (LIP.XXXXX or similar \w+\.\d+)
-      const stripped = valLine.replace(/^[A-Z]+\.\d+\s*/i, '').trim();
-
-      // Format A: initials before a dash  "KK - Kimberly" / "DL - Dave" / "AKA - Anish" / "TRANS - Transatlantic"
-      const mA = stripped.match(/^([A-Z]{1,6})\s*-\s*/);
-      if (mA) { rep = mA[1].trim(); break; }
-
-      // Format B: no dash — full name like "Branden Hylwa, Premium Beverage Solutions"
-      // Extract initials from first and last name before the comma
-      const nameBeforeComma = stripped.split(',')[0].trim();
-      const nameParts = nameBeforeComma.split(/\s+/).filter(p => /^[A-Za-z]/.test(p));
-      if (nameParts.length >= 2) {
-        rep = (nameParts[0][0] + nameParts[1][0]).toUpperCase();
-        break;
+      // ── Layout B: line has SALES REP but no LICENSE # ──
+      // e.g. "SALES REP 10157 - Mill CreekDR - Dominic"
+      if (/SALES\s*REP/i.test(line) && !/LICENSE/i.test(line)) {
+        // Extract the last occurrence of "XX - Name" pattern (the actual rep initials)
+        const matches = [...line.matchAll(/([A-Z]{1,6})\s*-\s*[A-Z][a-z]/g)];
+        if (matches.length > 0) {
+          // Take the last match — that's the rep, not the winery code
+          rep = matches[matches.length - 1][1].trim();
+          break;
+        }
       }
-      if (nameParts.length === 1) {
-        rep = nameParts[0].slice(0, 2).toUpperCase();
-        break;
-      }
-
-      break;
     }
 
     // Log the section around LICENSE/SALES REP for debugging
