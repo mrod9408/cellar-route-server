@@ -400,7 +400,10 @@ app.get('/api/invoice-rep/:invoiceId', async (req, res) => {
       if (mInline) { rep = mInline[1].trim(); break; }
     }
 
-    console.log(`[REP] Invoice ${invoiceId} → "${rep}" | text sample: ${text.slice(0,300).replace(/\n/g,' ')}`);
+    // Log the section around LICENSE/SALES REP for debugging
+    const repIdx = text.search(/LICENSE|SALES\s+REP/i);
+    const textSnippet = repIdx >= 0 ? text.slice(repIdx, repIdx + 200).replace(/\n/g,' ') : text.slice(0,200).replace(/\n/g,' ');
+    console.log(`[REP] Invoice ${invoiceId} → "${rep}" | around-rep: ${textSnippet}`);
     repCache[invoiceId] = rep;
     res.json({ rep });
   } catch (err) {
