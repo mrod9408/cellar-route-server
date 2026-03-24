@@ -358,17 +358,82 @@ app.get('/api/customer-statement/:customerId', async (req, res) => {
     ? ['https://quickbooks.api.intuit.com', 'https://qbo.api.intuit.com', 'https://c1.qbo.intuit.com', 'https://c3.qbo.intuit.com', 'https://c5.qbo.intuit.com']
     : ['https://sandbox-quickbooks.api.intuit.com'];
 
-  for (const baseUrl of baseUrls) {
-    const url = `${baseUrl}/v3/company/${companyId}/reports/CustomerBalanceDetail?customer=${customerId}&start_date=${startDate}&end_date=${endDate}&minorversion=65`;
+  const qbGet = async (url) => {
+    for (const baseUrl of baseUrls) {
+      try {
+        const fullUrl = url.startsWith('http') ? url : `${baseUrl}${url}`;
+        const r = await fetch(fullUrl, { method: 'GET', headers: { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' } });
+        const data = await r.json();
+        if (r.ok) return data;
+        if (data?.Fault?.Error?.[0]?.code !== '130') throw new Error(JSON.stringify(data?.Fault));
+      } catch (err) {
+        if (baseUrl === baseUrls[baseUrls.length - 1]) throw err;
+      }
+    }
+  };
+
+  try {
+    // Fetch the balance detail report
+    let report = null;
+    for (const baseUrl of baseUrls) {
+      try {
+        const url = `${baseUrl}/v3/company/${companyId}/reports/CustomerBalanceDetail?customer=${customerId}&start_date=${startDate}&end_date=${endDate}&minorversion=65`;
+        const r = await fetch(url, { method: 'GET', headers: { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' } });
+        const data = await r.json();
+        if (r.ok) { report = data; break; }
+        if (data?.Fault?.Error?.[0]?.code !== '130') break;
+      } catch (err) { /* try next cluster */ }
+    }
+    if (!report) return res.status(404).json({ error: `Statement data not available for customer ${customerId}` });
+
+    // Fetch invoices for this customer to build docNumber → salesRep map
+    // QB Invoice has SalesRepRef (name of rep) if set
+    const salesRepByInvoiceNum = {};
     try {
-      const qbRes = await fetch(url, { method: 'GET', headers: { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' } });
-      const data = await qbRes.json();
-      if (qbRes.ok) { res.json({ ok: true, report: data, startDate, endDate }); return; }
-      const errCode = data?.Fault?.Error?.[0]?.code;
-      if (errCode !== '130') return res.status(qbRes.status).json({ error: 'QB report error', detail: JSON.stringify(data?.Fault) });
-    } catch (err) { console.error(`[STATEMENT] Network error on ${baseUrl}:`, err.message); }
+      const invQuery = `SELECT DocNumber, SalesTermRef, CustomField FROM Invoice WHERE CustomerRef = '${customerId}' AND TxnDate >= '${startDate}' MAXRESULTS 200`;
+      for (const baseUrl of baseUrls) {
+        try {
+          const invUrl = `${baseUrl}/v3/company/${companyId}/query?query=${encodeURIComponent(invQuery)}&minorversion=65`;
+          const invRes = await fetch(invUrl, { method: 'GET', headers: { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' } });
+          const invData = await invRes.json();
+          if (invRes.ok) {
+            const invoices = invData.QueryResponse?.Invoice || [];
+            for (const inv of invoices) {
+              const docNum = inv.DocNumber || '';
+              // QB Online stores sales rep in CustomField array — field name varies by company
+              // Check common field names: "Sales Rep", "Rep", "Salesperson", "Sales Person"
+              let rep = '';
+              if (inv.CustomField && Array.isArray(inv.CustomField)) {
+                for (const cf of inv.CustomField) {
+                  const name = (cf.Name || '').toLowerCase();
+                  if (name.includes('rep') || name.includes('sales') || name.includes('person')) {
+                    rep = cf.StringValue || cf.BooleanValue || '';
+                    if (rep) break;
+                  }
+                }
+                // If nothing matched by name, take the first non-empty custom field
+                if (!rep) {
+                  for (const cf of inv.CustomField) {
+                    if (cf.StringValue) { rep = cf.StringValue; break; }
+                  }
+                }
+              }
+              if (docNum) salesRepByInvoiceNum[docNum] = rep;
+            }
+            break;
+          }
+          if (invData?.Fault?.Error?.[0]?.code !== '130') break;
+        } catch (err) { /* try next cluster */ }
+      }
+    } catch (err) {
+      console.warn('[STATEMENT] Could not fetch sales rep data:', err.message);
+    }
+
+    res.json({ ok: true, report, startDate, endDate, salesRepByInvoiceNum });
+  } catch (err) {
+    console.error('[STATEMENT] Error:', err.message);
+    res.status(500).json({ error: 'Statement fetch failed', detail: err.message });
   }
-  res.status(404).json({ error: `Statement data not available for customer ${customerId}` });
 });
 
 // ─── STATEMENT DEBUG ENDPOINT ────────────────────────────────────────────────
