@@ -469,6 +469,63 @@ app.get('/api/debug-statement/:customerId', async (req, res) => {
 });
 
 // ─── DEBUG: RAW INVOICE FIELDS FOR A CUSTOMER ────────────────────────────────
+// ─── DEBUG: QB SALES REP / EMPLOYEE LIST + INVOICE FULL OBJECT ───────────────
+app.get('/api/debug-salesrep/:customerId', async (req, res) => {
+  const accessToken = await getValidAccessToken();
+  const companyId   = tokenStore.companyId;
+  const environment = tokenStore.environment;
+  const { customerId } = req.params;
+  if (!accessToken || !companyId) return res.json({ error: 'Not connected' });
+
+  const baseUrls = environment === 'production'
+    ? ['https://quickbooks.api.intuit.com', 'https://qbo.api.intuit.com', 'https://c1.qbo.intuit.com', 'https://c3.qbo.intuit.com', 'https://c5.qbo.intuit.com']
+    : ['https://sandbox-quickbooks.api.intuit.com'];
+
+  const startDate = `${new Date().getFullYear()}-01-01`;
+  const results = {};
+
+  const qbQuery = async (query) => {
+    for (const baseUrl of baseUrls) {
+      try {
+        const url = `${baseUrl}/v3/company/${companyId}/query?query=${encodeURIComponent(query)}&minorversion=65`;
+        const r = await fetch(url, { method: 'GET', headers: { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' } });
+        const data = await r.json();
+        if (r.ok) return data;
+        if (data?.Fault?.Error?.[0]?.code !== '130') return { error: data?.Fault };
+      } catch (err) { /* try next */ }
+    }
+    return { error: 'all clusters failed' };
+  };
+
+  // 1. Fetch the raw full invoice object (not SELECT * — fetch by entity read)
+  const startDate2 = `${new Date().getFullYear()}-01-01`;
+  const invData = await qbQuery(`SELECT * FROM Invoice WHERE CustomerRef = '${customerId}' AND TxnDate >= '${startDate2}' ORDERBY TxnDate DESC MAXRESULTS 1`);
+  const rawInv = invData?.QueryResponse?.Invoice?.[0] || null;
+  results.rawInvoiceFull = rawInv;
+
+  // 2. Try fetching the invoice by entity read (sometimes returns more fields)
+  if (rawInv?.Id) {
+    for (const baseUrl of baseUrls) {
+      try {
+        const url = `${baseUrl}/v3/company/${companyId}/invoice/${rawInv.Id}?minorversion=65`;
+        const r = await fetch(url, { method: 'GET', headers: { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' } });
+        const data = await r.json();
+        if (r.ok) { results.invoiceEntityRead = data.Invoice; break; }
+      } catch (err) { /* skip */ }
+    }
+  }
+
+  // 3. Fetch Employee list (sales reps are often stored as employees in QB)
+  const empData = await qbQuery(`SELECT * FROM Employee MAXRESULTS 50`);
+  results.employees = empData?.QueryResponse?.Employee || empData?.error || [];
+
+  // 4. Fetch Vendor list (some companies store reps as vendors)
+  const vendData = await qbQuery(`SELECT Id, DisplayName, CustomField FROM Vendor WHERE Active = true MAXRESULTS 50`);
+  results.vendors = vendData?.QueryResponse?.Vendor || vendData?.error || [];
+
+  res.json(results);
+});
+
 // ─── DEBUG: RAW CUSTOMER FIELDS ──────────────────────────────────────────────
 app.get('/api/debug-customer-fields/:customerId', async (req, res) => {
   const accessToken = await getValidAccessToken();
