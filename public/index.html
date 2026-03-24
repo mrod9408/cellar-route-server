@@ -1707,7 +1707,7 @@ async function fetchStatementPdf(customerId, customerName, overdueInfo){
   const base = document.getElementById('serverUrl')?.value.trim() || serverUrl;
   const res = await fetch(`${base}/api/customer-statement/${customerId}`);
   if (!res.ok) throw new Error(`Statement fetch failed for customer ${customerId}: ${res.status}`);
-  const { report, startDate, endDate } = await res.json();
+  const { report, startDate, endDate, salesRepByInvoiceNum = {} } = await res.json();
   const txRows = [];
   const rows = report?.Rows?.Row || [];
   const extractRows = (rowArr) => {
@@ -1748,10 +1748,11 @@ async function fetchStatementPdf(customerId, customerName, overdueInfo){
     const colY = PAGE_H - HEADER_H - (overdueInfo?.overdueBalance > 0 ? 50 : 30);
     p.drawText('DATE',      { x: MARGIN,       y: colY, size: 7, font: bold, color: GRAY });
     p.drawText('TYPE',      { x: MARGIN + 65,  y: colY, size: 7, font: bold, color: GRAY });
-    p.drawText('NUM',       { x: MARGIN + 145, y: colY, size: 7, font: bold, color: GRAY });
-    p.drawText('DUE DATE',  { x: MARGIN + 210, y: colY, size: 7, font: bold, color: GRAY });
-    p.drawText('AMOUNT',    { x: MARGIN + 295, y: colY, size: 7, font: bold, color: GRAY });
-    p.drawText('OPEN BAL',  { x: MARGIN + 375, y: colY, size: 7, font: bold, color: GRAY });
+    p.drawText('NUM',       { x: MARGIN + 140, y: colY, size: 7, font: bold, color: GRAY });
+    p.drawText('DUE DATE',  { x: MARGIN + 200, y: colY, size: 7, font: bold, color: GRAY });
+    p.drawText('AMOUNT',    { x: MARGIN + 278, y: colY, size: 7, font: bold, color: GRAY });
+    p.drawText('OPEN BAL',  { x: MARGIN + 348, y: colY, size: 7, font: bold, color: GRAY });
+    p.drawText('SALES REP', { x: MARGIN + 420, y: colY, size: 7, font: bold, color: GRAY });
     p.drawLine({ start: { x: MARGIN, y: colY - 3 }, end: { x: PAGE_W - MARGIN, y: colY - 3 }, thickness: 0.5, color: GRAY });
     return { page: p, y: colY - ROW_H - 4 };
   };
@@ -1766,6 +1767,7 @@ async function fetchStatementPdf(customerId, customerName, overdueInfo){
       ({ page, y } = addPage()); pageNum++;
     }
     const [date, type, num, dueDate, amount, openBal] = txRows[i];
+    const salesRep = (num && salesRepByInvoiceNum[num]) ? salesRepByInvoiceNum[num] : '';
     const dueDateObj = dueDate ? new Date(dueDate) : null;
     const openBalNum = parseFloat((openBal||'0').replace(/[^0-9.\-]/g,'')) || 0;
     const isPastDue = dueDateObj && dueDateObj < today && openBalNum > 0 && type === 'Invoice';
@@ -1778,11 +1780,11 @@ async function fetchStatementPdf(customerId, customerName, overdueInfo){
     const opts = { size: 7.5, font: rowFont, color: textColor };
     page.drawText((date||'').slice(0,10),     { x: MARGIN + 5,   y, ...opts });
     page.drawText((type||'').slice(0,16),     { x: MARGIN + 65,  y, ...opts });
-    page.drawText((num||'').slice(0,10),      { x: MARGIN + 145, y, ...opts });
-    page.drawText((dueDate||'').slice(0,10),  { x: MARGIN + 210, y, ...opts });
-    page.drawText((amount||'').slice(0,12),   { x: MARGIN + 295, y, ...opts });
-    page.drawText((openBal||'').slice(0,12),  { x: MARGIN + 375, y, ...opts });
-    if (isPastDue) { page.drawText('PAST DUE', { x: MARGIN + 455, y, size: 6.5, font: bold, color: rgb(0.8, 0.1, 0.1) }); }
+    page.drawText((num||'').slice(0,10),      { x: MARGIN + 140, y, ...opts });
+    page.drawText((dueDate||'').slice(0,10),  { x: MARGIN + 200, y, ...opts });
+    page.drawText((amount||'').slice(0,12),   { x: MARGIN + 278, y, ...opts });
+    page.drawText((openBal||'').slice(0,12),  { x: MARGIN + 348, y, ...opts });
+    page.drawText(salesRep.slice(0,14),       { x: MARGIN + 420, y, ...opts });
     y -= ROW_H;
   }
   y -= 4;
