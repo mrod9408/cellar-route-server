@@ -616,6 +616,48 @@ app.get('/api/debug-statement/:customerId', async (req, res) => {
   res.json({ customerId, environment, companyId: 'REDACTED', dateRange: { startDate, endDate }, results });
 });
 
+// ─── DEBUG: RAW COLDATA FROM STATEMENT REPORT ────────────────────────────────
+app.get('/api/debug-coldata/:customerId', async (req, res) => {
+  const accessToken = await getValidAccessToken();
+  const companyId   = tokenStore.companyId;
+  const environment = tokenStore.environment;
+  const { customerId } = req.params;
+  if (!accessToken || !companyId) return res.json({ error: 'Not connected' });
+
+  const baseUrls = environment === 'production'
+    ? ['https://quickbooks.api.intuit.com', 'https://qbo.api.intuit.com', 'https://c1.qbo.intuit.com', 'https://c3.qbo.intuit.com', 'https://c5.qbo.intuit.com']
+    : ['https://sandbox-quickbooks.api.intuit.com'];
+
+  const today = new Date();
+  const startDate = new Date(today.getFullYear(), 0, 1).toISOString().split('T')[0];
+  const endDate   = today.toISOString().split('T')[0];
+
+  for (const baseUrl of baseUrls) {
+    try {
+      const url = `${baseUrl}/v3/company/${companyId}/reports/CustomerBalanceDetail?customer=${customerId}&start_date=${startDate}&end_date=${endDate}&minorversion=65`;
+      const r   = await fetch(url, { method: 'GET', headers: { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' } });
+      const data = await r.json();
+      if (!r.ok) {
+        if (data?.Fault?.Error?.[0]?.code === '130') continue;
+        return res.json({ error: data?.Fault });
+      }
+      // Extract just the raw rows with their ColData
+      const rawRows = [];
+      const walk = (rows) => {
+        for (const row of rows || []) {
+          if (row.type === 'Data' && row.ColData) {
+            rawRows.push({ type: row.type, ColData: row.ColData });
+          }
+          if (row.Rows?.Row) walk(row.Rows.Row);
+        }
+      };
+      walk(data?.Rows?.Row || []);
+      return res.json({ count: rawRows.length, rows: rawRows.slice(0, 10) }); // first 10 rows
+    } catch (err) { /* try next */ }
+  }
+  res.status(500).json({ error: 'Failed' });
+});
+
 // ─── DEBUG: RAW INVOICE FIELDS FOR A CUSTOMER ────────────────────────────────
 // ─── DEBUG: QB SALES REP / EMPLOYEE LIST + INVOICE FULL OBJECT ───────────────
 app.get('/api/debug-salesrep/:customerId', async (req, res) => {
