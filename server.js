@@ -384,43 +384,64 @@ app.get('/api/invoice-rep/:invoiceId', async (req, res) => {
     //   "SALES REP 10157 - Mill CreekDR - Dominic SKU..."
     //   Rep is the part matching XX - Name after the winery name
 
+    // From the logs we know pdf-parse produces lines like:
+    //   "LICENSE #SALES REP LIP.15640KK - Kimberly Kunzik Ungrafted SKUPRODUCT..."
+    // i.e. the headers AND the values are ALL on ONE merged line.
+    // We search every line for this pattern and extract the rep.
+
+    const extractRepFromValueStr = (str) => {
+      // Strip license number (LIP.XXXXX or similar) and any injected dates
+      const cleaned = str
+        .replace(/\d{2}\/\d{2}\/\d{4}\s*/g, '')   // dates like 03/17/2026
+        .replace(/[A-Z]{1,5}\.\d{4,6}\s*/i, '')      // license like LIP.15640
+        .trim();
+
+      // Format 1: initials before dash "KK - Kimberly" / "TRANS - Transatlantic" / "DR - Dominic"
+      const m1 = cleaned.match(/^([A-Z]{1,6})\s*-\s*[A-Z]/);
+      if (m1) return m1[1].trim();
+
+      // Format 2: full name no dash "Branden Hylwa, Premium Beverage Solutions"
+      const nameBeforeComma = cleaned.split(',')[0].trim();
+      const parts = nameBeforeComma.split(/\s+/).filter(p => /^[A-Za-z]/.test(p));
+      if (parts.length >= 2) return (parts[0][0] + parts[1][0]).toUpperCase();
+      if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+
+      return '';
+    };
+
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
 
-      // ── Layout A: line contains both LICENSE and SALES REP merged together ──
-      if (/LICENSE/i.test(line) && /SALES.{0,4}REP/i.test(line)) {
-        // Strip everything up to and including the last LIP.NNNNN (or date injections)
-        // The value portion starts after the license number
-        // e.g. "LICENSE #SALES REP 03/17/2026LIP.14175KK - Kimberly..."
-        //   → strip "LICENSE #SALES REP 03/17/2026LIP.14175" → "KK - Kimberly..."
-        const stripped = line
-          .replace(/LICENSE\s*#?\s*SALES\s*REP\s*/i, '')   // remove header labels
-          .replace(/\d{2}\/\d{2}\/\d{4}\s*/g, '')          // remove any injected dates
-          .replace(/[A-Z]{1,5}\.\d{4,6}\s*/i, '')            // remove license number LIP.XXXXX
-          .trim();
+      // ── Case 1: headers and values on same merged line ──
+      // "LICENSE #SALES REP LIP.15640KK - Kimberly..."
+      if (/LICENSE/i.test(line) && /SALES.{0,6}REP/i.test(line)) {
+        // Strip the header labels to isolate the value portion
+        const afterHeaders = line.replace(/.*SALES\s*REP\s*/i, '').trim();
+        rep = extractRepFromValueStr(afterHeaders);
+        if (rep) break;
 
-        // Format A1: initials before dash "KK - Kimberly" / "TRANS - Transatlantic"
-        const mA1 = stripped.match(/^([A-Z]{1,6})\s*-\s*[A-Z]/);
-        if (mA1) { rep = mA1[1].trim(); break; }
-
-        // Format A2: full name no dash "Branden Hylwa, Premium Beverage Solutions"
-        const nameBeforeComma = stripped.split(',')[0].trim();
-        const nameParts = nameBeforeComma.split(/\s+/).filter(p => /^[A-Za-z]/.test(p));
-        if (nameParts.length >= 2) { rep = (nameParts[0][0] + nameParts[1][0]).toUpperCase(); break; }
-        if (nameParts.length === 1) { rep = nameParts[0].slice(0, 2).toUpperCase(); break; }
+        // Fallback: value might be on next line
+        const nextLine = (lines[i + 1] || '').replace(/\d{2}\/\d{2}\/\d{4}\s*/g, '').trim();
+        if (nextLine) {
+          rep = extractRepFromValueStr(nextLine);
+          if (rep) break;
+        }
         break;
       }
 
-      // ── Layout B: line has SALES REP but no LICENSE # ──
-      // e.g. "SALES REP 10157 - Mill CreekDR - Dominic"
+      // ── Case 2: "SALES REP" line with no LICENSE # (logistics invoices) ──
+      // "SALES REP 10157 - Mill CreekDR - Dominic"
       if (/SALES\s*REP/i.test(line) && !/LICENSE/i.test(line)) {
-        // Extract the last occurrence of "XX - Name" pattern (the actual rep initials)
+        // Take the last "XX - Capitalized" match on the line — that's the actual rep
         const matches = [...line.matchAll(/([A-Z]{1,6})\s*-\s*[A-Z][a-z]/g)];
         if (matches.length > 0) {
-          // Take the last match — that's the rep, not the winery code
           rep = matches[matches.length - 1][1].trim();
           break;
         }
+        // Fallback: value on next line
+        const nextLine = (lines[i + 1] || '').trim();
+        if (nextLine) { rep = extractRepFromValueStr(nextLine); if (rep) break; }
+        break;
       }
     }
 
