@@ -469,6 +469,44 @@ app.get('/api/debug-statement/:customerId', async (req, res) => {
 });
 
 // ─── DEBUG: RAW INVOICE FIELDS FOR A CUSTOMER ────────────────────────────────
+// ─── DEBUG: RAW CUSTOMER FIELDS ──────────────────────────────────────────────
+app.get('/api/debug-customer-fields/:customerId', async (req, res) => {
+  const accessToken = await getValidAccessToken();
+  const companyId   = tokenStore.companyId;
+  const environment = tokenStore.environment;
+  const { customerId } = req.params;
+  if (!accessToken || !companyId) return res.json({ error: 'Not connected' });
+
+  const baseUrls = environment === 'production'
+    ? ['https://quickbooks.api.intuit.com', 'https://qbo.api.intuit.com', 'https://c1.qbo.intuit.com', 'https://c3.qbo.intuit.com', 'https://c5.qbo.intuit.com']
+    : ['https://sandbox-quickbooks.api.intuit.com'];
+
+  for (const baseUrl of baseUrls) {
+    try {
+      const url = `${baseUrl}/v3/company/${companyId}/customer/${customerId}?minorversion=65`;
+      const r   = await fetch(url, { method: 'GET', headers: { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' } });
+      const data = await r.json();
+      if (!r.ok) {
+        if (data?.Fault?.Error?.[0]?.code === '130') continue;
+        return res.json({ error: 'QB error', detail: data?.Fault });
+      }
+      const c = data.Customer || data;
+      return res.json({
+        environment,
+        Id:           c.Id,
+        DisplayName:  c.DisplayName,
+        CustomField:  c.CustomField  || [],
+        SalesRepRef:  c.SalesRepRef  || null,
+        _allTopLevelKeys: Object.keys(c),
+        _fullRecord: c
+      });
+    } catch (err) {
+      if (baseUrl === baseUrls[baseUrls.length - 1])
+        return res.status(500).json({ error: err.message });
+    }
+  }
+});
+
 // Hit /api/debug-invoice-fields/:customerId to see exactly what QB returns
 // for that customer's invoices — use this to find the sales rep field name.
 app.get('/api/debug-invoice-fields/:customerId', async (req, res) => {
