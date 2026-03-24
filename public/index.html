@@ -1713,12 +1713,33 @@ async function fetchStatementPdf(customerId, customerName, overdueInfo){
   const extractRows = (rowArr) => {
     for (const row of rowArr) {
       if (row.type === 'Data' && row.ColData) {
-        txRows.push(row.ColData.map(c => c.value || ''));
+        const values = row.ColData.map(c => c.value || '');
+        // ColData[0] often has an id attribute linking to the QB entity
+        const entityId = row.ColData[0]?.id || row.ColData.find(c => c.id)?.id || '';
+        txRows.push({ values, entityId });
       }
       if (row.Rows?.Row) extractRows(row.Rows.Row);
     }
   };
   extractRows(rows);
+
+  // Pre-fetch sales reps for all Invoice rows in parallel
+  const repByEntityId = {};
+  const invoiceRowsToFetch = txRows.filter(r => {
+    const type = r.values[1] || '';
+    return type === 'Invoice' && r.entityId;
+  });
+  if (invoiceRowsToFetch.length > 0) {
+    await Promise.all(invoiceRowsToFetch.map(async (r) => {
+      try {
+        const repRes = await fetch(`${base}/api/invoice-rep/${r.entityId}`);
+        if (repRes.ok) {
+          const { rep } = await repRes.json();
+          repByEntityId[r.entityId] = rep || '';
+        }
+      } catch(e) { repByEntityId[r.entityId] = ''; }
+    }));
+  }
   const doc  = await PDFDocument.create();
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
   const reg  = await doc.embedFont(StandardFonts.Helvetica);
@@ -1766,8 +1787,9 @@ async function fetchStatementPdf(customerId, customerName, overdueInfo){
       page.drawText(`Page ${pageNum} of ${totalPages}`, { x: PAGE_W - MARGIN - 60, y: 20, size: 7, font: reg, color: GRAY });
       ({ page, y } = addPage()); pageNum++;
     }
-    const [date, type, num, dueDate, amount, openBal] = txRows[i];
-    const salesRep = (num && salesRepByInvoiceNum[num]) ? salesRepByInvoiceNum[num] : '';
+    const { values, entityId } = txRows[i];
+    const [date, type, num, dueDate, amount, openBal] = values;
+    const salesRep = (entityId && repByEntityId[entityId]) ? repByEntityId[entityId] : '';
     const dueDateObj = dueDate ? new Date(dueDate) : null;
     const openBalNum = parseFloat((openBal||'0').replace(/[^0-9.\-]/g,'')) || 0;
     const isPastDue = dueDateObj && dueDateObj < today && openBalNum > 0 && type === 'Invoice';
