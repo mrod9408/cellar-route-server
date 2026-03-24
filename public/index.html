@@ -60,6 +60,30 @@
     .tab.active { color: var(--gold-light); border-bottom-color: var(--gold); }
     .main { padding: 16px; max-width: 600px; margin: 0 auto; }
 
+    /* ── DATE PICKER CARD ─────────────────────────────────────────────────── */
+    .date-picker-row {
+      display: flex; align-items: center; gap: 10px; margin-bottom: 14px;
+      background: rgba(255,255,255,0.07); border-radius: 12px; padding: 10px 14px;
+    }
+    .date-picker-label { color: rgba(247,242,234,0.65); font-size: 12px; font-weight: 600;
+      text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
+    .date-picker-input {
+      flex: 1; padding: 8px 12px; border: 1.5px solid rgba(255,255,255,0.2);
+      border-radius: 9px; font-family: 'DM Sans', sans-serif; font-size: 14px;
+      color: var(--cream); background: rgba(255,255,255,0.1); outline: none;
+      cursor: pointer; min-width: 0;
+    }
+    .date-picker-input:focus { border-color: var(--gold); }
+    /* Make the calendar icon white on webkit */
+    .date-picker-input::-webkit-calendar-picker-indicator { filter: invert(1); cursor: pointer; }
+    .date-today-btn {
+      padding: 8px 13px; background: rgba(201,168,76,0.2); border: 1.5px solid var(--gold);
+      border-radius: 9px; color: var(--gold-light); font-family: 'DM Sans', sans-serif;
+      font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap;
+      transition: background 0.15s;
+    }
+    .date-today-btn:hover { background: rgba(201,168,76,0.35); }
+
     /* ── STATS ────────────────────────────────────────────────────────────── */
     .stats-bar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 16px; }
     .stat-card { background: var(--white); border-radius: var(--radius); padding: 12px 8px; text-align: center; box-shadow: var(--shadow); }
@@ -111,17 +135,27 @@
     .selection-summary { background: var(--cream); border-radius: 10px; padding: 10px 14px; margin-top: 12px; font-size: 13px; color: var(--burgundy-dark); font-weight: 500; display: flex; justify-content: space-between; align-items: center; }
 
     /* ── PICKING LIST ─────────────────────────────────────────────────────── */
-    .picking-product-row { display:flex; align-items:center; padding: 10px 14px; border-bottom: 1px solid #f0e8ec; gap: 12px; }
+    .picking-product-row {
+      display: flex; align-items: center; padding: 13px 16px;
+      border-bottom: 2px solid var(--cream-dark);
+      gap: 12px;
+    }
     .picking-product-row:last-child { border-bottom: none; }
     .picking-product-row:hover { background: #fdf8fa; }
-    .picking-qty { font-size: 22px; font-weight: 800; color: var(--wine); min-width: 52px; text-align:right; font-variant-numeric: tabular-nums; }
-    .picking-unit { font-size: 11px; color: var(--gray); font-weight: 500; min-width: 28px; }
-    .picking-name { font-size: 13px; font-weight: 600; color: var(--dark); flex: 1; }
-    .picking-stops { font-size: 11px; color: var(--gray); white-space:nowrap; }
+    /* Alternating row shading for easy scanning */
+    .picking-product-row:nth-child(odd)  { background: #FFFFFF; }
+    .picking-product-row:nth-child(even) { background: #FAF7F2; }
+    .picking-product-row:hover { background: #f5eeee !important; }
+    .picking-qty { font-size: 24px; font-weight: 800; color: var(--burgundy); min-width: 52px; text-align: right; font-variant-numeric: tabular-nums; flex-shrink: 0; }
+    .picking-unit { font-size: 11px; color: var(--gray); font-weight: 500; min-width: 30px; flex-shrink: 0; }
+    .picking-name { font-size: 13px; font-weight: 600; color: var(--charcoal); flex: 1;
+      /* Full name — no truncation */
+      white-space: normal; word-break: break-word; line-height: 1.4; }
+    .picking-stops { font-size: 11px; color: var(--gray); white-space: nowrap; flex-shrink: 0; }
     .picking-card { background: var(--white); border-radius: var(--radius); box-shadow: var(--shadow); margin-bottom: 16px; overflow: hidden; }
-    .picking-card-header { background: var(--wine); color: var(--gold); padding: 10px 14px; font-size: 13px; font-weight: 700; display:flex; justify-content:space-between; align-items:center; }
-    .picking-card-header span { color: rgba(255,255,255,0.7); font-size:12px; font-weight:400; }
-    .picking-search { width:100%; padding:10px 14px; border:none; border-bottom:1px solid #f0e8ec; font-size:13px; outline:none; background:#fdf8fa; }
+    .picking-card-header { background: var(--burgundy-dark); color: var(--gold-light); padding: 10px 16px; font-size: 13px; font-weight: 700; display: flex; justify-content: space-between; align-items: center; letter-spacing: 0.5px; text-transform: uppercase; }
+    .picking-card-header span { color: rgba(255,255,255,0.55); font-size: 12px; font-weight: 400; text-transform: none; letter-spacing: 0; }
+    .picking-search { width: 100%; padding: 11px 16px; border: none; border-bottom: 2px solid var(--cream-dark); font-size: 14px; outline: none; background: #fdf8fa; font-family: 'DM Sans', sans-serif; }
 
     /* ── OVERDUE SUMMARY BANNER ───────────────────────────────────────────── */
     .overdue-summary { background: var(--orange-light); border: 1.5px solid var(--orange); border-radius: 12px; padding: 12px 16px; margin-bottom: 14px; display: flex; align-items: flex-start; gap: 10px; }
@@ -177,7 +211,7 @@
     .map-reassign-panel.visible { display: block; }
     .reassign-queue-item { display:flex; align-items:center; justify-content:space-between; padding:8px 12px; border-bottom:1px solid #f0e8ec; gap:8px; }
     .reassign-queue-item:last-child { border-bottom:none; }
-    .reassign-queue-name { font-size:13px; font-weight:600; color:var(--dark); flex:1; }
+    .reassign-queue-name { font-size:13px; font-weight:600; color:var(--charcoal); flex:1; }
     .reassign-queue-meta { font-size:11px; color:var(--gray); }
     .reassign-queue-remove { background:none; border:none; color:var(--gray); font-size:16px; cursor:pointer; padding:0 4px; line-height:1; }
     .reassign-queue-remove:hover { color:var(--burgundy); }
@@ -344,9 +378,17 @@
 
       <div class="connect-card" id="connectCard">
         <h3>🔌 QuickBooks</h3>
-        <p style="font-size:13px;color:var(--gray);margin-bottom:16px">Credentials are stored securely on the server. Hit the button below to pull today's deliveries.</p>
+        <p style="font-size:13px;color:var(--gray);margin-bottom:16px">Select the delivery date, then pull invoices from QuickBooks.</p>
         <p style="font-size:12px;color:var(--green);background:var(--green-light);padding:10px 14px;border-radius:10px;margin-bottom:14px">🔄 Auto-refresh is active - tokens renew automatically all day.</p>
-        <button class="btn-primary" id="fetchBtn" onclick="fetchInvoices()">Pull Today's Deliveries</button>
+
+        <!-- ── DATE PICKER ── -->
+        <div class="date-picker-row">
+          <span class="date-picker-label">📅 Date</span>
+          <input type="date" class="date-picker-input" id="deliveryDate" />
+          <button class="date-today-btn" onclick="setDeliveryDateToday()">Today</button>
+        </div>
+
+        <button class="btn-primary" id="fetchBtn" onclick="fetchInvoices()">Pull Invoices for Selected Date</button>
       </div>
 
       <div id="plannerSection" style="display:none">
@@ -357,7 +399,7 @@
           <div class="stat-card"><div class="stat-number" id="stat-done">0</div><div class="stat-label">Done</div></div>
         </div>
 
-        <!-- OVERDUE SUMMARY - shown after fetch if any overdue customers on today's route -->
+        <!-- OVERDUE SUMMARY -->
         <div class="overdue-summary" id="overdueSummary" style="display:none">
           <div class="overdue-summary-icon">!!️</div>
           <div class="overdue-summary-text">
@@ -436,7 +478,7 @@
         </div>
         <div class="map-reassign-panel" id="reassignPanel">
           <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-            <div style="font-size:14px;font-weight:700;color:var(--dark);">Move Queue</div>
+            <div style="font-size:14px;font-weight:700;color:var(--charcoal);">Move Queue</div>
             <button onclick="cancelReassign()" style="background:none;border:none;font-size:18px;color:var(--gray);cursor:pointer;line-height:1;">✕</button>
           </div>
           <div style="font-size:12px;color:var(--gray);margin-bottom:10px;">Click stops on the map to add them here, then move them all at once.</div>
@@ -452,7 +494,6 @@
       </div>
     </div>
 
-    <!-- ══ SETTINGS ══ -->
     <!-- ══ PICKING LIST ══ -->
     <div class="view" id="view-picking">
       <div id="pickingEmpty" style="text-align:center;padding:60px 20px;color:var(--gray);">
@@ -463,7 +504,7 @@
       <div id="pickingContent" style="display:none;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
           <div>
-            <div style="font-size:18px;font-weight:700;color:var(--dark);">Today's Picking List</div>
+            <div style="font-size:18px;font-weight:700;color:var(--charcoal);">Today's Picking List</div>
             <div id="pickingSummary" style="font-size:13px;color:var(--gray);margin-top:2px;"></div>
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
@@ -477,6 +518,7 @@
       </div>
     </div>
 
+    <!-- ══ SETTINGS ══ -->
     <div class="view" id="view-settings">
       <div class="settings-card">
         <h3>🔐 Change PIN</h3>
@@ -503,7 +545,6 @@
 </div>
 
 <div class="toast" id="toast"></div>
-
 <script>
 // ═══════════════════ CONFIG ═══════════════════════════════════════════════════
 let GOOGLE_MAPS_KEY = '';
@@ -594,18 +635,14 @@ function getCoords(inv) {
   };
 }
 
-// ── GEOCODING ────────────────────────────────────────────────────────────────
-// Cache geocoded results so we don't hit the API twice for the same address.
-// Falls back to ZIP_MAP centroid if geocoding fails.
 const _geocodeCache = {};
 
 async function geocodeAddress(inv) {
   const addr = (inv.shipAddress?.zip ? inv.shipAddress : null)
     || (inv.billAddress?.zip ? inv.billAddress : null)
     || inv.shipAddress || inv.billAddress;
-  if (!addr) return getCoords(inv); // fallback
+  if (!addr) return getCoords(inv);
 
-  // Build the best address string we can from what QB gave us
   const parts = [
     addr.line1 || addr.Line1 || '',
     addr.city  || addr.City  || '',
@@ -614,8 +651,6 @@ async function geocodeAddress(inv) {
   ].map(s => (s||'').trim()).filter(Boolean);
 
   if (!parts.length) return getCoords(inv);
-
-  // If we only have a zip, just use ZIP_MAP — no need to call API
   if (parts.length === 1 && /^\d{5}$/.test(parts[0])) return getCoords(inv);
 
   const addressStr = parts.join(', ');
@@ -634,11 +669,9 @@ async function geocodeAddress(inv) {
       const { lat, lng } = data.results[0].geometry.location;
       _geocodeCache[addressStr] = { lat, lng };
     } else {
-      console.warn(`Geocode failed for "${addressStr}": ${data.status}`);
-      _geocodeCache[addressStr] = getCoords(inv); // fallback to ZIP centroid
+      _geocodeCache[addressStr] = getCoords(inv);
     }
   } catch (err) {
-    console.warn(`Geocode error for "${addressStr}":`, err.message);
     _geocodeCache[addressStr] = getCoords(inv);
   }
   return _geocodeCache[addressStr];
@@ -674,7 +707,7 @@ function getStateLabel(inv) {
   return addr.state || 'Unknown';
 }
 
-// ═══════════════════ ROUTING ENGINE (unchanged) ════════════════════════════
+// ═══════════════════ ROUTING ENGINE ══════════════════════════════════════════
 const ZIP_ZONES = {
   '100':'Manhattan','101':'Manhattan','102':'Manhattan',
   '104':'Bronx','103':'StatenIsland','112':'Brooklyn',
@@ -795,15 +828,37 @@ let serverUrl='https://cellar-route-server-production.up.railway.app';
 let activeTab='route', activeDriverFilter='all';
 let currentUser=null;
 let appPin='2024';
-
-// ── NEW: overdue state ────────────────────────────────────────────────────────
-// Map of customerId → { overdueBalance, invoiceCount } for customers with
-// at least one past-due invoice. Populated in parallel with invoice fetch.
 let overdueByCustomer = {};
 
 // Google Maps state
-let gMap=null, gMapMarkers=[], gMapPolylines=[], gInfoWindow=null, selectedStopForReassign=null;
+let gMap=null, gMapMarkers=[], gMapPolylines=[], gInfoWindow=null;
 let visibleRoutes=new Set();
+let moveQueue = [];
+
+// ═══════════════════ DATE PICKER HELPERS ═════════════════════════════════════
+
+// Returns today's date as YYYY-MM-DD in local time (not UTC)
+function getTodayLocal() {
+  const d = new Date();
+  const yr = d.getFullYear();
+  const mo = String(d.getMonth() + 1).padStart(2, '0');
+  const dy = String(d.getDate()).padStart(2, '0');
+  return `${yr}-${mo}-${dy}`;
+}
+
+function setDeliveryDateToday() {
+  const input = document.getElementById('deliveryDate');
+  if (input) input.value = getTodayLocal();
+}
+
+// Formats YYYY-MM-DD → "Mon, Jan 6" for display
+function formatDateLabel(isoDate) {
+  if (!isoDate) return '';
+  // Parse as local date to avoid timezone offset shifting the day
+  const [yr, mo, dy] = isoDate.split('-').map(Number);
+  const d = new Date(yr, mo - 1, dy);
+  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+}
 
 // ═══════════════════ LOAD GOOGLE MAPS ════════════════════════════════════════
 function loadGoogleMaps(key){if(gmapsLoadPromise)return gmapsLoadPromise;gmapsLoadPromise=new Promise((resolve,reject)=>{if(window.google&&window.google.maps){gmapsLoaded=true;resolve();return;}window.__gmapsCallback=()=>{gmapsLoaded=true;resolve();};const script=document.getElementById('gmaps-script');script.src=`https://maps.googleapis.com/maps/api/js?key=${key}&libraries=geometry&callback=__gmapsCallback`;script.onerror=()=>reject(new Error('Failed to load Google Maps'));});return gmapsLoadPromise;}
@@ -813,7 +868,7 @@ let pinEntry='';
 function pinPress(digit){if(pinEntry.length>=4)return;pinEntry+=digit;updateDots();if(pinEntry.length===4)setTimeout(checkPin,150);}
 function pinDelete(){pinEntry=pinEntry.slice(0,-1);updateDots();document.getElementById('pinError').textContent='';document.querySelectorAll('.pin-dot').forEach(d=>d.classList.remove('error'));}
 function updateDots(){for(let i=0;i<4;i++)document.getElementById('dot'+i).classList.toggle('filled',i<pinEntry.length);}
-function checkPin(){if(pinEntry===appPin){document.getElementById('loginScreen').classList.add('hidden');document.getElementById('appShell').style.display='block';document.getElementById('userBadge')&&(document.getElementById('userBadge').textContent='');initApp();setTimeout(()=>document.getElementById('loginScreen').style.display='none',400);}else{document.querySelectorAll('.pin-dot').forEach(d=>{d.classList.remove('filled');d.classList.add('error');});document.getElementById('pinError').textContent='Incorrect PIN. Try again.';pinEntry='';setTimeout(()=>document.querySelectorAll('.pin-dot').forEach(d=>d.classList.remove('error')),800);}}
+function checkPin(){if(pinEntry===appPin){document.getElementById('loginScreen').classList.add('hidden');document.getElementById('appShell').style.display='block';initApp();setTimeout(()=>document.getElementById('loginScreen').style.display='none',400);}else{document.querySelectorAll('.pin-dot').forEach(d=>{d.classList.remove('filled');d.classList.add('error');});document.getElementById('pinError').textContent='Incorrect PIN. Try again.';pinEntry='';setTimeout(()=>document.querySelectorAll('.pin-dot').forEach(d=>d.classList.remove('error')),800);}}
 function logout(){currentUser=null;pinEntry='';updateDots();document.getElementById('pinError').textContent='';document.getElementById('pinStep').classList.remove('hidden');document.getElementById('loginScreen').style.display='flex';document.getElementById('loginScreen').classList.remove('hidden');document.getElementById('appShell').style.display='none';}
 function changePin(){const val=document.getElementById('newPin').value.trim();if(!/^\d{4}$/.test(val)){showToast('PIN must be exactly 4 digits');return;}appPin=val;document.getElementById('newPin').value='';saveState();showToast('✓ PIN updated');}
 
@@ -824,6 +879,10 @@ async function initApp() {
     const cfg=await fetch(base+'/api/config').then(r=>r.json()).catch(()=>({}));
     if(cfg.googleMapsKey){GOOGLE_MAPS_KEY=cfg.googleMapsKey;loadGoogleMaps(GOOGLE_MAPS_KEY).catch(()=>{});}
   } catch(e){console.warn('Could not load config from server');}
+
+  // Set date picker to today
+  setDeliveryDateToday();
+
   const now=new Date();
   document.getElementById('todayDate').textContent=now.toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
   const saved=sessionStorage.getItem('cellarRouteState');
@@ -835,6 +894,8 @@ async function initApp() {
     if(s.selectedInvoiceIds)selectedInvoiceIds=new Set(s.selectedInvoiceIds);
     else selectedInvoiceIds=new Set(invoices.map(i=>i.id));
     if(s.overdueByCustomer)overdueByCustomer=s.overdueByCustomer;
+    // Restore saved delivery date if any
+    if(s.deliveryDate){const inp=document.getElementById('deliveryDate');if(inp)inp.value=s.deliveryDate;}
   }
   document.getElementById('serverUrl').value=serverUrl;
   checkTokenStatus();
@@ -845,13 +906,20 @@ async function initApp() {
     if(clusters.length>0)renderClusters();
   }
 }
-function saveState(){sessionStorage.setItem('cellarRouteState',JSON.stringify({invoices,assignments,completed,drivers,serverUrl,clusters,appPin,selectedInvoiceIds:[...selectedInvoiceIds],overdueByCustomer}));}
+function saveState(){
+  const deliveryDate=document.getElementById('deliveryDate')?.value||'';
+  sessionStorage.setItem('cellarRouteState',JSON.stringify({invoices,assignments,completed,drivers,serverUrl,clusters,appPin,selectedInvoiceIds:[...selectedInvoiceIds],overdueByCustomer,deliveryDate}));
+}
 
 // ═══════════════════ TABS ════════════════════════════════════════════════════
 function showTab(tab){activeTab=tab;document.querySelectorAll('.tab').forEach((t,i)=>{t.classList.toggle('active',['route','map','picking','settings'][i]===tab);});if(tab==='picking')setTimeout(renderPickingList,50);document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));document.getElementById('view-'+tab).classList.add('active');if(tab==='map')setTimeout(()=>initOrRefreshMap(),80);}
 
 // ═══════════════════ FETCH INVOICES ══════════════════════════════════════════
 async function fetchInvoices() {
+  // Read selected date from the picker
+  const dateInput = document.getElementById('deliveryDate');
+  const selectedDate = (dateInput && dateInput.value) ? dateInput.value : getTodayLocal();
+
   document.getElementById('fetchBtn').disabled=true;
   document.getElementById('fetchBtn').textContent='Connecting...';
   document.getElementById('connectCard').style.display='none';
@@ -859,10 +927,10 @@ async function fetchInvoices() {
   try {
     const base=document.getElementById('serverUrl').value.trim()||serverUrl;
 
-    // Fire invoices + overdue in parallel for speed
+    // Pass the date as a query param; overdue fetch stays date-independent
     const [invRes, overdueRes] = await Promise.all([
-      fetch(base+'/api/invoices'),
-      fetch(base+'/api/overdue').catch(() => null) // overdue is non-critical
+      fetch(`${base}/api/invoices?date=${encodeURIComponent(selectedDate)}`),
+      fetch(base+'/api/overdue').catch(() => null)
     ]);
 
     const data = await invRes.json();
@@ -871,7 +939,6 @@ async function fetchInvoices() {
     assignments={};completed={};clusters=[];
     selectedInvoiceIds=new Set(invoices.map(i=>i.id));
 
-    // Process overdue results
     overdueByCustomer = {};
     if(overdueRes && overdueRes.ok) {
       const overdueData = await overdueRes.json();
@@ -892,16 +959,18 @@ async function fetchInvoices() {
     document.getElementById('plannerSection').style.display='block';
     updateStats();renderInvoiceSelectionList();renderOverdueSummary();
 
+    // Update the header date label to the selected date
+    document.getElementById('todayDate').textContent = formatDateLabel(selectedDate);
+
     const overdueCount = Object.keys(overdueByCustomer).length;
-    const overdueOnRoute = invoices.filter(inv => overdueByCustomer[String(inv.customerId)]).length;
-    let toastMsg = `✓ ${invoices.length} invoices loaded`;
+    let toastMsg = `✓ ${invoices.length} invoices for ${formatDateLabel(selectedDate)}`;
     if(overdueCount > 0) toastMsg += ` · ${overdueCount} overdue`;
     showToast(toastMsg);
   } catch(err) {
     document.getElementById('routeLoading').style.display='none';
     document.getElementById('connectCard').style.display='block';
     document.getElementById('fetchBtn').disabled=false;
-    document.getElementById('fetchBtn').textContent="Pull Today's Deliveries";
+    document.getElementById('fetchBtn').textContent='Pull Invoices for Selected Date';
     showToast('❌ '+err.message);
   }
 }
@@ -914,11 +983,14 @@ function refreshInvoices(){
   document.getElementById('connectCard').style.display='block';
   document.getElementById('plannerSection').style.display='none';
   document.getElementById('fetchBtn').disabled=false;
-  document.getElementById('fetchBtn').textContent="Pull Today's Deliveries";
+  document.getElementById('fetchBtn').textContent='Pull Invoices for Selected Date';
   document.getElementById('clusterList').innerHTML='';
   document.getElementById('warningBanners').innerHTML='';
   document.getElementById('invoiceStateGroups').innerHTML='';
-  document.getElementById('overdueSummary').style.display='none';document.getElementById('pickingEmpty').style.display='block';document.getElementById('pickingContent').style.display='none';
+  document.getElementById('overdueSummary').style.display='none';
+  document.getElementById('pickingEmpty').style.display='block';
+  document.getElementById('pickingContent').style.display='none';
+  setDeliveryDateToday();
   showTab('route');
 }
 
@@ -927,15 +999,10 @@ function renderOverdueSummary() {
   const banner = document.getElementById('overdueSummary');
   const overdueCustomerIds = Object.keys(overdueByCustomer);
   if(!overdueCustomerIds.length){ banner.style.display='none'; return; }
-
-  // Only count customers who appear on today's route
   const overdueOnRoute = invoices.filter(inv => overdueByCustomer[String(inv.customerId)]);
   const uniqueOnRoute  = [...new Set(overdueOnRoute.map(inv => inv.customerId))];
-
   if(!uniqueOnRoute.length){ banner.style.display='none'; return; }
-
   const totalOwed = uniqueOnRoute.reduce((s, cid) => s + (overdueByCustomer[cid]?.overdueBalance || 0), 0);
-  // Build per-customer detail lines sorted worst first
   const detailLines = uniqueOnRoute
     .sort((a,b) => (overdueByCustomer[b]?.daysOverdue||0) - (overdueByCustomer[a]?.daysOverdue||0))
     .map(cid => {
@@ -1016,8 +1083,7 @@ function runAutoRoute(){
   clusters.filter(c=>c.overLimit).forEach(c=>warns.push(`!!️ Route ${clusters.indexOf(c)+1} has ${c.cases} cases - over ${caseLimit} limit.`));
   saveState();updateStats();
   document.getElementById('warningBanners').innerHTML=warns.map(w=>`<div class="warn-banner"><span>${w.startsWith('!!️')?'🟠':'ℹ️'}</span><span>${w}</span></div>`).join('');
-  renderClusters();
-  renderPickingList();
+  renderClusters();renderPickingList();
   showToast(`✓ ${clusters.length} routes generated`);
 }
 
@@ -1085,8 +1151,6 @@ async function initOrRefreshMap(){
   loadingOverlay.style.display='flex';
   document.getElementById('routeLegend').innerHTML=clusters.map((c,i)=>`<div class="legend-item"><div class="legend-dot" style="background:${c.color}"></div>Route ${i+1}</div>`).join('');
   try{await loadGoogleMaps(GOOGLE_MAPS_KEY);}catch(e){loadingOverlay.style.display='none';showToast('❌ Could not load Google Maps');return;}
-  // Geocode all stops using real addresses via Google Maps Geocoding API.
-  // We batch all requests in parallel and fall back to ZIP centroid on failure.
   const allStops=[];
   loadingOverlay.innerHTML='<div class="spinner"></div><p>Geocoding addresses…</p>';
   const geocodeJobs=[];
@@ -1103,7 +1167,6 @@ async function initOrRefreshMap(){
     });
   });
   await Promise.all(geocodeJobs);
-  // Restore stop order within each cluster after async geocoding
   allStops.sort((a,b)=>a.ci-b.ci||a.si-b.si);
   loadingOverlay.innerHTML='<div class="spinner"></div><p>Loading map…</p>';
   if(!allStops.length){loadingOverlay.style.display='none';document.getElementById('mapEmptyState').style.display='block';document.getElementById('mapEmptyState').innerHTML=`<div class="empty-icon">📍</div><div class="empty-title">No mappable stops</div><div class="empty-text">Check that your QuickBooks addresses include ZIP codes.</div>`;document.getElementById('mapContent').style.display='none';return;}
@@ -1128,7 +1191,6 @@ async function initOrRefreshMap(){
     clusterStops.forEach(({inv,si,coords,color})=>{
       bounds.extend({lat:coords.lat,lng:coords.lng});
       const isOverdue=!!overdueByCustomer[String(inv.customerId)];
-      // Overdue stops get an orange ring around the marker
       const svgIcon={url:`data:image/svg+xml;charset=UTF-8,${encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" width="32" height="38" viewBox="0 0 32 38"><path d="M16 0C7.163 0 0 7.163 0 16c0 10.627 14 22 16 22s16-11.373 16-22C32 7.163 24.837 0 16 0z" fill="${color}"/>${isOverdue?`<circle cx="16" cy="15" r="12" fill="none" stroke="#C4621D" stroke-width="2.5"/>`:'<circle cx="16" cy="15" r="10" fill="white" opacity="0.2"/>'}<text x="16" y="20" text-anchor="middle" font-family="DM Sans,sans-serif" font-size="11" font-weight="700" fill="white">${si+1}</text></svg>`)}`,scaledSize:new google.maps.Size(32,38),anchor:new google.maps.Point(16,38)};
       const marker=new google.maps.Marker({position:{lat:coords.lat,lng:coords.lng},map:gMap,icon:svgIcon,title:inv.customerName,zIndex:100+si});
       const addr=(inv.shipAddress?.zip?inv.shipAddress:null)||(inv.billAddress?.zip?inv.billAddress:null)||inv.shipAddress||inv.billAddress;
@@ -1153,13 +1215,8 @@ function toggleAllRoutes(){if(visibleRoutes.size===clusters.length){visibleRoute
 function applyRouteVisibility(){const objs=window._routeMapObjects||{};clusters.forEach((_,ci)=>{const show=visibleRoutes.has(ci);const routeObj=objs[ci];if(!routeObj)return;routeObj.markers.forEach(m=>m.setVisible(show));if(routeObj.polyline)routeObj.polyline.setVisible(show);});}
 
 // ═══════════════════ REASSIGN STOP ═══════════════════════════════════════════
-// ── Move Queue: stops staged here before moving to a target route ────────────
-let moveQueue = []; // [{invId, clusterIdx, customerName, invoiceNumber, cases}]
-
 function openReassignPanel(invId, clusterIdx) {
   if (gInfoWindow) gInfoWindow.close();
-
-  // Add to queue if not already there
   const already = moveQueue.some(q => q.invId == invId);
   if (!already) {
     const cluster = clusters[clusterIdx];
@@ -1168,7 +1225,6 @@ function openReassignPanel(invId, clusterIdx) {
       moveQueue.push({ invId: inv.id, clusterIdx, customerName: inv.customerName, invoiceNumber: inv.invoiceNumber, cases: inv.cases || 0 });
     }
   }
-
   renderReassignQueue();
   document.getElementById('reassignPanel').classList.add('visible');
 }
@@ -1177,7 +1233,6 @@ function renderReassignQueue() {
   const queueEl  = document.getElementById('reassignQueue');
   const emptyEl  = document.getElementById('reassignQueueEmpty');
   const sel      = document.getElementById('reassignSelect');
-
   if (!moveQueue.length) {
     emptyEl.style.display = 'block';
     queueEl.querySelectorAll('.reassign-queue-item').forEach(el => el.remove());
@@ -1194,27 +1249,20 @@ function renderReassignQueue() {
       queueEl.appendChild(div);
     });
   }
-
-  // Populate destination dropdown — exclude routes that all queued stops already belong to
   sel.innerHTML = clusters.map((c, i) => `<option value="${i}">Route ${i+1} · ${c.stops.length} stops</option>`).join('');
 }
 
-function removeFromQueue(idx) {
-  moveQueue.splice(idx, 1);
-  renderReassignQueue();
-}
+function removeFromQueue(idx) { moveQueue.splice(idx, 1); renderReassignQueue(); }
 
 function confirmReassign() {
   if (!moveQueue.length) { showToast('Queue is empty — click stops on the map to add them'); return; }
   const targetIdx = parseInt(document.getElementById('reassignSelect').value);
   if (isNaN(targetIdx)) return;
-
   const toCluster = clusters[targetIdx];
   const affected  = new Set([targetIdx]);
   let moved = 0;
-
   moveQueue.forEach(q => {
-    if (q.clusterIdx === targetIdx) return; // already on this route
+    if (q.clusterIdx === targetIdx) return;
     const fromCluster = clusters[q.clusterIdx];
     const inv = fromCluster?.stops.find(s => s.id == q.invId);
     if (!inv) return;
@@ -1225,10 +1273,7 @@ function confirmReassign() {
     affected.add(q.clusterIdx);
     moved++;
   });
-
   if (!moved) { showToast('Those stops are already on that route'); return; }
-
-  // Re-optimise all affected clusters
   affected.forEach(ci => {
     const c = clusters[ci];
     c.stops = nearestNeighborTSP(c.stops.filter(s => s._coords));
@@ -1238,43 +1283,31 @@ function confirmReassign() {
     c.zone = zs.length <= 3 ? zs.join(' + ') : `${zs.slice(0,2).join(' + ')} +${zs.length-2} more`;
     c.territory = c.zone;
   });
-
   moveQueue = [];
-  saveState();
-  cancelReassign();
-  renderClusters();
-  renderPickingList();
-  initOrRefreshMap();
+  saveState();cancelReassign();renderClusters();renderPickingList();initOrRefreshMap();
   showToast(`✓ Moved ${moved} stop${moved !== 1 ? 's' : ''} to Route ${targetIdx + 1}`);
 }
 
-function cancelReassign() {
-  moveQueue = [];
-  document.getElementById('reassignPanel').classList.remove('visible');
-}
-
+function cancelReassign() { moveQueue = []; document.getElementById('reassignPanel').classList.remove('visible'); }
 
 // ═══════════════════ STATS ════════════════════════════════════════════════════
 function updateStats(){const sel=invoices.filter(i=>selectedInvoiceIds.has(i.id));const tc=sel.reduce((s,i)=>s+(i.cases||0),0);const cl=parseInt(document.getElementById('caseLimit')?.value)||250;const mv=Math.ceil(tc/cl);document.getElementById('stat-total').textContent=sel.length;document.getElementById('stat-cases').textContent=tc;document.getElementById('stat-vans').textContent=mv||'-';document.getElementById('stat-done').textContent=Object.keys(completed).length;document.getElementById('stat-vans').classList.toggle('warn',mv>(parseInt(document.getElementById('driverCount')?.value)||0));}
 
 // ═══════════════════ SETTINGS ═════════════════════════════════════════════════
 function saveSettings(){serverUrl=document.getElementById('serverUrl').value.trim()||serverUrl;saveState();showToast('Settings saved');}
+
 // ═══════════════════ PICKING LIST ════════════════════════════════════════════
 
 function buildPickingData(routeFilter) {
-  // Aggregate line items across all selected invoices (or just one route)
   const source = clusters.length ? clusters : [];
   if (!source.length) return null;
 
-  const products = {}; // itemName -> { qty, cases, stops: Set, routes: Set }
-  const routeSelect = document.getElementById('pickingRouteFilter');
-
+  const products = {};
   source.forEach((cluster, ci) => {
     if (routeFilter !== 'all' && ci !== parseInt(routeFilter)) return;
     cluster.stops.forEach(inv => {
       (inv.lineItems || []).forEach(item => {
         if (!item.itemName || item.qty <= 0) return;
-        // Normalise name: strip leading SKU codes like "CW-1234 " if present
         const name = item.itemName.trim();
         if (!products[name]) {
           products[name] = { qty: 0, stops: new Set(), routes: new Set() };
@@ -1286,7 +1319,6 @@ function buildPickingData(routeFilter) {
     });
   });
 
-  // Sort alphabetically by product name
   return Object.entries(products)
     .map(([name, d]) => ({ name, qty: d.qty, stopCount: d.stops.size, routes: [...d.routes].sort((a,b)=>a-b) }))
     .sort((a, b) => a.name.localeCompare(b.name));
@@ -1301,7 +1333,6 @@ function renderPickingList() {
   document.getElementById('pickingEmpty').style.display = 'none';
   document.getElementById('pickingContent').style.display = 'block';
 
-  // Populate route filter dropdown
   const sel = document.getElementById('pickingRouteFilter');
   const prev = sel.value;
   sel.innerHTML = '<option value="all">All Routes</option>' +
@@ -1311,21 +1342,16 @@ function renderPickingList() {
   const routeFilter = sel.value;
   const items = buildPickingData(routeFilter);
 
-  // Summary line
   const totalQty = items.reduce((s, p) => s + p.qty, 0);
-  const selectedInv = routeFilter === 'all'
-    ? clusters.flatMap(c => c.stops)
-    : (clusters[parseInt(routeFilter)]?.stops || []);
   document.getElementById('pickingSummary').textContent =
     `${items.length} products · ${totalQty} total units`;
 
-  // Search filter
   const searchVal = (document.getElementById('pickingSearch')?.value || '').toLowerCase();
   const filtered = searchVal ? items.filter(p => p.name.toLowerCase().includes(searchVal)) : items;
 
   const container = document.getElementById('pickingListContainer');
 
-  // Group by first letter for readability
+  // Group by first letter
   const groups = {};
   filtered.forEach(item => {
     const letter = item.name[0].toUpperCase();
@@ -1370,8 +1396,11 @@ async function downloadPickingListPdf() {
   const GRAY  = rgb(0.42, 0.42, 0.42);
   const LGRAY = rgb(0.96, 0.96, 0.96);
   const BLACK = rgb(0, 0, 0);
-  const ROW_H = 20;
+  const LINE_COLOR = rgb(0.75, 0.75, 0.75);
+  // Taller rows so full product names have room to breathe
+  const ROW_H = 26;
   const today = new Date().toLocaleDateString('en-US', {weekday:'long',year:'numeric',month:'long',day:'numeric'});
+  const deliveryDateLabel = formatDateLabel(document.getElementById('deliveryDate')?.value || getTodayLocal());
   const routeLabel = routeFilter === 'all' ? 'All Routes' : `Route ${parseInt(routeFilter)+1}`;
 
   const addPage = () => {
@@ -1380,11 +1409,12 @@ async function downloadPickingListPdf() {
     p.drawRectangle({ x:0, y:PAGE_H-70, width:PAGE_W, height:70, color:WINE });
     p.drawText('PICKING LIST', { x:MARGIN, y:PAGE_H-30, size:20, font:bold, color:GOLD });
     p.drawText('Classic Wines Inc.', { x:MARGIN, y:PAGE_H-48, size:9, font:reg, color:rgb(0.9,0.9,0.9) });
-    p.drawText(`${today}  -  ${routeLabel}`, { x:MARGIN, y:PAGE_H-62, size:8, font:reg, color:rgb(0.75,0.75,0.75) });
+    p.drawText(`${deliveryDateLabel}  ·  ${routeLabel}`, { x:MARGIN, y:PAGE_H-62, size:8, font:reg, color:rgb(0.75,0.75,0.75) });
     // Column headers
     p.drawRectangle({ x:MARGIN, y:PAGE_H-88, width:PAGE_W-MARGIN*2, height:16, color:LGRAY });
     p.drawText('QTY',     { x:MARGIN+4,  y:PAGE_H-83, size:7, font:bold, color:GRAY });
     p.drawText('PRODUCT', { x:MARGIN+80, y:PAGE_H-83, size:7, font:bold, color:GRAY });
+    p.drawText('STOPS',   { x:PAGE_W-MARGIN-80, y:PAGE_H-83, size:7, font:bold, color:GRAY });
     return { page: p, y: PAGE_H - 88 - ROW_H };
   };
 
@@ -1393,26 +1423,82 @@ async function downloadPickingListPdf() {
   const totalPages = Math.ceil(items.length / Math.floor((PAGE_H - 110) / ROW_H)) || 1;
 
   items.forEach((item, i) => {
-    if (y < 50) {
+    if (y < 55) {
       page.drawText(`Page ${pageNum} of ${totalPages}`, { x:PAGE_W-MARGIN-60, y:20, size:7, font:reg, color:GRAY });
       ({ page, y } = addPage()); pageNum++;
     }
+    // Alternating row background
     const bg = i % 2 === 0 ? rgb(0.98,0.98,0.98) : rgb(1,1,1);
-    page.drawRectangle({ x:MARGIN, y:y-4, width:PAGE_W-MARGIN*2, height:ROW_H, color:bg });
+    page.drawRectangle({ x:MARGIN, y:y-6, width:PAGE_W-MARGIN*2, height:ROW_H, color:bg });
+
+    // Solid separator line between every row
+    page.drawLine({
+      start: { x:MARGIN, y:y-6 },
+      end:   { x:PAGE_W-MARGIN, y:y-6 },
+      thickness: 0.75,
+      color: LINE_COLOR
+    });
 
     const qtyStr = String(item.qty);
-    page.drawText(qtyStr, { x:MARGIN+4, y, size:11, font:bold, color:WINE });
-    const nameStr = item.name.length > 65 ? item.name.slice(0,63)+'..' : item.name;
-    page.drawText(nameStr, { x:MARGIN+80, y, size:9, font:reg, color:BLACK });
+    page.drawText(qtyStr, { x:MARGIN+4, y, size:12, font:bold, color:WINE });
+
+    // Full product name — wrap long names across multiple lines
+    const maxNameWidth = PAGE_W - MARGIN*2 - 160; // leave room for qty col and stops col
+    const nameFont = reg;
+    const nameFontSize = 9;
+    // Simple word-wrap: split into lines that fit within maxNameWidth
+    const words = item.name.split(' ');
+    const lines = [];
+    let currentLine = '';
+    for (const word of words) {
+      const test = currentLine ? currentLine + ' ' + word : word;
+      const testWidth = nameFont.widthOfTextAtSize(test, nameFontSize);
+      if (testWidth > maxNameWidth && currentLine) {
+        lines.push(currentLine);
+        currentLine = word;
+      } else {
+        currentLine = test;
+      }
+    }
+    if (currentLine) lines.push(currentLine);
+
+    // Draw each line
+    lines.forEach((line, li) => {
+      page.drawText(line, { x:MARGIN+80, y: y - (li * (nameFontSize + 2)), size:nameFontSize, font:nameFont, color:BLACK });
+    });
+
+    // If multiple lines needed, expand the row background to cover them
+    if (lines.length > 1) {
+      const extraH = (lines.length - 1) * (nameFontSize + 2);
+      // Redraw bg taller
+      page.drawRectangle({ x:MARGIN, y:y-6-extraH, width:PAGE_W-MARGIN*2, height:ROW_H+extraH, color:bg });
+      // Redraw the line below including extra height
+      page.drawLine({
+        start: { x:MARGIN, y:y-6-extraH },
+        end:   { x:PAGE_W-MARGIN, y:y-6-extraH },
+        thickness: 0.75, color: LINE_COLOR
+      });
+      // Redraw text on top of new bg
+      lines.forEach((line, li) => {
+        page.drawText(line, { x:MARGIN+80, y: y - (li * (nameFontSize + 2)), size:nameFontSize, font:nameFont, color:BLACK });
+      });
+      page.drawText(qtyStr, { x:MARGIN+4, y, size:12, font:bold, color:WINE });
+      const stopsStr = `${item.stopCount} stop${item.stopCount!==1?'s':''} · Rt ${item.routes.join(', ')}`;
+      page.drawText(stopsStr, { x:PAGE_W-MARGIN-80, y, size:8, font:reg, color:GRAY });
+      y -= ROW_H + extraH;
+      return;
+    }
+
+    const stopsStr = `${item.stopCount} stop${item.stopCount!==1?'s':''} · Rt ${item.routes.join(', ')}`;
+    page.drawText(stopsStr, { x:PAGE_W-MARGIN-80, y, size:8, font:reg, color:GRAY });
     y -= ROW_H;
   });
 
-  // Totals footer
-  y -= 4;
-  page.drawLine({ start:{x:MARGIN,y}, end:{x:PAGE_W-MARGIN,y}, thickness:0.5, color:GRAY });
+  // Final bottom divider line
+  page.drawLine({ start:{x:MARGIN,y}, end:{x:PAGE_W-MARGIN,y}, thickness:1, color:GRAY });
   y -= 14;
   const totalQty = items.reduce((s,p)=>s+p.qty,0);
-  page.drawText(`${items.length} products  -  ${totalQty % 1 === 0 ? totalQty : totalQty.toFixed(1)} total units`, { x:MARGIN, y, size:9, font:bold, color:WINE });
+  page.drawText(`${items.length} products  ·  ${Number.isInteger(totalQty) ? totalQty : totalQty.toFixed(1)} total units`, { x:MARGIN, y, size:9, font:bold, color:WINE });
   page.drawText(`Page ${pageNum} of ${totalPages}`, { x:PAGE_W-MARGIN-60, y:20, size:7, font:reg, color:GRAY });
 
   const bytes = await doc.save();
@@ -1420,14 +1506,14 @@ async function downloadPickingListPdf() {
   const url   = URL.createObjectURL(blob);
   const a     = document.createElement('a');
   a.href = url;
-  a.download = `PickingList_${new Date().toISOString().slice(0,10)}${routeFilter!=='all'?'_Route'+(parseInt(routeFilter)+1):''}.pdf`;
+  a.download = `PickingList_${document.getElementById('deliveryDate')?.value || getTodayLocal()}${routeFilter!=='all'?'_Route'+(parseInt(routeFilter)+1):''}.pdf`;
   a.click();
   URL.revokeObjectURL(url);
   showToast('Picking list downloaded');
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
-function clearAll(){if(!confirm('Clear all delivery data?'))return;invoices=[];assignments={};completed={};clusters=[];selectedInvoiceIds=new Set();overdueByCustomer={};clearMapObjects();gMap=null;saveState();document.getElementById('connectCard').style.display='block';document.getElementById('plannerSection').style.display='none';document.getElementById('clusterList').innerHTML='';document.getElementById('warningBanners').innerHTML='';document.getElementById('invoiceStateGroups').innerHTML='';document.getElementById('overdueSummary').style.display='none';document.getElementById('fetchBtn').disabled=false;document.getElementById('fetchBtn').textContent="Pull Today's Deliveries";showToast('Data cleared');showTab('route');}
+function clearAll(){if(!confirm('Clear all delivery data?'))return;invoices=[];assignments={};completed={};clusters=[];selectedInvoiceIds=new Set();overdueByCustomer={};clearMapObjects();gMap=null;saveState();document.getElementById('connectCard').style.display='block';document.getElementById('plannerSection').style.display='none';document.getElementById('clusterList').innerHTML='';document.getElementById('warningBanners').innerHTML='';document.getElementById('invoiceStateGroups').innerHTML='';document.getElementById('overdueSummary').style.display='none';document.getElementById('fetchBtn').disabled=false;document.getElementById('fetchBtn').textContent='Pull Invoices for Selected Date';showToast('Data cleared');showTab('route');}
 function openMap(a){if(!a||a.trim()===''){showToast('No address available');return;}window.open('https://maps.google.com/?q='+a,'_blank');}
 
 // ═══════════════════ TOKEN STATUS ════════════════════════════════════════════
@@ -1441,8 +1527,6 @@ function renderPdfPanel(){
   const btn=document.getElementById('btnAllPdf');
   if(btn){btn.disabled=false;btn.textContent='⬇ Download Combined PDF - All Routes';}
   setPdfStatus('');hidePdfProgress();
-
-  // Show note about statements if any overdue customers are on today's route
   const noteEl = document.getElementById('pdfOverdueNote');
   if(!noteEl)return;
   const overdueOnRoute = clusters.flatMap(c=>c.stops).filter(inv=>overdueByCustomer[String(inv.customerId)]);
@@ -1457,18 +1541,12 @@ function renderPdfPanel(){
 
 async function fetchInvoicePdf(invoiceId){const base=document.getElementById('serverUrl')?.value.trim()||serverUrl;const res=await fetch(`${base}/api/invoice-pdf/${invoiceId}`);if(!res.ok)throw new Error(`PDF fetch failed for invoice ${invoiceId}: ${res.status}`);return res.arrayBuffer();}
 
-// NEW: Fetch statement PDF for a customer
 async function fetchStatementPdf(customerId, customerName, overdueInfo){
   const {PDFDocument, rgb, StandardFonts} = PDFLib;
   const base = document.getElementById('serverUrl')?.value.trim() || serverUrl;
-
-  // Fetch report data as JSON (QB Online does not support PDF output for reports)
   const res = await fetch(`${base}/api/customer-statement/${customerId}`);
   if (!res.ok) throw new Error(`Statement fetch failed for customer ${customerId}: ${res.status}`);
   const { report, startDate, endDate } = await res.json();
-
-  // Extract transaction rows from QB CustomerBalanceDetail report structure
-  // Rows are nested: report.Rows.Row[] → section rows → ColData[]
   const txRows = [];
   const rows = report?.Rows?.Row || [];
   const extractRows = (rowArr) => {
@@ -1480,12 +1558,9 @@ async function fetchStatementPdf(customerId, customerName, overdueInfo){
     }
   };
   extractRows(rows);
-
-  // Build a PDF page with the statement data
   const doc  = await PDFDocument.create();
   const bold = await doc.embedFont(StandardFonts.HelveticaBold);
   const reg  = await doc.embedFont(StandardFonts.Helvetica);
-
   const PAGE_W = 612, PAGE_H = 792;
   const MARGIN = 40, COL_W = PAGE_W - MARGIN * 2;
   const WINE_DARK = rgb(0.29, 0.075, 0.176);
@@ -1494,29 +1569,21 @@ async function fetchStatementPdf(customerId, customerName, overdueInfo){
   const GRAY      = rgb(0.42, 0.42, 0.42);
   const BLACK     = rgb(0, 0, 0);
   const WHITE     = rgb(1, 1, 1);
-
   const ROW_H = 14, HEADER_H = 90;
   const ROWS_PER_PAGE = Math.floor((PAGE_H - HEADER_H - 80) / ROW_H);
-
   const addPage = () => {
     const p = doc.addPage([PAGE_W, PAGE_H]);
-    // Header bar
     p.drawRectangle({ x: 0, y: PAGE_H - HEADER_H, width: PAGE_W, height: HEADER_H, color: WINE_DARK });
     p.drawText('ACCOUNT STATEMENT', { x: MARGIN, y: PAGE_H - 32, size: 16, font: bold, color: GOLD });
     p.drawText('Classic Wines Inc.', { x: MARGIN, y: PAGE_H - 50, size: 9, font: reg, color: WHITE });
     p.drawText(customerName || `Customer #${customerId}`, { x: MARGIN, y: PAGE_H - 65, size: 11, font: bold, color: WHITE });
     p.drawText(`Period: ${startDate} - ${endDate}`, { x: MARGIN, y: PAGE_H - 80, size: 8, font: reg, color: rgb(0.75, 0.75, 0.75) });
-
-    // Balance summary bar — two figures side by side
     if (overdueInfo?.overdueBalance > 0) {
       p.drawRectangle({ x: MARGIN, y: PAGE_H - HEADER_H - 26, width: COL_W, height: 22, color: ORANGE });
       const totalBal = `TOTAL BALANCE: $${overdueInfo.overdueBalance.toLocaleString('en-US', {minimumFractionDigits:2})}`;
-      // overdueInvoiceBalance is calculated below per-row; show placeholder label here
       p.drawText(totalBal, { x: MARGIN + 6, y: PAGE_H - HEADER_H - 11, size: 8, font: bold, color: WHITE });
       p.drawText('Past-due rows highlighted in red below', { x: MARGIN + 6, y: PAGE_H - HEADER_H - 20, size: 7, font: reg, color: rgb(1,0.85,0.85) });
     }
-
-    // Column headers
     const colY = PAGE_H - HEADER_H - (overdueInfo?.overdueBalance > 0 ? 50 : 30);
     p.drawText('DATE',      { x: MARGIN,       y: colY, size: 7, font: bold, color: GRAY });
     p.drawText('TYPE',      { x: MARGIN + 65,  y: colY, size: 7, font: bold, color: GRAY });
@@ -1525,40 +1592,26 @@ async function fetchStatementPdf(customerId, customerName, overdueInfo){
     p.drawText('AMOUNT',    { x: MARGIN + 295, y: colY, size: 7, font: bold, color: GRAY });
     p.drawText('OPEN BAL',  { x: MARGIN + 375, y: colY, size: 7, font: bold, color: GRAY });
     p.drawLine({ start: { x: MARGIN, y: colY - 3 }, end: { x: PAGE_W - MARGIN, y: colY - 3 }, thickness: 0.5, color: GRAY });
-
     return { page: p, y: colY - ROW_H - 4 };
   };
-
   let { page, y } = addPage();
   let pageNum = 1;
   const totalPages = Math.ceil(txRows.length / ROWS_PER_PAGE) || 1;
-
   const today = new Date(); today.setHours(0,0,0,0);
   let calcOverdueBalance = 0;
-
   for (let i = 0; i < txRows.length; i++) {
     if (y < 50) {
       page.drawText(`Page ${pageNum} of ${totalPages}`, { x: PAGE_W - MARGIN - 60, y: 20, size: 7, font: reg, color: GRAY });
-      ({ page, y } = addPage());
-      pageNum++;
+      ({ page, y } = addPage()); pageNum++;
     }
     const [date, type, num, dueDate, amount, openBal] = txRows[i];
-
-    // A row is past due if it has a due date that is before today and an open balance
     const dueDateObj = dueDate ? new Date(dueDate) : null;
     const openBalNum = parseFloat((openBal||'0').replace(/[^0-9.\-]/g,'')) || 0;
     const isPastDue = dueDateObj && dueDateObj < today && openBalNum > 0 && type === 'Invoice';
     if (isPastDue) calcOverdueBalance += openBalNum;
-
-    // Row background: light red for past due, alternating light gray otherwise
     const rowBg = isPastDue ? rgb(1, 0.9, 0.9) : (i % 2 === 0 ? rgb(0.97, 0.97, 0.97) : WHITE);
     page.drawRectangle({ x: MARGIN, y: y - 2, width: COL_W, height: ROW_H, color: rowBg });
-
-    // Left red accent bar for past-due rows
-    if (isPastDue) {
-      page.drawRectangle({ x: MARGIN, y: y - 2, width: 3, height: ROW_H, color: rgb(0.8, 0.1, 0.1) });
-    }
-
+    if (isPastDue) { page.drawRectangle({ x: MARGIN, y: y - 2, width: 3, height: ROW_H, color: rgb(0.8, 0.1, 0.1) }); }
     const textColor = isPastDue ? rgb(0.6, 0.05, 0.05) : BLACK;
     const rowFont   = isPastDue ? bold : reg;
     const opts = { size: 7.5, font: rowFont, color: textColor };
@@ -1568,15 +1621,9 @@ async function fetchStatementPdf(customerId, customerName, overdueInfo){
     page.drawText((dueDate||'').slice(0,10),  { x: MARGIN + 210, y, ...opts });
     page.drawText((amount||'').slice(0,12),   { x: MARGIN + 295, y, ...opts });
     page.drawText((openBal||'').slice(0,12),  { x: MARGIN + 375, y, ...opts });
-
-    // PAST DUE label on the right for overdue rows
-    if (isPastDue) {
-      page.drawText('PAST DUE', { x: MARGIN + 455, y, size: 6.5, font: bold, color: rgb(0.8, 0.1, 0.1) });
-    }
+    if (isPastDue) { page.drawText('PAST DUE', { x: MARGIN + 455, y, size: 6.5, font: bold, color: rgb(0.8, 0.1, 0.1) }); }
     y -= ROW_H;
   }
-
-  // Summary totals row at the bottom
   y -= 4;
   page.drawLine({ start: { x: MARGIN, y }, end: { x: PAGE_W - MARGIN, y }, thickness: 0.5, color: GRAY });
   y -= 14;
@@ -1591,7 +1638,6 @@ async function fetchStatementPdf(customerId, customerName, overdueInfo){
     page.drawText(overdueStr, { x: MARGIN + 295, y, size: 8, font: bold, color: rgb(0.7, 0.05, 0.05) });
   }
   page.drawText(`Page ${pageNum} of ${totalPages}`, { x: PAGE_W - MARGIN - 60, y: 20, size: 7, font: reg, color: GRAY });
-
   const pdfBytes = await doc.save();
   return pdfBytes.buffer;
 }
@@ -1607,13 +1653,10 @@ async function makeDividerPage(pdfDoc,routeNum,stops,cases,dist,date){
   page.drawText(meta,{x:40,y:670,size:11,font:regFont,color:rgb(0.42,0.42,0.42)});
   page.drawLine({start:{x:40,y:655},end:{x:572,y:655},thickness:1.5,color:rgb(0.83,0.71,0.74)});
   page.drawText('STOP ORDER',{x:40,y:638,size:8,font:boldFont,color:rgb(0.55,0.55,0.55)});
-
-  // Count overdue stops on this route for the divider
   const overdueStops = stops.filter(s => overdueByCustomer[s.customerId]);
   if(overdueStops.length){
     page.drawText(`!! ${overdueStops.length} overdue customer${overdueStops.length!==1?'s':''} - statements included`,{x:40,y:620,size:9,font:boldFont,color:rgb(0.769,0.384,0.114)});
   }
-
   const col1X=40,col2X=326,rowH=19,startY=overdueStops.length?600:618;
   const useTwo=stops.length>14;
   const col1Stops=useTwo?stops.slice(0,Math.ceil(stops.length/2)):stops;
@@ -1629,7 +1672,6 @@ async function makeDividerPage(pdfDoc,routeNum,stops,cases,dist,date){
     const cityState=addr?[addr.city,addr.state].filter(Boolean).join(', '):'';
     if(cityState)page.drawText(cityState,{x:x+26,y:y-9,size:8,font:regFont,color:rgb(0.5,0.5,0.5)});
     page.drawText(`${stop.cases||0} cs`,{x:x+220,y:y+1,size:9,font:regFont,color:rgb(0.18,0.49,0.36)});
-    // Small "STMT" indicator for overdue stops
     if(hasStmt)page.drawText('STMT',{x:x+250,y:y+1,size:7,font:boldFont,color:rgb(0.769,0.384,0.114)});
   };
   col1Stops.forEach((stop,i)=>{const y=startY-(i*rowH);if(y<40)return;drawStopRow(stop,i,col1X,y);});
@@ -1637,42 +1679,28 @@ async function makeDividerPage(pdfDoc,routeNum,stops,cases,dist,date){
   if(useTwo)page.drawLine({start:{x:312,y:startY+10},end:{x:312,y:Math.max(40,startY-(col1Stops.length*rowH))},thickness:0.5,color:rgb(0.85,0.85,0.85)});
 }
 
-// Download one combined PDF - invoices in stop order, with statements
-// inserted immediately after the invoice for any overdue customer.
 async function downloadAllRoutesPdf(){
   if(!clusters.length){showToast('No routes to download');return;}
   const btn=document.getElementById('btnAllPdf');
   btn.disabled=true;btn.textContent='⏳ Building…';
-
-  // Count total pages to fetch (invoices + statements)
   const allStops=clusters.flatMap(c=>c.stops);
   const overdueOnRoute=[...new Set(allStops.filter(inv=>overdueByCustomer[String(inv.customerId)]).map(inv=>inv.customerId))];
-  const totalDocs=allStops.length+overdueOnRoute.length; // invoices + one statement per unique overdue customer
-  // Track which customer statements have already been fetched & merged so we
-  // don't duplicate a statement if a customer appears on multiple routes
+  const totalDocs=allStops.length+overdueOnRoute.length;
   const fetchedStatements=new Set();
   let fetched=0;
   showPdfProgress(0);
-
   try{
     const{PDFDocument}=PDFLib;
     const merged=await PDFDocument.create();
-    const date=new Date().toLocaleDateString('en-US',{weekday:'short',month:'short',day:'numeric'});
-
+    const deliveryDateLabel = formatDateLabel(document.getElementById('deliveryDate')?.value || getTodayLocal());
     for(let ci=0;ci<clusters.length;ci++){
       const cluster=clusters[ci];
       setPdfStatus(`Route ${ci+1} of ${clusters.length}: fetching ${cluster.stops.length} invoices…`);
-
-      // Divider page
-      await makeDividerPage(merged,ci+1,cluster.stops,cluster.cases,cluster.distance,date);
-
-      // Invoices + optional statement per stop
+      await makeDividerPage(merged,ci+1,cluster.stops,cluster.cases,cluster.distance,deliveryDateLabel);
       for(let i=0;i<cluster.stops.length;i++){
         const inv=cluster.stops[i];
         showPdfProgress(Math.round((fetched/totalDocs)*95));
         setPdfStatus(`Fetching ${fetched+1} of ${totalDocs}: ${inv.customerName}…`);
-
-        // Invoice PDF
         try{
           const buf=await fetchInvoicePdf(inv.id);
           const src=await PDFDocument.load(buf);
@@ -1680,9 +1708,6 @@ async function downloadAllRoutesPdf(){
           pages.forEach(p=>merged.addPage(p));
         }catch(e){console.warn(`Skipped invoice ${inv.invoiceNumber}:`,e.message);}
         fetched++;
-
-        // Statement PDF - only if this customer is overdue AND we haven't
-        // already included their statement earlier in this PDF
         const custId=inv.customerId;
         if(custId&&overdueByCustomer[String(custId)]&&!fetchedStatements.has(custId)){
           showPdfProgress(Math.round((fetched/totalDocs)*95));
@@ -1698,15 +1723,14 @@ async function downloadAllRoutesPdf(){
         }
       }
     }
-
     showPdfProgress(100);
     const bytes=await merged.save();
     const blob=new Blob([bytes],{type:'application/pdf'});
     const url=URL.createObjectURL(blob);
     const a=document.createElement('a');
-    a.href=url;a.download=`Cellar_Route_All_${new Date().toISOString().slice(0,10)}.pdf`;
+    a.href=url;
+    a.download=`Cellar_Route_${document.getElementById('deliveryDate')?.value||getTodayLocal()}.pdf`;
     a.click();URL.revokeObjectURL(url);
-
     const stmtCount=fetchedStatements.size;
     setPdfStatus(`✓ Downloaded - ${allStops.length} invoices${stmtCount?` + ${stmtCount} statement${stmtCount!==1?'s':''}`:''} across ${clusters.length} routes`);
     showToast(`✓ PDF ready${stmtCount?` · ${stmtCount} statements included`:''}`);
