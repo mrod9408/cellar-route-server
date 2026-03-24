@@ -526,6 +526,57 @@ app.get('/api/debug-salesrep/:customerId', async (req, res) => {
   res.json(results);
 });
 
+// ─── DEBUG: QB SALESREP ENTITY LIST + FETCH INVOICE BY DOC NUMBER ────────────
+app.get('/api/debug-salesrep-list', async (req, res) => {
+  const accessToken = await getValidAccessToken();
+  const companyId   = tokenStore.companyId;
+  const environment = tokenStore.environment;
+  if (!accessToken || !companyId) return res.json({ error: 'Not connected' });
+
+  const baseUrls = environment === 'production'
+    ? ['https://quickbooks.api.intuit.com', 'https://qbo.api.intuit.com', 'https://c1.qbo.intuit.com', 'https://c3.qbo.intuit.com', 'https://c5.qbo.intuit.com']
+    : ['https://sandbox-quickbooks.api.intuit.com'];
+
+  const results = {};
+
+  const qbQuery = async (query) => {
+    for (const baseUrl of baseUrls) {
+      try {
+        const url = `${baseUrl}/v3/company/${companyId}/query?query=${encodeURIComponent(query)}&minorversion=65`;
+        const r = await fetch(url, { method: 'GET', headers: { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' } });
+        const data = await r.json();
+        if (r.ok) return data;
+        if (data?.Fault?.Error?.[0]?.code !== '130') return { error: data?.Fault };
+      } catch (err) { /* try next */ }
+    }
+    return { error: 'all clusters failed' };
+  };
+
+  // 1. Try the SalesRep entity directly
+  const srData = await qbQuery(`SELECT * FROM SalesRep MAXRESULTS 100`);
+  results.salesRepEntity = srData?.QueryResponse?.SalesRep || srData?.error || 'no results';
+
+  // 2. Try OtherName list (some QB setups store reps here)
+  const onData = await qbQuery(`SELECT * FROM OtherName MAXRESULTS 100`);
+  results.otherNames = onData?.QueryResponse?.OtherName || onData?.error || 'no results';
+
+  // 3. Fetch a specific invoice by DocNumber — pass ?docnum=XXXXX
+  const docNum = req.query.docnum;
+  if (docNum) {
+    const invData = await qbQuery(`SELECT * FROM Invoice WHERE DocNumber = '${docNum}'`);
+    const inv = invData?.QueryResponse?.Invoice?.[0] || null;
+    results.invoiceByDocNum = inv ? {
+      DocNumber:   inv.DocNumber,
+      CustomField: inv.CustomField || [],
+      // Dump every field that might reference a rep
+      _allKeys:    Object.keys(inv),
+      _full:       inv
+    } : 'not found';
+  }
+
+  res.json(results);
+});
+
 // ─── DEBUG: RAW CUSTOMER FIELDS ──────────────────────────────────────────────
 app.get('/api/debug-customer-fields/:customerId', async (req, res) => {
   const accessToken = await getValidAccessToken();
