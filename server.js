@@ -468,6 +468,55 @@ app.get('/api/debug-statement/:customerId', async (req, res) => {
   res.json({ customerId, environment, companyId: 'REDACTED', dateRange: { startDate, endDate }, results });
 });
 
+// ─── DEBUG: RAW INVOICE FIELDS FOR A CUSTOMER ────────────────────────────────
+// Hit /api/debug-invoice-fields/:customerId to see exactly what QB returns
+// for that customer's invoices — use this to find the sales rep field name.
+app.get('/api/debug-invoice-fields/:customerId', async (req, res) => {
+  const accessToken = await getValidAccessToken();
+  const companyId   = tokenStore.companyId;
+  const environment = tokenStore.environment;
+  const { customerId } = req.params;
+  if (!accessToken || !companyId) return res.json({ error: 'Not connected' });
+
+  const baseUrls = environment === 'production'
+    ? ['https://quickbooks.api.intuit.com', 'https://qbo.api.intuit.com', 'https://c1.qbo.intuit.com', 'https://c3.qbo.intuit.com', 'https://c5.qbo.intuit.com']
+    : ['https://sandbox-quickbooks.api.intuit.com'];
+
+  const startDate = `${new Date().getFullYear()}-01-01`;
+
+  // Try fetching with * (all fields) so we can see everything QB returns
+  const query = `SELECT * FROM Invoice WHERE CustomerRef = '${customerId}' AND TxnDate >= '${startDate}' ORDERBY TxnDate DESC MAXRESULTS 3`;
+
+  for (const baseUrl of baseUrls) {
+    try {
+      const url = `${baseUrl}/v3/company/${companyId}/query?query=${encodeURIComponent(query)}&minorversion=65`;
+      const r   = await fetch(url, { method: 'GET', headers: { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' } });
+      const data = await r.json();
+      if (!r.ok) {
+        if (data?.Fault?.Error?.[0]?.code === '130') continue;
+        return res.json({ error: 'QB error', detail: data?.Fault });
+      }
+      const invoices = data.QueryResponse?.Invoice || [];
+      // Return a stripped-down view: just the fields that could contain a sales rep
+      const summary = invoices.map(inv => ({
+        DocNumber:    inv.DocNumber,
+        TxnDate:      inv.TxnDate,
+        // These are the most common places QB stores sales rep info:
+        SalesTermRef: inv.SalesTermRef || null,
+        ClassRef:     inv.ClassRef     || null,
+        DepartmentRef:inv.DepartmentRef|| null,
+        CustomField:  inv.CustomField  || [],   // <-- what we need to see
+        // Also dump the full top-level keys so nothing is missed
+        _allTopLevelKeys: Object.keys(inv),
+      }));
+      return res.json({ count: invoices.length, environment, invoices: summary });
+    } catch (err) {
+      if (baseUrl === baseUrls[baseUrls.length - 1])
+        return res.status(500).json({ error: err.message });
+    }
+  }
+});
+
 // ─── FETCH CUSTOMERS ──────────────────────────────────────────────────────────
 app.get('/api/customers', async (req, res) => {
   let accessToken = await getValidAccessToken();
