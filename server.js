@@ -430,31 +430,18 @@ app.get('/api/invoice-rep/:invoiceId', async (req, res) => {
       }
 
       // ── Case 2: "SALES REP" line with no LICENSE # (logistics invoices) ──
-      // "SALES REP 10157 - Mill CreekDR - Dominic"
-      // The rep initials always come AFTER the last winery number (e.g. 10157)
+      // "SALES REP 10157 - Mill CreekDR - Dominic SKUPRODUCT..."
+      // The actual rep always appears immediately before "SKU" or at the end of the winery name
+      // and is always in format "XX - Name" where XX is 1-5 uppercase letters
       if (/SALES\s*REP/i.test(line) && !/LICENSE/i.test(line)) {
-        // Strip everything up to and including the last number sequence and winery name
-        // Pattern: "SALES REP 10157 - Mill CreekDR - Dominic"
-        // After the number + dash + winery, the rep initials start
-        // Find the portion after the last run of digits
-        const afterNum = line.replace(/.*\d+\s*-\s*/i, '').trim();
-        // afterNum = "Mill CreekDR - Dominic SKUPRODUCT..."
-        // The rep initials are the all-caps block that appears before " - " followed by a name
-        // They are glued directly after the winery name with no space: "Mill CreekDR - Dominic"
-        // Extract the last "XX - Name" where XX is all caps
-        const m = afterNum.match(/([A-Z]+)\s*-\s*([A-Z][a-z])/);
-        if (m) {
-          // Make sure it's not a long word (winery names in all caps) — rep codes are 1-5 chars
-          const candidate = m[1].trim();
-          // Walk backwards from the match to find just the uppercase-only suffix
-          // e.g. from "CreekDR" we want "DR" not "CREEKDR"
-          const pureInitials = candidate.match(/[A-Z]+$/)?.[0] || candidate;
-          rep = pureInitials.length <= 5 ? pureInitials : pureInitials.slice(-3);
+        // Rep initials always use "XX - Name" with spaces around the dash
+        // Winery codes use "10157 - WineryName" with a number before the dash
+        // So match pure uppercase 1-5 chars followed by SPACE-DASH-SPACE then capital letter
+        const repMatches = [...line.matchAll(/([A-Z]{1,5}) - [A-Z][a-z]/g)];
+        if (repMatches.length > 0) {
+          rep = repMatches[repMatches.length - 1][1].trim();
           break;
         }
-        // Fallback: value on next line
-        const nextLine = (lines[i + 1] || '').trim();
-        if (nextLine) { rep = extractRepFromValueStr(nextLine); if (rep) break; }
         break;
       }
     }
