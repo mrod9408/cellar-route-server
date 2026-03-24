@@ -67,15 +67,16 @@
     }
     .date-picker-label { color: rgba(247,242,234,0.65); font-size: 12px; font-weight: 600;
       text-transform: uppercase; letter-spacing: 0.5px; white-space: nowrap; }
-    .date-picker-input {
+    .date-display-btn {
       flex: 1; padding: 8px 12px; border: 1.5px solid rgba(255,255,255,0.2);
       border-radius: 9px; font-family: 'DM Sans', sans-serif; font-size: 14px;
       color: var(--cream); background: rgba(255,255,255,0.1); outline: none;
-      cursor: pointer; min-width: 0;
+      cursor: pointer; min-width: 0; text-align: left; display: flex;
+      align-items: center; justify-content: space-between; gap: 8px;
+      transition: border-color 0.15s;
     }
-    .date-picker-input:focus { border-color: var(--gold); }
-    /* Make the calendar icon white on webkit */
-    .date-picker-input::-webkit-calendar-picker-indicator { filter: invert(1); cursor: pointer; }
+    .date-display-btn:hover { border-color: var(--gold); }
+    .date-display-btn .cal-icon { opacity: 0.6; font-size: 16px; }
     .date-today-btn {
       padding: 8px 13px; background: rgba(201,168,76,0.2); border: 1.5px solid var(--gold);
       border-radius: 9px; color: var(--gold-light); font-family: 'DM Sans', sans-serif;
@@ -83,6 +84,60 @@
       transition: background 0.15s;
     }
     .date-today-btn:hover { background: rgba(201,168,76,0.35); }
+
+    /* ── CALENDAR POPUP ───────────────────────────────────────────────────── */
+    .cal-overlay {
+      position: fixed; inset: 0; z-index: 999; background: rgba(0,0,0,0.45);
+      display: flex; align-items: center; justify-content: center;
+      animation: fadeIn 0.15s ease;
+    }
+    @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+    .cal-popup {
+      background: #fff; border-radius: 18px; box-shadow: 0 20px 60px rgba(74,19,32,0.35);
+      padding: 20px; width: 320px; font-family: 'DM Sans', sans-serif;
+      animation: slideUp 0.2s ease;
+    }
+    @keyframes slideUp { from { transform: translateY(16px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
+    .cal-nav {
+      display: flex; align-items: center; justify-content: space-between;
+      margin-bottom: 14px;
+    }
+    .cal-nav button {
+      background: none; border: none; font-size: 20px; cursor: pointer;
+      color: var(--burgundy); padding: 4px 10px; border-radius: 8px;
+      transition: background 0.12s;
+    }
+    .cal-nav button:hover { background: var(--cream-dark); }
+    .cal-month-label {
+      font-size: 15px; font-weight: 700; color: var(--charcoal); letter-spacing: 0.3px;
+    }
+    .cal-grid {
+      display: grid; grid-template-columns: repeat(7, 1fr); gap: 3px;
+    }
+    .cal-dow {
+      text-align: center; font-size: 10px; font-weight: 700;
+      color: var(--gray); text-transform: uppercase; padding: 4px 0 6px;
+      letter-spacing: 0.5px;
+    }
+    .cal-day {
+      text-align: center; padding: 7px 0; border-radius: 8px;
+      font-size: 13px; cursor: pointer; transition: background 0.12s, color 0.12s;
+      color: var(--charcoal);
+    }
+    .cal-day:hover { background: var(--cream-dark); }
+    .cal-day.empty { cursor: default; }
+    .cal-day.today {
+      background: var(--cream-dark); color: var(--burgundy);
+      font-weight: 800; box-shadow: inset 0 0 0 2px var(--burgundy);
+    }
+    .cal-day.selected {
+      background: var(--burgundy); color: #fff; font-weight: 700;
+    }
+    .cal-day.today.selected {
+      background: var(--burgundy); color: #fff; font-weight: 800;
+      box-shadow: inset 0 0 0 2px var(--gold);
+    }
+    .cal-day.other-month { color: #ccc; }
 
     /* ── STATS ────────────────────────────────────────────────────────────── */
     .stats-bar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 16px; }
@@ -147,11 +202,8 @@
     .picking-product-row:nth-child(even) { background: #FAF7F2; }
     .picking-product-row:hover { background: #f5eeee !important; }
     .picking-qty { font-size: 24px; font-weight: 800; color: var(--burgundy); min-width: 52px; text-align: right; font-variant-numeric: tabular-nums; flex-shrink: 0; }
-    .picking-unit { font-size: 11px; color: var(--gray); font-weight: 500; min-width: 30px; flex-shrink: 0; }
     .picking-name { font-size: 13px; font-weight: 600; color: var(--charcoal); flex: 1;
-      /* Full name — no truncation */
       white-space: normal; word-break: break-word; line-height: 1.4; }
-    .picking-stops { font-size: 11px; color: var(--gray); white-space: nowrap; flex-shrink: 0; }
     .picking-card { background: var(--white); border-radius: var(--radius); box-shadow: var(--shadow); margin-bottom: 16px; overflow: hidden; }
     .picking-card-header { background: var(--burgundy-dark); color: var(--gold-light); padding: 10px 16px; font-size: 13px; font-weight: 700; display: flex; justify-content: space-between; align-items: center; letter-spacing: 0.5px; text-transform: uppercase; }
     .picking-card-header span { color: rgba(255,255,255,0.55); font-size: 12px; font-weight: 400; text-transform: none; letter-spacing: 0; }
@@ -384,9 +436,14 @@
         <!-- ── DATE PICKER ── -->
         <div class="date-picker-row">
           <span class="date-picker-label">📅 Date</span>
-          <input type="date" class="date-picker-input" id="deliveryDate" />
+          <button class="date-display-btn" id="dateDisplayBtn" onclick="openCalendar()">
+            <span id="dateDisplayLabel">Select a date</span>
+            <span class="cal-icon">🗓</span>
+          </button>
           <button class="date-today-btn" onclick="setDeliveryDateToday()">Today</button>
         </div>
+        <!-- Hidden value store -->
+        <input type="hidden" id="deliveryDate" />
 
         <button class="btn-primary" id="fetchBtn" onclick="fetchInvoices()">Pull Invoices for Selected Date</button>
       </div>
@@ -504,7 +561,7 @@
       <div id="pickingContent" style="display:none;">
         <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:16px;flex-wrap:wrap;gap:10px;">
           <div>
-            <div style="font-size:18px;font-weight:700;color:var(--charcoal);">Today's Picking List</div>
+            <div style="font-size:18px;font-weight:700;color:var(--charcoal);" id="pickingListTitle">Picking List</div>
             <div id="pickingSummary" style="font-size:13px;color:var(--gray);margin-top:2px;"></div>
           </div>
           <div style="display:flex;gap:8px;flex-wrap:wrap;">
@@ -846,18 +903,121 @@ function getTodayLocal() {
   return `${yr}-${mo}-${dy}`;
 }
 
-function setDeliveryDateToday() {
-  const input = document.getElementById('deliveryDate');
-  if (input) input.value = getTodayLocal();
-}
-
 // Formats YYYY-MM-DD → "Mon, Jan 6" for display
 function formatDateLabel(isoDate) {
   if (!isoDate) return '';
-  // Parse as local date to avoid timezone offset shifting the day
   const [yr, mo, dy] = isoDate.split('-').map(Number);
   const d = new Date(yr, mo - 1, dy);
   return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+}
+
+// Update the visible date button label
+function updateDateDisplay(isoDate) {
+  const lbl = document.getElementById('dateDisplayLabel');
+  if (lbl) lbl.textContent = isoDate ? formatDateLabel(isoDate) : 'Select a date';
+}
+
+function setDeliveryDateToday() {
+  const input = document.getElementById('deliveryDate');
+  const today = getTodayLocal();
+  if (input) input.value = today;
+  updateDateDisplay(today);
+  closeCalendar();
+}
+
+// ── CALENDAR POPUP ────────────────────────────────────────────────────────────
+let calYear = null, calMonth = null;
+
+function openCalendar() {
+  const current = document.getElementById('deliveryDate')?.value;
+  const ref = current ? new Date(current + 'T00:00:00') : new Date();
+  calYear  = ref.getFullYear();
+  calMonth = ref.getMonth();
+  renderCalendarPopup();
+}
+
+function closeCalendar() {
+  const overlay = document.getElementById('calOverlay');
+  if (overlay) overlay.remove();
+}
+
+function renderCalendarPopup() {
+  closeCalendar();
+  const today = getTodayLocal();
+  const selectedVal = document.getElementById('deliveryDate')?.value || '';
+
+  const DAYS = ['Su','Mo','Tu','We','Th','Fr','Sa'];
+  const MONTHS = ['January','February','March','April','May','June',
+                  'July','August','September','October','November','December'];
+
+  const firstDay = new Date(calYear, calMonth, 1).getDay();
+  const daysInMonth = new Date(calYear, calMonth + 1, 0).getDate();
+  const daysInPrevMonth = new Date(calYear, calMonth, 0).getDate();
+
+  let cells = '';
+  // Leading blanks (prev month)
+  for (let i = 0; i < firstDay; i++) {
+    const d = daysInPrevMonth - firstDay + 1 + i;
+    const prevMonth = calMonth === 0 ? 12 : calMonth;
+    const prevYear  = calMonth === 0 ? calYear - 1 : calYear;
+    const iso = `${prevYear}-${String(prevMonth).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    cells += `<div class="cal-day other-month" onclick="pickDate('${iso}')">${d}</div>`;
+  }
+  // Current month
+  for (let d = 1; d <= daysInMonth; d++) {
+    const iso = `${calYear}-${String(calMonth+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    const isToday    = iso === today;
+    const isSelected = iso === selectedVal;
+    let cls = 'cal-day';
+    if (isToday && isSelected) cls += ' today selected';
+    else if (isToday)    cls += ' today';
+    else if (isSelected) cls += ' selected';
+    cells += `<div class="${cls}" onclick="pickDate('${iso}')">${d}</div>`;
+  }
+  // Trailing blanks (next month)
+  const totalCells = firstDay + daysInMonth;
+  const trailing = totalCells % 7 === 0 ? 0 : 7 - (totalCells % 7);
+  for (let d = 1; d <= trailing; d++) {
+    const nextMonth = calMonth === 11 ? 1 : calMonth + 2;
+    const nextYear  = calMonth === 11 ? calYear + 1 : calYear;
+    const iso = `${nextYear}-${String(nextMonth).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    cells += `<div class="cal-day other-month" onclick="pickDate('${iso}')">${d}</div>`;
+  }
+
+  const html = `
+    <div class="cal-overlay" id="calOverlay" onclick="handleOverlayClick(event)">
+      <div class="cal-popup" onclick="event.stopPropagation()">
+        <div class="cal-nav">
+          <button onclick="calNav(-1)">&#8249;</button>
+          <div class="cal-month-label">${MONTHS[calMonth]} ${calYear}</div>
+          <button onclick="calNav(1)">&#8250;</button>
+        </div>
+        <div class="cal-grid">
+          ${DAYS.map(d => `<div class="cal-dow">${d}</div>`).join('')}
+          ${cells}
+        </div>
+      </div>
+    </div>`;
+
+  document.body.insertAdjacentHTML('beforeend', html);
+}
+
+function handleOverlayClick(e) {
+  if (e.target.id === 'calOverlay') closeCalendar();
+}
+
+function calNav(dir) {
+  calMonth += dir;
+  if (calMonth < 0)  { calMonth = 11; calYear--; }
+  if (calMonth > 11) { calMonth = 0;  calYear++; }
+  renderCalendarPopup();
+}
+
+function pickDate(iso) {
+  const input = document.getElementById('deliveryDate');
+  if (input) input.value = iso;
+  updateDateDisplay(iso);
+  closeCalendar();
 }
 
 // ═══════════════════ LOAD GOOGLE MAPS ════════════════════════════════════════
@@ -880,7 +1040,7 @@ async function initApp() {
     if(cfg.googleMapsKey){GOOGLE_MAPS_KEY=cfg.googleMapsKey;loadGoogleMaps(GOOGLE_MAPS_KEY).catch(()=>{});}
   } catch(e){console.warn('Could not load config from server');}
 
-  // Set date picker to today
+  // Set date picker to today and update display
   setDeliveryDateToday();
 
   const now=new Date();
@@ -895,7 +1055,7 @@ async function initApp() {
     else selectedInvoiceIds=new Set(invoices.map(i=>i.id));
     if(s.overdueByCustomer)overdueByCustomer=s.overdueByCustomer;
     // Restore saved delivery date if any
-    if(s.deliveryDate){const inp=document.getElementById('deliveryDate');if(inp)inp.value=s.deliveryDate;}
+    if(s.deliveryDate){const inp=document.getElementById('deliveryDate');if(inp)inp.value=s.deliveryDate;updateDateDisplay(s.deliveryDate);}
   }
   document.getElementById('serverUrl').value=serverUrl;
   checkTokenStatus();
@@ -1333,6 +1493,13 @@ function renderPickingList() {
   document.getElementById('pickingEmpty').style.display = 'none';
   document.getElementById('pickingContent').style.display = 'block';
 
+  // Update picking list title with date
+  const pickingTitle = document.getElementById('pickingListTitle');
+  if (pickingTitle) {
+    const dateLabel = formatDateLabel(document.getElementById('deliveryDate')?.value || getTodayLocal());
+    pickingTitle.textContent = dateLabel + ' · Picking List';
+  }
+
   const sel = document.getElementById('pickingRouteFilter');
   const prev = sel.value;
   sel.innerHTML = '<option value="all">All Routes</option>' +
@@ -1371,9 +1538,7 @@ function renderPickingList() {
       ${groupItems.map(item => `
         <div class="picking-product-row">
           <div class="picking-qty">${item.qty}</div>
-          <div class="picking-unit">units</div>
           <div class="picking-name">${item.name}</div>
-          <div class="picking-stops">${item.stopCount} stop${item.stopCount!==1?'s':''} · Rt ${item.routes.join(', ')}</div>
         </div>
       `).join('')}
     </div>
@@ -1414,7 +1579,7 @@ async function downloadPickingListPdf() {
     p.drawRectangle({ x:MARGIN, y:PAGE_H-88, width:PAGE_W-MARGIN*2, height:16, color:LGRAY });
     p.drawText('QTY',     { x:MARGIN+4,  y:PAGE_H-83, size:7, font:bold, color:GRAY });
     p.drawText('PRODUCT', { x:MARGIN+80, y:PAGE_H-83, size:7, font:bold, color:GRAY });
-    p.drawText('STOPS',   { x:PAGE_W-MARGIN-80, y:PAGE_H-83, size:7, font:bold, color:GRAY });
+
     return { page: p, y: PAGE_H - 88 - ROW_H };
   };
 
@@ -1443,7 +1608,7 @@ async function downloadPickingListPdf() {
     page.drawText(qtyStr, { x:MARGIN+4, y, size:12, font:bold, color:WINE });
 
     // Full product name — wrap long names across multiple lines
-    const maxNameWidth = PAGE_W - MARGIN*2 - 160; // leave room for qty col and stops col
+    const maxNameWidth = PAGE_W - MARGIN*2 - 80; // qty col only, no stops col
     const nameFont = reg;
     const nameFontSize = 9;
     // Simple word-wrap: split into lines that fit within maxNameWidth
@@ -1483,14 +1648,10 @@ async function downloadPickingListPdf() {
         page.drawText(line, { x:MARGIN+80, y: y - (li * (nameFontSize + 2)), size:nameFontSize, font:nameFont, color:BLACK });
       });
       page.drawText(qtyStr, { x:MARGIN+4, y, size:12, font:bold, color:WINE });
-      const stopsStr = `${item.stopCount} stop${item.stopCount!==1?'s':''} · Rt ${item.routes.join(', ')}`;
-      page.drawText(stopsStr, { x:PAGE_W-MARGIN-80, y, size:8, font:reg, color:GRAY });
       y -= ROW_H + extraH;
       return;
     }
 
-    const stopsStr = `${item.stopCount} stop${item.stopCount!==1?'s':''} · Rt ${item.routes.join(', ')}`;
-    page.drawText(stopsStr, { x:PAGE_W-MARGIN-80, y, size:8, font:reg, color:GRAY });
     y -= ROW_H;
   });
 
