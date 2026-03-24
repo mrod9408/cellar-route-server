@@ -373,31 +373,56 @@ app.get('/api/invoice-rep/:invoiceId', async (req, res) => {
     let rep = '';
     const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
 
+    // Your QB PDF merges LICENSE # and SALES REP headers onto one line,
+    // then the values immediately follow: "LICENSE #SALES REP LIP.15640KK - Kimberly..."
+    // or with a date: "LICENSE #SALES REP 03/17/2026LIP.15640KK - Kimberly..."
+    // We find the rep portion after the LIP.XXXXX license number.
+    //
+    // Format A (most invoices): "XX - Full Name"  → extract "XX"
+    // Format B (some invoices): "Full Name, Company" → extract initials from first word caps
+    // Format C (some invoices): "Full Name Company" → extract initials from first word caps
+
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
 
-      // Case A: headers on same line "LICENSE # SALES REP" or "LICENSE# SALES REP"
-      if (/LICENSE.{0,6}SALES\s+REP/i.test(line)) {
-        // Value line is next non-empty line: "LIP.15640 KK - Kimberly Kunzik Ungrafted"
-        const valLine = lines[i + 1] || '';
-        // Extract the initials — the part that matches /[A-Z]{1,4}/ immediately before " - "
-        const m = valLine.match(/([A-Z]{1,5})\s*-\s*[A-Z]/);
-        if (m) { rep = m[1].trim(); break; }
+      // Find the line containing LICENSE and SALES REP headers (they merge in pdf-parse)
+      if (!/LICENSE/i.test(line) || !/SALES.{0,4}REP/i.test(line)) continue;
+
+      // The value line follows immediately — grab it and possibly the one after
+      // (sometimes a date like "03/17/2026" gets injected between header and value)
+      let valLine = '';
+      for (let j = i + 1; j <= i + 3; j++) {
+        const candidate = lines[j] || '';
+        // Skip if it looks like just a date
+        if (/^\d{2}\/\d{2}\/\d{4}$/.test(candidate)) continue;
+        valLine = candidate;
+        break;
       }
 
-      // Case B: "SALES REP" on its own line, value on next line
-      if (/^SALES\s+REP$/i.test(line)) {
-        const valLine = lines[i + 1] || '';
-        const m = valLine.match(/([A-Z]{1,5})\s*-\s*[A-Z]/);
-        if (m) { rep = m[1].trim(); break; }
-        // Fallback: just take whatever is before the dash
-        const m2 = valLine.match(/^([^-]+)-/);
-        if (m2) { rep = m2[1].trim(); break; }
+      if (!valLine) break;
+
+      // The value line looks like: "LIP.15640KK - Kimberly Kunzik Ungrafted"
+      // Strip the license number prefix (LIP.XXXXX or similar \w+\.\d+)
+      const stripped = valLine.replace(/^[A-Z]+\.\d+\s*/i, '').trim();
+
+      // Format A: initials before a dash  "KK - Kimberly" / "DL - Dave" / "AKA - Anish" / "TRANS - Transatlantic"
+      const mA = stripped.match(/^([A-Z]{1,6})\s*-\s*/);
+      if (mA) { rep = mA[1].trim(); break; }
+
+      // Format B: no dash — full name like "Branden Hylwa, Premium Beverage Solutions"
+      // Extract initials from first and last name before the comma
+      const nameBeforeComma = stripped.split(',')[0].trim();
+      const nameParts = nameBeforeComma.split(/\s+/).filter(p => /^[A-Za-z]/.test(p));
+      if (nameParts.length >= 2) {
+        rep = (nameParts[0][0] + nameParts[1][0]).toUpperCase();
+        break;
+      }
+      if (nameParts.length === 1) {
+        rep = nameParts[0].slice(0, 2).toUpperCase();
+        break;
       }
 
-      // Case C: "SALES REP" inline with value on same line "SALES REP KK - Name"
-      const mInline = line.match(/SALES\s+REP\s+([A-Z]{1,5})\s*-/i);
-      if (mInline) { rep = mInline[1].trim(); break; }
+      break;
     }
 
     // Log the section around LICENSE/SALES REP for debugging
