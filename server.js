@@ -2,6 +2,8 @@ const express = require('express');
 const cors = require('cors');
 const fetch = require('node-fetch');
 const path = require('path');
+let pdfParse;
+try { pdfParse = require('pdf-parse'); } catch(e) { console.warn('pdf-parse not installed — sales rep extraction disabled'); }
 
 const app = express();
 const PORT = process.env.PORT || 8080;
@@ -308,6 +310,93 @@ app.get('/api/overdue', async (req, res) => {
   } catch (err) {
     console.error('[OVERDUE] Fatal error:', err.message);
     res.status(500).json({ error: 'Server error fetching overdue data', detail: err.message });
+  }
+});
+
+// ─── INVOICE REP LOOKUP — downloads QB PDF and extracts sales rep text ────────
+// Accepts invoice QB entity ID (not doc number). Returns { rep: "KK - Kimberly Kunzik Ungrafted" }
+// Results are cached in memory for the life of the server process.
+const repCache = {};
+
+app.get('/api/invoice-rep/:invoiceId', async (req, res) => {
+  const accessToken = await getValidAccessToken();
+  const companyId   = tokenStore.companyId;
+  const environment = tokenStore.environment;
+  const { invoiceId } = req.params;
+  if (!accessToken || !companyId) return res.status(400).json({ error: 'Not connected.' });
+
+  // Return cached result immediately
+  if (repCache[invoiceId] !== undefined) {
+    return res.json({ rep: repCache[invoiceId], cached: true });
+  }
+
+  const baseUrls = environment === 'production'
+    ? ['https://quickbooks.api.intuit.com', 'https://qbo.api.intuit.com', 'https://c1.qbo.intuit.com', 'https://c3.qbo.intuit.com', 'https://c5.qbo.intuit.com']
+    : ['https://sandbox-quickbooks.api.intuit.com'];
+
+  // Download the PDF bytes
+  let pdfBuffer = null;
+  for (const baseUrl of baseUrls) {
+    try {
+      const pdfUrl = `${baseUrl}/v3/company/${companyId}/invoice/${invoiceId}/pdf?minorversion=65`;
+      const qbRes  = await fetch(pdfUrl, { method: 'GET', headers: { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/pdf' } });
+      if (qbRes.ok) {
+        const arrayBuf = await qbRes.arrayBuffer();
+        pdfBuffer = Buffer.from(arrayBuf);
+        break;
+      }
+      if (qbRes.status === 401 || qbRes.status === 403) return res.status(qbRes.status).json({ error: 'QB auth error' });
+    } catch (err) { /* try next cluster */ }
+  }
+
+  if (!pdfBuffer) {
+    repCache[invoiceId] = '';
+    return res.json({ rep: '', error: 'PDF not found' });
+  }
+
+  // Extract text with pdf-parse and look for SALES REP
+  try {
+    if (!pdfParse) {
+      repCache[invoiceId] = '';
+      return res.json({ rep: '', error: 'pdf-parse not installed on server' });
+    }
+    const parsed   = await pdfParse(pdfBuffer);
+    const text     = parsed.text || '';
+
+    // QB invoice PDF layout has "SALES REP" as a label followed by the rep value
+    // on the next line or separated by whitespace. Try several patterns:
+    let rep = '';
+
+    // Pattern 1: "SALES REP\nKK - Kimberly..." or "SALES REP KK -..."
+    const m1 = text.match(/SALES\s+REP\s*\n([^\n]+)/i);
+    if (m1) rep = m1[1].trim();
+
+    // Pattern 2: label and value on same line separated by spaces: "LICENSE # SALES REP\nLIP.12345 KK - Name"
+    if (!rep) {
+      const m2 = text.match(/LICENSE\s*#\s+SALES\s+REP\s*\n([^\n]+)/i);
+      if (m2) {
+        // Line looks like "LIP.15640 KK - Kimberly Kunzik Ungrafted"
+        // Strip the license number (starts with LIP. or similar) from the front
+        const line = m2[1].trim();
+        const repMatch = line.match(/^[\w.]+\s+(.+)$/);
+        rep = repMatch ? repMatch[1].trim() : line;
+      }
+    }
+
+    // Pattern 3: find line after "SALES REP" anywhere in text
+    if (!rep) {
+      const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
+      const idx   = lines.findIndex(l => /^SALES\s*REP$/i.test(l));
+      if (idx !== -1 && lines[idx + 1]) rep = lines[idx + 1].trim();
+    }
+
+    console.log(`[REP] Invoice ${invoiceId} → "${rep}"`);
+    repCache[invoiceId] = rep;
+    res.json({ rep });
+  } catch (err) {
+    console.error(`[REP] pdf-parse error for invoice ${invoiceId}:`, err.message);
+    repCache[invoiceId] = '';
+    res.json({ rep: '', error: err.message });
   }
 });
 
