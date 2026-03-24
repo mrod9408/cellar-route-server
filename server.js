@@ -363,34 +363,44 @@ app.get('/api/invoice-rep/:invoiceId', async (req, res) => {
     const parsed   = await pdfParse(pdfBuffer);
     const text     = parsed.text || '';
 
-    // QB invoice PDF layout has "SALES REP" as a label followed by the rep value
-    // on the next line or separated by whitespace. Try several patterns:
+    // Your QB PDF layout:
+    //   LICENSE #    SALES REP
+    //   LIP.15640    KK - Kimberly Kunzik Ungrafted
+    //
+    // pdf-parse merges both label columns onto one line, then the values onto the next.
+    // We find the value line after "LICENSE" + "SALES REP" headers, then extract
+    // just the initials before the first dash (e.g. "KK").
     let rep = '';
+    const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
 
-    // Pattern 1: "SALES REP\nKK - Kimberly..." or "SALES REP KK -..."
-    const m1 = text.match(/SALES\s+REP\s*\n([^\n]+)/i);
-    if (m1) rep = m1[1].trim();
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
 
-    // Pattern 2: label and value on same line separated by spaces: "LICENSE # SALES REP\nLIP.12345 KK - Name"
-    if (!rep) {
-      const m2 = text.match(/LICENSE\s*#\s+SALES\s+REP\s*\n([^\n]+)/i);
-      if (m2) {
-        // Line looks like "LIP.15640 KK - Kimberly Kunzik Ungrafted"
-        // Strip the license number (starts with LIP. or similar) from the front
-        const line = m2[1].trim();
-        const repMatch = line.match(/^[\w.]+\s+(.+)$/);
-        rep = repMatch ? repMatch[1].trim() : line;
+      // Case A: headers on same line "LICENSE # SALES REP" or "LICENSE# SALES REP"
+      if (/LICENSE.{0,6}SALES\s+REP/i.test(line)) {
+        // Value line is next non-empty line: "LIP.15640 KK - Kimberly Kunzik Ungrafted"
+        const valLine = lines[i + 1] || '';
+        // Extract the initials — the part that matches /[A-Z]{1,4}/ immediately before " - "
+        const m = valLine.match(/([A-Z]{1,5})\s*-\s*[A-Z]/);
+        if (m) { rep = m[1].trim(); break; }
       }
+
+      // Case B: "SALES REP" on its own line, value on next line
+      if (/^SALES\s+REP$/i.test(line)) {
+        const valLine = lines[i + 1] || '';
+        const m = valLine.match(/([A-Z]{1,5})\s*-\s*[A-Z]/);
+        if (m) { rep = m[1].trim(); break; }
+        // Fallback: just take whatever is before the dash
+        const m2 = valLine.match(/^([^-]+)-/);
+        if (m2) { rep = m2[1].trim(); break; }
+      }
+
+      // Case C: "SALES REP" inline with value on same line "SALES REP KK - Name"
+      const mInline = line.match(/SALES\s+REP\s+([A-Z]{1,5})\s*-/i);
+      if (mInline) { rep = mInline[1].trim(); break; }
     }
 
-    // Pattern 3: find line after "SALES REP" anywhere in text
-    if (!rep) {
-      const lines = text.split('\n').map(l => l.trim()).filter(Boolean);
-      const idx   = lines.findIndex(l => /^SALES\s*REP$/i.test(l));
-      if (idx !== -1 && lines[idx + 1]) rep = lines[idx + 1].trim();
-    }
-
-    console.log(`[REP] Invoice ${invoiceId} → "${rep}"`);
+    console.log(`[REP] Invoice ${invoiceId} → "${rep}" | text sample: ${text.slice(0,300).replace(/\n/g,' ')}`);
     repCache[invoiceId] = rep;
     res.json({ rep });
   } catch (err) {
