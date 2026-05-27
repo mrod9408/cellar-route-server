@@ -588,7 +588,7 @@
       <div class="settings-card">
         <h3>🔗 Server URL</h3>
         <div class="form-row">
-          <input class="form-input" type="text" id="serverUrl" placeholder="https://cellar-route-server-production.up.railway.app" />
+          <input class="form-input" type="text" id="serverUrl" placeholder="https://cellar-route-server.onrender.com" />
         </div>
         <button class="btn-primary" onclick="saveSettings()">Save Settings</button>
       </div>
@@ -881,7 +881,7 @@ function buildDistanceRoutes(selectedInvoices,driverCount,caseLimit){
 let invoices=[], assignments={}, completed={}, clusters=[];
 let selectedInvoiceIds = new Set();
 let drivers=['Maria','John','Carlos','Tamika','Luis','Devon'];
-let serverUrl='https://cellar-route-server-production.up.railway.app';
+let serverUrl='https://cellar-route-server.onrender.com';
 let activeTab='route', activeDriverFilter='all';
 let currentUser=null;
 let appPin='2024';
@@ -1678,7 +1678,7 @@ function clearAll(){if(!confirm('Clear all delivery data?'))return;invoices=[];a
 function openMap(a){if(!a||a.trim()===''){showToast('No address available');return;}window.open('https://maps.google.com/?q='+a,'_blank');}
 
 // ═══════════════════ TOKEN STATUS ════════════════════════════════════════════
-async function checkTokenStatus(){try{const base=document.getElementById('serverUrl')?.value.trim()||serverUrl;const res=await fetch(base+'/api/token-status');if(!res.ok)return;const data=await res.json();const banner=document.getElementById('tokenBanner');if(!banner)return;if(!data.connected){banner.style.display='flex';banner.style.background='#FDF0E8';banner.style.border='1.5px solid var(--orange)';banner.style.color='var(--orange)';banner.innerHTML=`<span style="font-size:20px">!!️</span><div><strong>QuickBooks token expired</strong><br><span style="font-weight:400">Update QB_REFRESH_TOKEN in Railway.</span></div>`;}else if(data.connected){banner.style.display='flex';banner.style.background='var(--green-light)';banner.style.border='1.5px solid var(--green)';banner.style.color='var(--green)';banner.innerHTML=`<span style="font-size:20px">✓</span><div><strong>QuickBooks connected</strong><br><span style="font-weight:400">Auto-refresh active · ${data.environment}</span></div>`;setTimeout(()=>{banner.style.display='none';},4000);}}catch(e){}}
+async function checkTokenStatus(){try{const base=document.getElementById('serverUrl')?.value.trim()||serverUrl;const res=await fetch(base+'/api/token-status');if(!res.ok)return;const data=await res.json();const banner=document.getElementById('tokenBanner');if(!banner)return;if(!data.connected){banner.style.display='flex';banner.style.background='#FDF0E8';banner.style.border='1.5px solid var(--orange)';banner.style.color='var(--orange)';banner.innerHTML=`<span style="font-size:20px">!!️</span><div><strong>QuickBooks token expired</strong><br><span style="font-weight:400">Update QB_REFRESH_TOKEN in Render.</span></div>`;}else if(data.connected){banner.style.display='flex';banner.style.background='var(--green-light)';banner.style.border='1.5px solid var(--green)';banner.style.color='var(--green)';banner.innerHTML=`<span style="font-size:20px">✓</span><div><strong>QuickBooks connected</strong><br><span style="font-weight:400">Auto-refresh active · ${data.environment}</span></div>`;setTimeout(()=>{banner.style.display='none';},4000);}}catch(e){}}
 
 // ═══════════════════ PDF INVOICE DOWNLOAD ════════════════════════════════════
 
