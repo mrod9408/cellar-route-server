@@ -54,7 +54,7 @@ async function doTokenRefresh() {
     tokenStore.expiresAt = Date.now() + (data.expires_in - 300) * 1000;
     tokenStore.refreshTokenExpiresAt = Date.now() + (101 * 24 * 60 * 60 * 1000);
     console.log('✓ Access token refreshed successfully');
-    if (data.refresh_token !== process.env.QB_REFRESH_TOKEN) await saveRefreshTokenToRailway(data.refresh_token);
+    if (data.refresh_token !== process.env.QB_REFRESH_TOKEN) await saveRefreshTokenToRender(data.refresh_token);
     return true;
   } catch (err) { console.error('Token refresh error:', err); return false; }
 }
@@ -67,22 +67,33 @@ async function getValidAccessToken() {
   return tokenStore.accessToken;
 }
 
-async function saveRefreshTokenToRailway(newRefreshToken) {
-  const railwayToken = process.env.RAILWAY_TOKEN, projectId = process.env.RAILWAY_PROJECT_ID,
-        serviceId = process.env.RAILWAY_SERVICE_ID, environmentId = process.env.RAILWAY_ENVIRONMENT_ID;
-  if (!railwayToken || !projectId || !serviceId || !environmentId) { console.log("Railway credentials not set — skipping auto-save"); return; }
+async function saveRefreshTokenToRender(newRefreshToken) {
+  const renderApiKey  = process.env.RENDER_API_KEY;
+  const renderService = process.env.RENDER_SERVICE_ID;
+  if (!renderApiKey || !renderService) {
+    console.log("Render credentials not set — skipping auto-save of refresh token");
+    return;
+  }
   try {
-    const mutation = `mutation UpsertVariables($input: VariableCollectionUpsertInput!) { variableCollectionUpsert(input: $input) }`;
-    const variables = { input: { projectId, serviceId, environmentId, variables: { QB_REFRESH_TOKEN: newRefreshToken } } };
-    const response = await fetch("https://backboard.railway.app/graphql/v2", {
-      method: "POST",
-      headers: { "Authorization": `Bearer ${railwayToken}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ query: mutation, variables })
+    // Render API: update an environment variable on this service
+    const response = await fetch(`https://api.render.com/v1/services/${renderService}/env-vars`, {
+      method: 'PUT',
+      headers: {
+        'Authorization': `Bearer ${renderApiKey}`,
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      },
+      body: JSON.stringify([{ key: 'QB_REFRESH_TOKEN', value: newRefreshToken }])
     });
-    const data = await response.json();
-    if (data.errors) { console.error("Failed to save refresh token:", JSON.stringify(data.errors)); }
-    else { console.log("✓ Refresh token auto-saved to Railway"); }
-  } catch (err) { console.error("Error saving refresh token:", err.message); }
+    if (response.ok) {
+      console.log("✓ Refresh token auto-saved to Render successfully");
+    } else {
+      const err = await response.text();
+      console.error("Failed to save refresh token to Render:", err);
+    }
+  } catch (err) {
+    console.error("Error saving refresh token to Render:", err.message);
+  }
 }
 
 setInterval(async () => { await doTokenRefresh(); }, 50 * 60 * 1000);
@@ -907,7 +918,7 @@ app.get('/api/token-status', (req, res) => {
 // ─── OAUTH AUTHORIZE ─────────────────────────────────────────────────────────
 app.get('/authorize', (req, res) => {
   const clientId = tokenStore.clientId || process.env.QB_CLIENT_ID;
-  const redirectUri = `https://cellar-route-server-production.up.railway.app/callback`;
+  const redirectUri = process.env.SERVER_URL ? `${process.env.SERVER_URL}/callback` : 'https://cellar-route-server-production.up.railway.app/callback';
   const url = `https://appcenter.intuit.com/connect/oauth2?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent('com.intuit.quickbooks.accounting')}&state=cellarroute_${Date.now()}`;
   res.redirect(url);
 });
@@ -924,7 +935,7 @@ app.get('/callback', async (req, res) => {
     const response = await fetch('https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer', {
       method: 'POST',
       headers: { 'Authorization': `Basic ${credentials}`, 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json' },
-      body: `grant_type=authorization_code&code=${encodeURIComponent(code)}&redirect_uri=${encodeURIComponent('https://cellar-route-server-production.up.railway.app/callback')}`
+      body: `grant_type=authorization_code&code=${encodeURIComponent(code)}&redirect_uri=${encodeURIComponent(process.env.SERVER_URL ? process.env.SERVER_URL + '/callback' : 'https://cellar-route-server-production.up.railway.app/callback')}`
     });
     const data = await response.json();
     if (!response.ok) return res.send(`<h2>Token exchange failed</h2><pre>${JSON.stringify(data, null, 2)}</pre>`);
@@ -933,11 +944,23 @@ app.get('/callback', async (req, res) => {
     tokenStore.companyId = realmId;
     tokenStore.expiresAt = Date.now() + (data.expires_in - 300) * 1000;
     tokenStore.refreshTokenExpiresAt = Date.now() + (101 * 24 * 60 * 60 * 1000);
-    res.send(`<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><style>body{font-family:sans-serif;background:#4A1320;color:#F7F2EA;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:20px;box-sizing:border-box}.card{background:#6B1E2E;border-radius:16px;padding:32px;max-width:500px;width:100%}h2{color:#E8C97A;font-size:22px;margin-bottom:16px}.token{background:rgba(0,0,0,0.3);border-radius:8px;padding:12px;font-size:12px;word-break:break-all;margin:12px 0}.label{font-size:11px;color:#C9A84C;font-weight:bold;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px}.btn{display:block;background:#C9A84C;color:#4A1320;padding:14px;border-radius:10px;text-align:center;font-weight:bold;text-decoration:none;margin-top:20px;font-size:15px}</style></head><body><div class="card"><h2>✓ QuickBooks Connected!</h2><p>Your app is now connected to your real QuickBooks company.</p><div class="label">Company (Realm) ID</div><div class="token">${realmId}</div><div class="label">Refresh Token — Save this in Railway as QB_REFRESH_TOKEN</div><div class="token">${data.refresh_token}</div><p style="color:#E8C97A;font-size:13px">⚠️ Copy the Refresh Token above and update QB_REFRESH_TOKEN in your Railway variables.</p><a class="btn" href="/">Go to Cellar Route App →</a></div></body></html>`);
+    res.send(`<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><style>body{font-family:sans-serif;background:#4A1320;color:#F7F2EA;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:20px;box-sizing:border-box}.card{background:#6B1E2E;border-radius:16px;padding:32px;max-width:500px;width:100%}h2{color:#E8C97A;font-size:22px;margin-bottom:16px}.token{background:rgba(0,0,0,0.3);border-radius:8px;padding:12px;font-size:12px;word-break:break-all;margin:12px 0}.label{font-size:11px;color:#C9A84C;font-weight:bold;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px}.btn{display:block;background:#C9A84C;color:#4A1320;padding:14px;border-radius:10px;text-align:center;font-weight:bold;text-decoration:none;margin-top:20px;font-size:15px}</style></head><body><div class="card"><h2>✓ QuickBooks Connected!</h2><p>Your app is now connected to your real QuickBooks company.</p><div class="label">Company (Realm) ID</div><div class="token">${realmId}</div><div class="label">Refresh Token — Save this in your environment variables as QB_REFRESH_TOKEN</div><div class="token">${data.refresh_token}</div><p style="color:#E8C97A;font-size:13px">⚠️ Copy the Refresh Token above and update QB_REFRESH_TOKEN in your Railway variables.</p><a class="btn" href="/">Go to Cellar Route App →</a></div></body></html>`);
   } catch (err) { res.send(`<h2>Server error</h2><pre>${err.message}</pre>`); }
 });
 
 app.listen(PORT, async () => {
   console.log(`Cellar Route Server running on port ${PORT}`);
   await startup();
+
+  // ── KEEP-ALIVE PING (prevents Render free tier from spinning down) ──────────
+  // Pings the server every 14 minutes so it never goes idle.
+  const SELF_URL = process.env.SERVER_URL || `http://localhost:${PORT}`;
+  setInterval(async () => {
+    try {
+      await fetch(`${SELF_URL}/api/token-status`);
+      console.log('[ping] Keep-alive ping sent');
+    } catch (err) {
+      console.warn('[ping] Keep-alive ping failed:', err.message);
+    }
+  }, 14 * 60 * 1000); // every 14 minutes
 });
