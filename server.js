@@ -166,8 +166,8 @@ app.get('/api/invoices', async (req, res) => {
     : ['https://sandbox-quickbooks.api.intuit.com'];
 
   const query = environment === 'production'
-    ? `SELECT * FROM Invoice WHERE TxnDate = '${requestedDate}' ORDERBY TxnDate ASC MAXRESULTS 100`
-    : `SELECT * FROM Invoice ORDERBY TxnDate DESC MAXRESULTS 100`;
+    ? `SELECT * FROM Invoice WHERE TxnDate = '${requestedDate}' ORDERBY TxnDate ASC MAXRESULTS 1000`
+    : `SELECT * FROM Invoice ORDERBY TxnDate DESC MAXRESULTS 1000`;
 
   try {
     const qbHeaders = { 'Authorization': `Bearer ${accessToken}`, 'Accept': 'application/json' };
