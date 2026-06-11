@@ -104,7 +104,7 @@ async function startup() {
   if (tokenStore.refreshToken && tokenStore.clientId && tokenStore.clientSecret) {
     const success = await doTokenRefresh();
     if (success) { console.log('✓ Ready! Auto-refresh is active.'); }
-    else { console.log('⚠️ Could not get initial token — check Railway environment variables.'); }
+    else { console.log('⚠️ Could not get initial token — check Render environment variables.'); }
   } else { console.log('⚠️ No credentials. Manual connection required.'); }
 }
 
@@ -149,7 +149,7 @@ app.get('/api/invoices', async (req, res) => {
   let accessToken = await getValidAccessToken();
   const companyId = tokenStore.companyId;
   const environment = tokenStore.environment;
-  if (!accessToken || !companyId) return res.status(400).json({ error: 'Not connected to QuickBooks. Check Railway environment variables.' });
+  if (!accessToken || !companyId) return res.status(400).json({ error: 'Not connected to QuickBooks. Check Render environment variables.' });
 
   const today = new Date();
   const todayStr = today.toISOString().split('T')[0];
@@ -918,7 +918,7 @@ app.get('/api/token-status', (req, res) => {
 // ─── OAUTH AUTHORIZE ─────────────────────────────────────────────────────────
 app.get('/authorize', (req, res) => {
   const clientId = tokenStore.clientId || process.env.QB_CLIENT_ID;
-  const redirectUri = process.env.SERVER_URL ? `${process.env.SERVER_URL}/callback` : 'https://cellar-route-server-production.up.railway.app/callback';
+  const redirectUri = `${process.env.SERVER_URL || 'https://cellar-route-server.onrender.com'}/callback`;
   const url = `https://appcenter.intuit.com/connect/oauth2?client_id=${clientId}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${encodeURIComponent('com.intuit.quickbooks.accounting')}&state=cellarroute_${Date.now()}`;
   res.redirect(url);
 });
@@ -935,7 +935,7 @@ app.get('/callback', async (req, res) => {
     const response = await fetch('https://oauth.platform.intuit.com/oauth2/v1/tokens/bearer', {
       method: 'POST',
       headers: { 'Authorization': `Basic ${credentials}`, 'Content-Type': 'application/x-www-form-urlencoded', 'Accept': 'application/json' },
-      body: `grant_type=authorization_code&code=${encodeURIComponent(code)}&redirect_uri=${encodeURIComponent(process.env.SERVER_URL ? process.env.SERVER_URL + '/callback' : 'https://cellar-route-server-production.up.railway.app/callback')}`
+      body: `grant_type=authorization_code&code=${encodeURIComponent(code)}&redirect_uri=${encodeURIComponent(`${process.env.SERVER_URL || 'https://cellar-route-server.onrender.com'}/callback`)}`
     });
     const data = await response.json();
     if (!response.ok) return res.send(`<h2>Token exchange failed</h2><pre>${JSON.stringify(data, null, 2)}</pre>`);
@@ -944,7 +944,7 @@ app.get('/callback', async (req, res) => {
     tokenStore.companyId = realmId;
     tokenStore.expiresAt = Date.now() + (data.expires_in - 300) * 1000;
     tokenStore.refreshTokenExpiresAt = Date.now() + (101 * 24 * 60 * 60 * 1000);
-    res.send(`<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><style>body{font-family:sans-serif;background:#4A1320;color:#F7F2EA;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:20px;box-sizing:border-box}.card{background:#6B1E2E;border-radius:16px;padding:32px;max-width:500px;width:100%}h2{color:#E8C97A;font-size:22px;margin-bottom:16px}.token{background:rgba(0,0,0,0.3);border-radius:8px;padding:12px;font-size:12px;word-break:break-all;margin:12px 0}.label{font-size:11px;color:#C9A84C;font-weight:bold;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px}.btn{display:block;background:#C9A84C;color:#4A1320;padding:14px;border-radius:10px;text-align:center;font-weight:bold;text-decoration:none;margin-top:20px;font-size:15px}</style></head><body><div class="card"><h2>✓ QuickBooks Connected!</h2><p>Your app is now connected to your real QuickBooks company.</p><div class="label">Company (Realm) ID</div><div class="token">${realmId}</div><div class="label">Refresh Token — Save this in your environment variables as QB_REFRESH_TOKEN</div><div class="token">${data.refresh_token}</div><p style="color:#E8C97A;font-size:13px">⚠️ Copy the Refresh Token above and update QB_REFRESH_TOKEN in your Railway variables.</p><a class="btn" href="/">Go to Cellar Route App →</a></div></body></html>`);
+    res.send(`<!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1"><style>body{font-family:sans-serif;background:#4A1320;color:#F7F2EA;display:flex;align-items:center;justify-content:center;min-height:100vh;margin:0;padding:20px;box-sizing:border-box}.card{background:#6B1E2E;border-radius:16px;padding:32px;max-width:500px;width:100%}h2{color:#E8C97A;font-size:22px;margin-bottom:16px}.token{background:rgba(0,0,0,0.3);border-radius:8px;padding:12px;font-size:12px;word-break:break-all;margin:12px 0}.label{font-size:11px;color:#C9A84C;font-weight:bold;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:4px}.btn{display:block;background:#C9A84C;color:#4A1320;padding:14px;border-radius:10px;text-align:center;font-weight:bold;text-decoration:none;margin-top:20px;font-size:15px}</style></head><body><div class="card"><h2>✓ QuickBooks Connected!</h2><p>Your app is now connected to your real QuickBooks company.</p><div class="label">Company (Realm) ID</div><div class="token">${realmId}</div><div class="label">Refresh Token — Save this in your environment variables as QB_REFRESH_TOKEN</div><div class="token">${data.refresh_token}</div><p style="color:#E8C97A;font-size:13px">⚠️ Copy the Refresh Token above and update QB_REFRESH_TOKEN in your Render environment variables.</p><a class="btn" href="/">Go to Cellar Route App →</a></div></body></html>`);
   } catch (err) { res.send(`<h2>Server error</h2><pre>${err.message}</pre>`); }
 });
 
